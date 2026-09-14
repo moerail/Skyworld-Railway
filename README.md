@@ -119,7 +119,8 @@ There is no chest-locking or land-claim protection. Look after your belongings a
 Optional contributions towards our network and electricity costs:
 
 **[爱发电 / Support Skyworld](https://afdian.com/a/skyworld)**
-**[Buy me a coffee](https://buymeacoffee.com/moerail)**
+
+**[支持本人 / Buy me a coffee](https://buymeacoffee.com/moerail)**
 
 我们的宗旨是让每个玩家在这里玩得开心。  
 Our goal is simple: a place where everyone can enjoy playing.
