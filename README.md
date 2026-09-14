@@ -1,5 +1,62 @@
 # SkyRail Suite
 
+<p align="center">
+  <img src="logo.png" alt="SkyRail Suite" width="64" height="64">
+</p>
+
+**完整手册 / Full Manuals / Volledige handleidingen:** [中文](README.zh.md) | [English](README.en.md) | [Nederlands](README.nl.md)
+
+面向 Minecraft / Folia 的列车运行、铁路基础设施、影子列控与调度显示套件。
+
+A train-operation, railway-infrastructure, shadow train-control and dispatching-display suite for Minecraft / Folia.
+
+Een suite voor treinbediening, spoorweginfrastructuur, schaduwtreinbeveiliging en verkeersleidingsweergave in Minecraft / Folia.
+
+SkyRail Suite 延续 SkyTrain Suite 开发线；现有插件名、指令和数据目录不变。
+
+## 组件 / Components / Onderdelen
+
+| Plugin | Version | Responsibility |
+| --- | --- | --- |
+| SkyTrainFolia (STF) | 2.1.0-alpha.7 | Trains, driving, physics, signs and cab HMI |
+| STCS | 2.2.0-alpha.1 | RailGraph, localisation, occupancy and shadow MA/EoA |
+| SkyworldTrainAPI (STA) | 0.8.0 | Versioned inter-plugin contracts, telemetry and events |
+| SkyPCC | 0.8.1 | Web track diagram, inspectors, event log and turnout control |
+
+## 开始使用 / Getting Started / Aan de slag
+
+从 [Releases](https://github.com/moerail/Skyworld-Railway/releases) 下载同一发布中的四个 JAR。当前适配基线：**Java 25，Shiroha / Folia 26.2**。安装前备份并先在测试服验证；完整安装、权限、指令、配置、教程与构建方法见上方三语手册，每份均可独立阅读。
+
+Download the four matching JARs from Releases. Current baseline: **Java 25, Shiroha / Folia 26.2**. Back up and test before deployment. Each manual above includes installation, permissions, commands, configuration, tutorials and build instructions.
+
+Download de vier bij elkaar horende JAR's via Releases. Huidige basis: **Java 25, Shiroha / Folia 26.2**. Maak een back-up en test vóór installatie. Elke handleiding hierboven bevat installatie, rechten, commando's, configuratie, voorbeelden en bouwinstructies.
+
+## 开发版边界 / Alpha Limitations / Alfabeperkingen
+
+- **中文：** MA/EoA 目前仅为影子计算与显示，ATP 不据此施加制动。司机失能 EB、手动 EB 与 RECOVERING 制动保持是独立的实际控制功能。本项目不是认证铁路安全系统。
+- **English:** MA/EoA are currently calculated and displayed in shadow mode; ATP does not brake in response. Driver-loss EB, manual EB and RECOVERING brake hold are separate active functions. This is not a certified railway safety system.
+- **Nederlands:** MA/EoA worden momenteel alleen in schaduwmodus berekend en weergegeven; ATP grijpt hierbij niet remmend in. Noodremming bij verlies van de machinist, handmatige noodremming en de remvasthouding in RECOVERING zijn afzonderlijke actieve functies. Dit is geen gecertificeerd spoorwegveiligheidssysteem.
+
+## 致谢 / Acknowledgements / Dankwoord
+
+**中文：** 感谢 [bergerkiller / Berger Healer](https://github.com/bergerhealer) 及 [BKCommonLib](https://github.com/bergerhealer/BKCommonLib)、[TrainCarts](https://github.com/bergerhealer/TrainCarts) 的贡献者，为 Minecraft 插件生态与矿车铁路玩法所做的长期工作。TrainCarts 的牌子接口和运行流程为本项目提供了重要参考。SkyRail Suite 是独立项目，不要求安装 BKCommonLib 或 TrainCarts，也不代表二者的官方版本、认可或完整兼容实现；相关 TrainCarts 版权与许可声明继续保留。
+
+**English:** Thank you to [bergerkiller / Berger Healer](https://github.com/bergerhealer) and the contributors to [BKCommonLib](https://github.com/bergerhealer/BKCommonLib) and [TrainCarts](https://github.com/bergerhealer/TrainCarts) for their long-standing work on Minecraft plugins and minecart railways. TrainCarts' sign interfaces and operating workflows have been important references for this project. SkyRail Suite is an independent project: it does not require either plugin, is not an official or endorsed version of either, and does not claim complete compatibility. The applicable TrainCarts copyright and license notice is retained.
+
+**Nederlands:** Met dank aan [bergerkiller / Berger Healer](https://github.com/bergerhealer) en de bijdragers aan [BKCommonLib](https://github.com/bergerhealer/BKCommonLib) en [TrainCarts](https://github.com/bergerhealer/TrainCarts) voor hun jarenlange werk aan Minecraft-plugins en spoorwegen met mijnkarretjes. De bordinterfaces en bedieningsprocedures van TrainCarts waren belangrijke referenties voor dit project. SkyRail Suite is een onafhankelijk project: geen van beide plugins is vereist, het is geen officiële of door hen onderschreven versie en volledige compatibiliteit wordt niet geclaimd. De toepasselijke copyright- en licentievermelding van TrainCarts blijft behouden.
+
+## 授权 / License / Licentie
+
+Code and documentation: [MIT](LICENSE), `Copyright (c) 2026 Skyworld Minecraft Server contributors`.
+
+维护联系 / Maintainer / Beheerder: [moerail](https://github.com/moerail).
+
+Logo 与角色图片不适用代码 MIT 授权。SkyPCC 内置吉祥物已获准随包分发，这不等于将图片按 MIT 开放。
+
+Logos and character artwork are outside the code's MIT license. Distribution of the bundled SkyPCC mascot is permitted; this does not MIT-license the artwork.
+
+Logo's en personageafbeeldingen vallen niet onder de MIT-codelicentie. Verspreiding van de meegeleverde SkyPCC-mascotte is toegestaan; hierdoor valt de afbeelding niet onder MIT.# SkyRail Suite
+
 面向 Minecraft / Folia 的列车、轨道基础设施、影子列控与调度显示套件。
 
 [English](README.en.md) / [Nederlands](README.nl.md)
