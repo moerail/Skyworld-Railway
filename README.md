@@ -2,6 +2,8 @@
 
 面向 Minecraft / Folia 的列车、轨道基础设施、影子列控与调度显示套件。
 
+[English](README.en.md) / [Nederlands](README.nl.md)：可单独发送，不依赖其他文档。
+
 本目录是从当前 SkyTrain Suite 开发线整理出的独立源码工作区。**项目总名使用 SkyRail Suite，现有插件名、Java 包名、指令、数据目录和版本暂不改变**，避免仅为了整理目录而破坏兼容性。原开发目录与服务器数据不受影响。
 
 > 当前 MA/EoA 仍是影子功能，ATP 不根据它施加制动。司机失能 EB 和 RECOVERING 制动保持是另外的实际控制功能。
