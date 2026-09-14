@@ -1,14 +1,15 @@
-# SkyRail Suite SkyRail铁路套件
+# SkyRail Suite
 
 <p align="center">
   <img src="logo.png" alt="SkyRail Suite" width="64" height="64">
 </p>
 
-**TRAIN** **R**uns **A**synchronously **I**n **N**etwork
 
 **完整手册 / Full Manuals / Volledige handleidingen:** [中文](README.zh.md) | [English](README.en.md) | [Nederlands](README.nl.md)
 
-面向 Minecraft / Folia 的列车运行、铁路基础设施、影子列控与调度显示套件。
+面向 Minecraft / Folia 的列车运行、铁路基础设施、影子列控与调度显示套件。 
+
+**TRAIN** **R**uns **A**synchronously **I**n **N**etwork
 
 A train-operation, railway-infrastructure, shadow train-control and dispatching-display suite for Minecraft / Folia.
 
