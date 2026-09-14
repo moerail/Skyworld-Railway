@@ -198,7 +198,7 @@ final class RailGraphManager {
 
         Vector direction = new Vector();
         String name;
-        if (type.scansBothDirections()) {
+        if (!type.isLineBoundary()) {
             name = clean(detailText, 64);
             if (name == null) {
                 throw new IllegalArgumentException(type.storageName() + " 第四行必须填写编号或名称。");

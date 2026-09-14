@@ -12,7 +12,7 @@ SkyRail Suite is the repository name. Runtime identities remain SkyTrainFolia, S
 | SkyPCC | HTTP/SSE gateway, display and authenticated operator requests | That browser interpolation is authoritative train position |
 | shared | Common command/help/version UI compiled into each plugin | A fifth runtime plugin or replacement for STA |
 
-Production Java/resources are copied without behavioural edits. Only source layout, build configuration and test paths were adapted. API/package renames are deliberately outside this migration.
+The initial source-tree migration copied production Java/resources without behavioural edits. The subsequent [TrainManager responsibility split](TRAIN-MANAGER-REFACTOR.md) separates STF internals while retaining commands, persistence formats, STA contracts and scheduler boundaries. Runtime API/package renames remain out of scope.
 
 ## Threads and Dependencies
 
@@ -27,4 +27,3 @@ Each module uses `src/test/java`; executable tests expose a public static main e
 SkyPCC JavaScript tests live in `SkyPCC/tests`. Current tests cover language tables, line filtering and the inspector/expanded-log UI. Historical browser tests remain separately callable because visual expectations can lag behind current UI changes.
 
 STCS/tools/testbench contains the offline Python solver/simulator and synthetic tests. It is a reference environment, not proof of Folia entity handling, braking safety or an executable RBC.
-

@@ -1,5 +1,7 @@
 # SkyRail Suite
 
+[Home](README.md) | [中文](README.zh.md) | [English](README.en.md) | **Nederlands**
+
 **Nederlandse uitgave. Zelfstandig leesbaar: aanvullende documentatie is niet nodig om deze handleiding te gebruiken.**
 
 Een suite voor treinbesturing, spoorweginfrastructuur, treinbeveiliging in schaduwbedrijf en verkeersleidingsweergave in Minecraft / Folia. SkyRail Suite is de nieuwe repositorynaam voor de SkyTrain Suite-ontwikkellijn; bestaande pluginnamen, commando's en gegevensmappen blijven gelijk.
@@ -40,7 +42,7 @@ Het project introduceert expliciete besturingsrechten, spoorbezetting, strijdige
 
 | Component | Versie | Verantwoordelijkheid |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.0-alpha.7` | Treinsamenstelling, beweging en bochten, besturingsrechten, tractie/remming, profielen, borden, fysieke wisselbediening, HMI en geluid |
+| SkyTrainFolia / STF | `2.1.0-alpha.8` | Treinsamenstelling, beweging en bochten, besturingsrechten, tractie/remming, profielen, borden, fysieke wisselbediening, HMI en geluid |
 | STCS | `2.2.0-alpha.1` | Infrastructuur, gerichte RailGraph, lijnkilometrering, plaatsbepaling, bewaard bezettingsregister, schaduw-MA/EoA en lokale wisselcontroles |
 | SkyworldTrainAPI / STA | `0.8.0` | Versiegebonden plugincontracten, telemetrie, voertuigwaarnemingen, cabinestatus, rijtoestemmingen en gebeurtenissen |
 | SkyPCC | `0.8.1` | Webspoorschema, inspectiepaneel voor treinen/infrastructuur, bezetting/reserveringen, gebeurtenissenlog en geauthenticeerde wisselbediening |
@@ -94,7 +96,7 @@ Dit schema toont verantwoordelijkheden, geen verplichte opeenvolging van alle aa
 Huidige installatiebestanden:
 
 ```text
-SkyTrainFolia-2.1.0-alpha.7.jar
+SkyTrainFolia-2.1.0-alpha.8.jar
 STCS-2.2.0-alpha.1.jar
 SkyworldTrainAPI-0.8.0.jar
 SkyPCC-0.8.1.jar
@@ -384,7 +386,7 @@ balise
 5010
 ```
 
-Regel 4 van Origin wijst de positieve richting de lijn in; bij End wijst deze naar buiten, met de lijn aan de andere kant. Relatieve richtingen volgen het bordvlak, niet links/rechts op PCC. `signal` kan als knoop worden geregistreerd, maar betekent niet dat ATP op seinbeelden is gerealiseerd.
+Regel 4 van Origin wijst vanaf kilometer nul de lijn in. Bij End wijst deze naar de kant waaruit de kilometrering wordt ontvangen; End begrenst expliciet de lijn, niet het fysieke spoor. Beide gebruiken `left`/`right`, nooit een naam. Relatieve richtingen volgen het bordvlak, niet links/rechts op PCC. `signal` kan als knoop worden geregistreerd, maar betekent niet dat ATP op seinbeelden is gerealiseerd.
 
 ### STF-wisselborden
 

@@ -59,7 +59,11 @@ SkyTrain Suite 把 Minecraft 作为可交互的铁路运行环境：玩家建设
 
 | 组件 | 当前版本 | 主要职责 |
 | --- | --- | --- |
+<<<<<<< HEAD
 | SkyTrainFolia / STF | `2.1.0-alpha.7` | 矿车编组、运动与过弯、驾驶权、牵引制动、车型、牌子、实体道岔执行、HMI 和声音 |
+=======
+| SkyTrainFolia / STF | `2.1.0-alpha.8` | 矿车编组、运动与过弯、驾驶权、牵引制动、车型、牌子、实体道岔执行、HMI 和声音 |
+>>>>>>> 261e00f (Refactor STF train management and fix STCS line boundaries)
 | STCS | `2.2.0-alpha.1` | 基础设施、有向 RailGraph、线路里程、定位、保留占用账本、影子 MA/EoA 和局部道岔检查 |
 | SkyworldTrainAPI / STA | `0.8.0` | 插件间带版本的服务契约、遥测、成员观测、驾驶台状态、许可和事件交换 |
 | SkyPCC | `0.8.1` | 网页线路图、车辆/设施 Inspector、占用与预约显示、事件栏、经鉴权的道岔控制 |
@@ -113,7 +117,11 @@ Minecraft 玩家 / 矿车 / 轨道 / 红石
 从仓库 Releases 获取匹配的一组 JAR；本地构建输出位于 `artifacts/`。当前文件名：
 
 ```text
+<<<<<<< HEAD
 SkyTrainFolia-2.1.0-alpha.7.jar
+=======
+SkyTrainFolia-2.1.0-alpha.8.jar
+>>>>>>> 261e00f (Refactor STF train management and fix STCS line boundaries)
 STCS-2.2.0-alpha.1.jar
 SkyworldTrainAPI-0.8.0.jar
 SkyPCC-0.8.1.jar
@@ -407,7 +415,11 @@ balise
 5010
 ```
 
+<<<<<<< HEAD
 Origin 第四行是线路正向/内侧；End 第四行描述边界外侧方向，线路内侧相反。相对方向按牌面解释，不能只按 PCC 屏幕左右判断。`signal` 可作为登记节点，但不代表已实现信号机 ATP。
+=======
+Origin 第四行指定从零点向哪一侧发送里程；End 第四行指定从哪一侧接收里程，并显式结束本线归属，而不是结束物理轨道。两者均填写 `left`/`right`，不能作为名称。相对方向按牌面解释，不能只按 PCC 屏幕左右判断。`signal` 可作为登记节点，但不代表已实现信号机 ATP。
+>>>>>>> 261e00f (Refactor STF train management and fix STCS line boundaries)
 
 ### STF 道岔
 

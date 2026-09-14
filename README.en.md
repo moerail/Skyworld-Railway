@@ -1,5 +1,7 @@
 # SkyRail Suite
 
+[Home](README.md) | [中文](README.zh.md) | **English** | [Nederlands](README.nl.md)
+
 **English edition. Self-contained: no companion documentation is required to read this manual.**
 
 A train-operation, railway-infrastructure, shadow train-control and dispatching-display suite for Minecraft / Folia. SkyRail Suite is the new repository name for the SkyTrain Suite development line; existing runtime plugin names, commands and data directories remain unchanged.
@@ -40,7 +42,7 @@ The project introduces explicit driving control, resource occupancy, conflicting
 
 | Component | Version | Responsibility |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.0-alpha.7` | Consists, movement and cornering, driving control, traction/braking, vehicle profiles, signs, physical turnout actuation, HMI and sounds |
+| SkyTrainFolia / STF | `2.1.0-alpha.8` | Consists, movement and cornering, driving control, traction/braking, vehicle profiles, signs, physical turnout actuation, HMI and sounds |
 | STCS | `2.2.0-alpha.1` | Infrastructure, directed RailGraph, line mileage, localisation, retained occupancy ledger, shadow MA/EoA and local turnout checks |
 | SkyworldTrainAPI / STA | `0.8.0` | Versioned inter-plugin contracts, telemetry, member observations, cab state, authorities and events |
 | SkyPCC | `0.8.1` | Web track diagram, train/infrastructure inspector, occupancy/reservations, event log and authenticated turnout control |
@@ -94,7 +96,7 @@ This illustrates responsibilities, not a mandatory serial call chain. Browser in
 Current installation files:
 
 ```text
-SkyTrainFolia-2.1.0-alpha.7.jar
+SkyTrainFolia-2.1.0-alpha.8.jar
 STCS-2.2.0-alpha.1.jar
 SkyworldTrainAPI-0.8.0.jar
 SkyPCC-0.8.1.jar
@@ -384,7 +386,7 @@ balise
 5010
 ```
 
-Origin line 4 points into the line's positive direction; End line 4 points outward, with the line interior opposite. Relative directions are interpreted against the sign face, not the left/right of the PCC screen. `signal` can be registered as a node, but does not imply implemented signal-based ATP.
+Origin line 4 points into the line: mileage starts at zero towards that side. End line 4 points towards the side from which it receives mileage; it explicitly ends this line's attribution, not the physical track. Both use `left`/`right`, never a name. Relative directions are interpreted against the sign face, not the left/right of the PCC screen. `signal` can be registered as a node, but does not imply implemented signal-based ATP.
 
 ### STF Turnout Signs
 

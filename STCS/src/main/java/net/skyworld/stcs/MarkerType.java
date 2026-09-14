@@ -28,4 +28,8 @@ enum MarkerType {
         // Boundary direction belongs to line inference, not physical track discovery.
         return true;
     }
+
+    boolean isLineBoundary() {
+        return this == ORIGIN || this == END;
+    }
 }

@@ -1,10 +1,5 @@
 package net.skyworld.skytrain;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -15,27 +10,19 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockState;
-import org.bukkit.block.Sign;
-import org.bukkit.block.data.type.WallSign;
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.InvalidConfigurationException;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Minecart;
@@ -45,16 +32,21 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.Vector;
 
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
-import io.papermc.paper.entity.TeleportFlag;
 
-final class TrainManager {
+/** Coordinates train lifecycle and preserves the command/listener facade. */
+final class TrainManager implements TrainMotionController.Host {
     private final SkyTrainPlugin plugin;
+    private final TrainSettings settings;
+    private final TrainPersistence persistence;
+    private final DriverControlService drivers;
+    private final TrainAudio audio;
+    private final ConsistLabels labels;
+    private final TrainMemberActuator actuator;
+    private final TrainSignActions signActions;
+    private final TrainDrivingControls controls;
+    private final TrainMotionController motion;
     private final SwitchManager switchManager;
-    private final LineInfrastructureManager infrastructureManager;
-    private final StationManager stationManager;
     private final AutomaticSigns automaticSigns;
-    private final File trainsFile;
-    private final File savedTrainsFile;
     private final NamespacedKey trainIdKey;
     private final NamespacedKey trainNameKey;
     private final NamespacedKey memberIndexKey;
@@ -64,40 +56,15 @@ final class TrainManager {
     private final ConcurrentMap<UUID, UUID> cartIndex = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, ScheduledTask> memberTasks = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Minecart> managedCarts = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, CompletableFuture<Boolean>> pendingTeleports = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, PassengerRecovery> passengerRecoveries = new ConcurrentHashMap<>();
-    private final java.util.concurrent.atomic.LongAdder passengerRecoveryTeleports = new java.util.concurrent.atomic.LongAdder();
-    private final java.util.concurrent.atomic.LongAdder ownedMoves = new java.util.concurrent.atomic.LongAdder();
-    private final java.util.concurrent.atomic.LongAdder ownedPassengerMoves = new java.util.concurrent.atomic.LongAdder();
-    private final java.util.concurrent.atomic.LongAdder ownedMoveFallbacks = new java.util.concurrent.atomic.LongAdder();
-    private final java.util.concurrent.atomic.LongAdder physicalTeleports = new java.util.concurrent.atomic.LongAdder();
-    private volatile boolean ownedMoverFailed;
 
     String motionSyncStatus() {
-        return (plugin.displaySync() == null ? "display=vanilla" : plugin.displaySync().status())
-                + ", passenger-recoveries=" + passengerRecoveryTeleports.sum()
-                + ", owned-moves=" + ownedMoves.sum() + ", owned-passenger-moves=" + ownedPassengerMoves.sum()
-                + ", owned-fallbacks=" + ownedMoveFallbacks.sum() + ", physical-teleports=" + physicalTeleports.sum()
-                + ", pending-teleports=" + pendingTeleports.size();
+        return actuator.motionSyncStatus();
     }
 
-    private void forgetDisplay(UUID entityId) {
-        passengerRecoveries.remove(entityId);
-        if (plugin.displaySync() != null) plugin.displaySync().forget(entityId);
-    }
-    private final ConcurrentMap<UUID, UUID> driverTargets = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, UUID> trainDrivers = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, UUID> driverSeats = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, String> driverNames = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, UUID> driverLeaseIds = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, ScheduledTask> driverChecks = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, Long> consistLabelVersions = new ConcurrentHashMap<>();
-    private final ConcurrentMap<UUID, ConsistLabelState> consistLabelStates = new ConcurrentHashMap<>();
     private final Set<UUID> pendingAutoLinks = ConcurrentHashMap.newKeySet();
     private final Set<UUID> retiringCarts = ConcurrentHashMap.newKeySet();
     private final TrainChunkLoader chunkLoader;
     private final StcsBridge stcsTelemetry;
-    private final Object dataIoLock = new Object();
     private final Object driverLock = new Object();
     private volatile ScheduledTask autosaveTask;
 
@@ -105,16 +72,24 @@ final class TrainManager {
             LineInfrastructureManager infrastructureManager, StationManager stationManager) {
         this.plugin = plugin;
         this.switchManager = switchManager;
-        this.infrastructureManager = infrastructureManager;
-        this.stationManager = stationManager;
         this.automaticSigns = new AutomaticSigns(plugin, this, stationManager);
         this.chunkLoader = new TrainChunkLoader(plugin);
         this.stcsTelemetry = new StcsBridge(plugin);
-        this.trainsFile = new File(plugin.getDataFolder(), "trains.yml");
-        this.savedTrainsFile = new File(plugin.getDataFolder(), "savedtrains.yml");
+
         this.trainIdKey = new NamespacedKey(plugin, "train_id");
         this.trainNameKey = new NamespacedKey(plugin, "train_name");
         this.memberIndexKey = new NamespacedKey(plugin, "member_index");
+        this.settings = new TrainSettings(plugin);
+        this.persistence = new TrainPersistence(plugin.getDataFolder(), plugin.getLogger(), settings, trains, nameIndex, cartIndex, savedTrains);
+        this.drivers = new DriverControlService(plugin, driverLock, trains::get, this::trainForCart, this::save);
+        this.actuator = new TrainMemberActuator(plugin, settings);
+        this.audio = new TrainAudio(plugin, settings, managedCarts::get, this::trainForCart);
+        this.labels = new ConsistLabels(plugin, settings, managedCarts::get);
+        this.controls = new TrainDrivingControls(settings, driverLock, this::requireTrain,
+                this::save, this::refreshMemberIndexes);
+        this.signActions = new TrainSignActions(plugin, this, settings, stationManager);
+        this.motion = new TrainMotionController(plugin, settings, this, switchManager,
+                infrastructureManager, chunkLoader, stcsTelemetry, signActions, actuator, audio);
     }
 
     int trainCount() {
@@ -153,7 +128,7 @@ final class TrainManager {
             }
         }
         if (cleared > 0) {
-            save();
+            persistence.save();
         }
         return cleared;
     }
@@ -166,226 +141,11 @@ final class TrainManager {
     }
 
     void load() {
-        synchronized (dataIoLock) {
-            Map<String, SavedTrainDefinition> loadedSavedTrains = readSavedTrains();
-            Map<UUID, Train> loadedTrains = new LinkedHashMap<>();
-            Map<String, UUID> loadedNameIndex = new LinkedHashMap<>();
-            Map<UUID, UUID> loadedCartIndex = new LinkedHashMap<>();
-
-            if (trainsFile.exists() && trainsFile.length() > 0L) {
-                YamlConfiguration config = loadYaml(trainsFile);
-                if (config == null) {
-                    return;
-                }
-
-                ConfigurationSection root = config.getConfigurationSection("trains");
-                if (root != null) {
-                    for (String key : root.getKeys(false)) {
-                        try {
-                            UUID id = UUID.fromString(key);
-                            ConfigurationSection section = root.getConfigurationSection(key);
-                            if (section == null) {
-                                continue;
-                            }
-
-                            Train train = new Train(
-                                    id,
-                                    section.getString("name", "train-" + key.substring(0, 8)),
-                                    section.getDouble("target-speed", defaultSpeed()),
-                                    section.getDouble("max-speed", maxSpeed()),
-                                    section.getDouble("spacing", defaultSpacing()),
-                                    TrainProperties.load(section.getConfigurationSection("properties")));
-                            train.moving = section.getBoolean("moving", false);
-                            train.reversed = section.getBoolean("reversed", false);
-                            train.driveControlEnabled = section.getBoolean("drive-control-enabled", false);
-                            train.protectionMode = ProtectionMode.restore(section.getString("protection-mode", "SHADOW"));
-                            train.manualTakeover = section.getBoolean("manual-takeover", train.driveControlEnabled);
-                            train.manualReleaseConfirmed = section.getBoolean("manual-release-confirmed", !train.manualTakeover);
-                            String lastDriver = section.getString("last-manual-driver", "");
-                            try { train.lastManualDriver = lastDriver.isBlank() ? null : UUID.fromString(lastDriver); }
-                            catch (IllegalArgumentException ex) { train.lastManualDriver = null; }
-                            train.reverser = Reverser.fromStorage(
-                                    section.getString("reverser", null),
-                                    train.reversed);
-                            train.powerNotch = Math.max(0, Math.min(4, section.getInt("power-notch", 0)));
-                            train.brakeNotch = Math.max(0, Math.min(7, section.getInt("brake-notch", 0)));
-                            train.emergencyBrake = section.getBoolean("emergency-brake", false);
-                            train.driverEmergencyHold = section.getBoolean("driver-emergency-hold", false);
-                            if (!section.getString("automatic-action", "").isEmpty()
-                                    && train.properties().conductionMode.automatic()) {
-                                // A prior process's station/route observation must not authorize a restart.
-                                train.moving = false;
-                                train.powerNotch = 0;
-                                train.brakeNotch = 0;
-                            }
-                            train.pauseUntilMillis = section.getLong("pause-until-millis", 0L);
-                            if (train.manualTakeover && !train.manualReleaseConfirmed) DriverSafety.brake(train);
-                            train.loadMileage(
-                                    section.getString("mileage.line"),
-                                    section.getBoolean("mileage.known", false),
-                                    section.getDouble("mileage.meters", 0.0),
-                                    section.getInt("mileage.travel-sign", 0),
-                                    new Vector(
-                                            section.getDouble("mileage.travel-direction.x", 0.0),
-                                            section.getDouble("mileage.travel-direction.y", 0.0),
-                                            section.getDouble("mileage.travel-direction.z", 0.0)),
-                                    section.getString("mileage.last-balise"),
-                                    section.getDouble("mileage.distance-since-balise-meters",
-                                            Double.POSITIVE_INFINITY),
-                                    section.getBoolean("mileage.in-signal-range", false));
-
-                            for (String member : section.getStringList("members")) {
-                                UUID entityId = UUID.fromString(member);
-                                train.addMember(entityId);
-                                loadedCartIndex.put(entityId, id);
-                            }
-
-                            loadedTrains.put(id, train);
-                            loadedNameIndex.put(train.key(), id);
-                        } catch (RuntimeException ex) {
-                            plugin.getLogger().log(Level.WARNING, "Failed to load train entry " + key, ex);
-                        }
-                    }
-                }
-            }
-
-            trains.clear();
-            trains.putAll(loadedTrains);
-            nameIndex.clear();
-            nameIndex.putAll(loadedNameIndex);
-            cartIndex.clear();
-            cartIndex.putAll(loadedCartIndex);
-            savedTrains.clear();
-            savedTrains.putAll(loadedSavedTrains);
-        }
+        persistence.load();
     }
 
     void save() {
-        synchronized (dataIoLock) {
-            if (!plugin.getDataFolder().exists() && !plugin.getDataFolder().mkdirs()) {
-                plugin.getLogger().warning("Could not create plugin data folder: " + plugin.getDataFolder());
-                return;
-            }
-
-            YamlConfiguration config = new YamlConfiguration();
-            for (Train train : trains.values()) {
-                String path = "trains." + train.id();
-                config.set(path + ".name", train.name());
-                config.set(path + ".moving", train.moving);
-                config.set(path + ".reversed", train.reversed);
-                config.set(path + ".drive-control-enabled", train.driveControlEnabled);
-                config.set(path + ".protection-mode", train.protectionMode.name());
-                config.set(path + ".manual-takeover", train.manualTakeover);
-                config.set(path + ".manual-release-confirmed", train.manualReleaseConfirmed);
-                config.set(path + ".last-manual-driver", train.lastManualDriver == null ? "" : train.lastManualDriver.toString());
-                config.set(path + ".reverser", train.reverser.name().toLowerCase(Locale.ROOT));
-                config.set(path + ".power-notch", train.powerNotch);
-                config.set(path + ".brake-notch", train.brakeNotch);
-                config.set(path + ".emergency-brake", train.emergencyBrake);
-                config.set(path + ".driver-emergency-hold", train.driverEmergencyHold);
-                config.set(path + ".automatic-action", train.automaticRun == null ? "" : train.automaticRun.phase.name());
-                config.set(path + ".target-speed", train.targetSpeed);
-                config.set(path + ".max-speed", train.maxSpeed);
-                config.set(path + ".spacing", train.spacing);
-                config.set(path + ".pause-until-millis", train.pauseUntilMillis);
-                Train.MileagePersistence mileage = train.mileagePersistence();
-                config.set(path + ".mileage.line", mileage.lineName());
-                config.set(path + ".mileage.known", mileage.known());
-                config.set(path + ".mileage.meters", mileage.meters());
-                config.set(path + ".mileage.travel-sign", mileage.travelSign());
-                config.set(path + ".mileage.travel-direction.x", mileage.travelDirection().getX());
-                config.set(path + ".mileage.travel-direction.y", mileage.travelDirection().getY());
-                config.set(path + ".mileage.travel-direction.z", mileage.travelDirection().getZ());
-                config.set(path + ".mileage.last-balise", mileage.lastBaliseName());
-                config.set(path + ".mileage.distance-since-balise-meters",
-                        Double.isFinite(mileage.distanceSinceBaliseMeters())
-                                ? mileage.distanceSinceBaliseMeters()
-                                : null);
-                config.set(path + ".mileage.in-signal-range", mileage.inSignalRange());
-                config.set(path + ".members", train.members().stream().map(UUID::toString).toList());
-                train.properties().save(config, path + ".properties");
-            }
-
-            try {
-                saveYamlAtomically(config, trainsFile);
-                saveSavedTrains();
-            } catch (IOException ex) {
-                plugin.getLogger().log(Level.WARNING, "Failed to save " + trainsFile, ex);
-            }
-        }
-    }
-
-    private Map<String, SavedTrainDefinition> readSavedTrains() {
-        Map<String, SavedTrainDefinition> loaded = new LinkedHashMap<>();
-        if (!savedTrainsFile.exists() || savedTrainsFile.length() == 0L) {
-            return loaded;
-        }
-
-        YamlConfiguration config = loadYaml(savedTrainsFile);
-        if (config == null) {
-            return Map.copyOf(savedTrains);
-        }
-        ConfigurationSection root = config.getConfigurationSection("saved-trains");
-        if (root == null) {
-            return loaded;
-        }
-
-        for (String key : root.getKeys(false)) {
-            SavedTrainDefinition saved = SavedTrainDefinition.load(key, root.getConfigurationSection(key));
-            if (saved != null) {
-                loaded.put(Train.normalizeName(key), saved);
-            }
-        }
-        return loaded;
-    }
-
-    private void saveSavedTrains() throws IOException {
-        YamlConfiguration config = new YamlConfiguration();
-        for (SavedTrainDefinition saved : savedTrains.values()) {
-            saved.save(config, "saved-trains." + saved.name);
-        }
-        saveYamlAtomically(config, savedTrainsFile);
-    }
-
-    private YamlConfiguration loadYaml(File file) {
-        YamlConfiguration config = new YamlConfiguration();
-        try {
-            config.load(file);
-            return config;
-        } catch (IOException | InvalidConfigurationException ex) {
-            File backup = backupUnreadableYaml(file);
-            plugin.getLogger().log(Level.WARNING,
-                    "Could not load " + file + ". The unreadable file was backed up to " + backup + ".", ex);
-            return null;
-        }
-    }
-
-    private File backupUnreadableYaml(File file) {
-        File backup = new File(file.getParentFile(),
-                file.getName() + ".corrupt-" + System.currentTimeMillis() + ".bak");
-        try {
-            Files.move(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException moveError) {
-            plugin.getLogger().log(Level.WARNING, "Failed to move unreadable YAML file " + file + " to backup.", moveError);
-        }
-        return backup;
-    }
-
-    private void saveYamlAtomically(YamlConfiguration config, File target) throws IOException {
-        File parent = target.getParentFile();
-        if (parent != null && !parent.exists() && !parent.mkdirs()) {
-            throw new IOException("Could not create directory " + parent);
-        }
-
-        File temporary = new File(parent, target.getName() + ".tmp");
-        config.save(temporary);
-        try {
-            Files.move(temporary.toPath(), target.toPath(),
-                    StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING);
-        } catch (AtomicMoveNotSupportedException ex) {
-            Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        }
+        persistence.save();
     }
 
     void startAutosave() {
@@ -398,7 +158,7 @@ final class TrainManager {
         long period = Math.max(200L, plugin.getConfig().getLong("settings.autosave-interval-ticks", 6000L));
         autosaveTask = Bukkit.getAsyncScheduler().runAtFixedRate(
                 plugin,
-                task -> save(),
+                task -> persistence.save(),
                 period * 50L,
                 period * 50L,
                 TimeUnit.MILLISECONDS);
@@ -407,7 +167,7 @@ final class TrainManager {
     void shutdown() {
         automaticSigns.stop();
         if (plugin.displaySync() != null) plugin.displaySync().reset();
-        passengerRecoveries.clear();
+        actuator.clearRecoveries();
         ScheduledTask autosave = autosaveTask;
         if (autosave != null && !autosave.isCancelled()) {
             autosave.cancel();
@@ -426,22 +186,12 @@ final class TrainManager {
         }
         memberTasks.clear();
         managedCarts.clear();
-        pendingTeleports.clear();
+        actuator.clearPending();
         pendingAutoLinks.clear();
         retiringCarts.clear();
         chunkLoader.shutdown();
-        synchronized (driverLock) {
-            for (UUID driver : List.copyOf(driverTargets.keySet())) revokeDriver(driver, null, "SERVER_STOP");
-            driverTargets.clear();
-            trainDrivers.clear();
-            driverSeats.clear();
-            driverNames.clear();
-            driverLeaseIds.clear();
-            driverChecks.values().forEach(ScheduledTask::cancel);
-            driverChecks.clear();
-        }
-        consistLabelVersions.clear();
-        consistLabelStates.clear();
+        drivers.shutdown();
+        labels.clear();
     }
 
     void reloadAll() {
@@ -449,9 +199,9 @@ final class TrainManager {
             throw new IllegalArgumentException("Stop all trains before reloading vehicle performance.");
         }
         plugin.reloadVehicleConfiguration();
-        save();
+        persistence.save();
         shutdown();
-        load();
+        persistence.load();
         startAutosave();
     }
 
@@ -464,19 +214,20 @@ final class TrainManager {
             throw new IllegalArgumentException("附近没有可用矿车");
         }
 
-        Train train = new Train(UUID.randomUUID(), cleanName, defaultSpeed(), maxSpeed(), defaultSpacing());
+        Train train = new Train(UUID.randomUUID(), cleanName, settings.defaultSpeed(), settings.maxSpeed(), settings.defaultSpacing());
         trains.put(train.id(), train);
         nameIndex.put(train.key(), train.id());
 
         appendCarts(train, carts);
         arrangeTrainCarts(train, carts, carts.get(0).getLocation());
-        save();
+        persistence.save();
         return train;
     }
 
     AutomaticSigns automaticSigns() { return automaticSigns; }
 
-    boolean automaticEligible(Train train) {
+    @Override
+    public boolean automaticEligible(Train train) {
         if (train != null && (train.protectionMode == ProtectionMode.ISOLATED || train.protectionMode == ProtectionMode.RECOVERING)) return false;
         return automaticStatus(train).equals("ready");
     }
@@ -485,7 +236,7 @@ final class TrainManager {
         synchronized (driverLock) {
             if (train == null || trains.get(train.id()) != train) return "unavailable";
             return automaticStatus(train.properties().conductionMode.automatic(),
-                    trainDrivers.containsKey(train.id()), train.manualTakeover,
+                    drivers.hasDriver(train.id()), train.manualTakeover,
                     train.manualReleaseConfirmed, train.driveControlEnabled, train.emergencyBrake);
         }
     }
@@ -577,7 +328,7 @@ final class TrainManager {
             }
         }
         if (types.isEmpty() || types.size() > limit) throw new IllegalArgumentException("Invalid spawn length");
-        double spacing = template == null ? defaultSpacing() : template.spacing;
+        double spacing = template == null ? settings.defaultSpacing() : template.spacing;
         double length = spacing * (types.size() - 1);
         VanillaRailWalker walker = VanillaRailWalker.at(rail.getLocation().add(.5,.0625,.5), preferred);
         if (walker == null) throw new IllegalArgumentException("No spawn rail");
@@ -601,7 +352,7 @@ final class TrainManager {
             if (!location.getWorld().getNearbyEntities(location, 1, 1, 1, e -> e instanceof Minecart).isEmpty())
                 throw new IllegalArgumentException("Spawn track occupied");
             Vector facing = walker.direction().multiply(-1);
-            location.setYaw(yawFromDirection(facing));
+            location.setYaw(actuator.yawFromDirection(facing));
             locations.add(location);
         }
         List<Minecart> carts = new ArrayList<>();
@@ -615,8 +366,8 @@ final class TrainManager {
             TrainProperties properties = template == null ? TrainProperties.defaults() : template.properties.copy();
             properties.conductionMode = ConductionMode.AUTOMATIC;
             created = new Train(UUID.randomUUID(), generateAutoTrainName(),
-                    template == null ? defaultSpeed() : template.targetSpeed,
-                    template == null ? maxSpeed() : template.maxSpeed, spacing, properties);
+                    template == null ? settings.defaultSpeed() : template.targetSpeed,
+                    template == null ? settings.maxSpeed() : template.maxSpeed, spacing, properties);
             trains.put(created.id(), created); nameIndex.put(created.key(), created.id());
             appendCarts(created, carts);
             created.reversed = spec.speed() < 0;
@@ -626,7 +377,7 @@ final class TrainManager {
             created.targetSpeed = speed > 0 ? speed : created.targetSpeed;
             created.seedCurrentSpeed(speed);
             created.moving = speed > 0;
-            save();
+            persistence.save();
         } catch (RuntimeException ex) {
             if (created != null) retireTrain(created);
             else for (Minecart cart : carts) cart.remove();
@@ -640,7 +391,7 @@ final class TrainManager {
         if (added > 0 && !carts.isEmpty()) {
             arrangeTrainCarts(train, carts, carts.get(0).getLocation());
         }
-        save();
+        persistence.save();
         return added;
     }
 
@@ -672,7 +423,7 @@ final class TrainManager {
     }
 
     void scheduleAutoLink(Minecart cart) {
-        if (!autoLinkEnabled() || cart == null || !cart.isValid() || cart.isDead()) {
+        if (!settings.autoLinkEnabled() || cart == null || !cart.isValid() || cart.isDead()) {
             return;
         }
 
@@ -692,7 +443,7 @@ final class TrainManager {
                         }
                     },
                     () -> pendingAutoLinks.remove(entityId),
-                    autoLinkDelayTicks());
+                    settings.autoLinkDelayTicks());
         } catch (RuntimeException ex) {
             pendingAutoLinks.remove(entityId);
             plugin.getLogger().log(Level.WARNING, "Failed to schedule minecart auto-link " + entityId, ex);
@@ -700,18 +451,18 @@ final class TrainManager {
     }
 
     private void autoLink(Minecart cart) {
-        if (!autoLinkEnabled() || !cart.isValid() || cart.isDead()) {
+        if (!settings.autoLinkEnabled() || !cart.isValid() || cart.isDead()) {
             return;
         }
 
         refreshCart(cart);
         List<Minecart> candidates = new ArrayList<>();
         candidates.add(cart);
-        candidates.addAll(nearbyMinecarts(cart, autoLinkRadius()));
-        connectCarts(candidates, cart.getLocation(), autoLinkCreateSingleCartTrains());
+        candidates.addAll(nearbyMinecarts(cart, settings.autoLinkRadius()));
+        connectCarts(candidates, cart.getLocation(), settings.autoLinkCreateSingleCartTrains());
     }
 
-    private int connectCarts(List<Minecart> carts, Location origin, boolean allowSingleCartTrain) {
+    int connectCarts(List<Minecart> carts, Location origin, boolean allowSingleCartTrain) {
         List<Minecart> unique = uniqueValidCarts(carts, origin);
         if (unique.isEmpty()) {
             return 0;
@@ -745,7 +496,7 @@ final class TrainManager {
         int added = appendCarts(chosenTarget, toAppend);
         if (added > 0) {
             arrangeTrainCarts(chosenTarget, unique, origin);
-            save();
+            persistence.save();
         }
         return added;
     }
@@ -760,16 +511,16 @@ final class TrainManager {
     }
 
     private void retireTrain(Train train) {
-        UUID driver = trainDrivers.get(train.id());
-        if (driver != null) revokeDriver(driver, null, "VEHICLE_REMOVED");
+        UUID driver = drivers.driverId(train.id());
+        if (driver != null) drivers.revokeDriver(driver, null, "VEHICLE_REMOVED");
         automaticSigns.forget(train.id());
         trains.remove(train.id());
         stcsTelemetry.remove(train.id());
         switchManager.releaseTrain(train.id());
         chunkLoader.release(train.id());
-        trainDrivers.remove(train.id());
+        drivers.removeTrainDriver(train.id());
         nameIndex.remove(train.key());
-        driverTargets.entrySet().removeIf(entry -> train.id().equals(entry.getValue()));
+        drivers.forgetTrainTargets(train.id());
         for (UUID member : train.members()) {
             cartIndex.remove(member);
             ScheduledTask task = memberTasks.remove(member);
@@ -777,12 +528,12 @@ final class TrainManager {
                 task.cancel();
             }
             Minecart cart = managedCarts.remove(member);
-            pendingTeleports.remove(member);
+            actuator.forgetPending(member);
             if (cart != null) {
                 scheduleCartRemoval(cart);
             }
         }
-        save();
+        persistence.save();
     }
 
     boolean isProtectedTrainCart(Minecart cart) {
@@ -797,8 +548,8 @@ final class TrainManager {
         }
 
         UUID entityId = cart.getUniqueId();
-        UUID driver = trainDrivers.get(train.id());
-        if (driver != null) revokeDriver(driver, entityId, "VEHICLE_REMOVED");
+        UUID driver = drivers.driverId(train.id());
+        if (driver != null) drivers.revokeDriver(driver, entityId, "VEHICLE_REMOVED");
         train.removeMember(entityId);
         train.clearMemberTargets();
         train.clearTrackPath();
@@ -808,14 +559,14 @@ final class TrainManager {
             task.cancel();
         }
         managedCarts.remove(entityId);
-        pendingTeleports.remove(entityId);
+        actuator.forgetPending(entityId);
 
         if (train.memberCount() == 0) {
             trains.remove(train.id());
             nameIndex.remove(train.key());
             switchManager.releaseTrain(train.id());
             chunkLoader.release(train.id());
-            trainDrivers.remove(train.id());
+            drivers.removeTrainDriver(train.id());
         }
         if (save) {
             this.save();
@@ -829,11 +580,11 @@ final class TrainManager {
             return;
         }
         UUID entityId = cart.getUniqueId();
-        UUID driver = trainDrivers.get(train.id());
-        if (driver != null) revokeDriver(driver, entityId, "VEHICLE_REMOVED");
+        UUID driver = drivers.driverId(train.id());
+        if (driver != null) drivers.revokeDriver(driver, entityId, "VEHICLE_REMOVED");
         if (!train.removeMember(entityId)) return;
         haltForMissingMember(train);
-        forgetDisplay(entityId);
+        actuator.forgetDisplay(entityId);
         train.clearMemberTargets();
         train.clearTrackPath();
         cartIndex.remove(entityId);
@@ -842,15 +593,15 @@ final class TrainManager {
             task.cancel();
         }
         managedCarts.remove(entityId);
-        pendingTeleports.remove(entityId);
+        actuator.forgetPending(entityId);
         if (train.memberCount() == 0) {
             trains.remove(train.id());
             nameIndex.remove(train.key());
             switchManager.releaseTrain(train.id());
             chunkLoader.release(train.id());
-            trainDrivers.remove(train.id());
+            drivers.removeTrainDriver(train.id());
         }
-        save();
+        persistence.save();
     }
 
     boolean refreshCart(Minecart cart) {
@@ -880,7 +631,8 @@ final class TrainManager {
         return trainId == null ? null : trains.get(trainId);
     }
 
-    boolean isSameTrain(Minecart minecart, Entity other) {
+    @Override
+    public boolean isSameTrain(Minecart minecart, Entity other) {
         if (!(other instanceof Minecart otherMinecart)) {
             return false;
         }
@@ -946,151 +698,36 @@ final class TrainManager {
     }
 
     boolean setDrivingTarget(Player player, Train train) {
-        if (player == null || train == null) {
-            return false;
-        }
-        synchronized (driverLock) {
-            UUID playerId = player.getUniqueId();
-            if (!player.isOnline() || player.isDead() || !(player.getVehicle() instanceof Minecart seat)
-                    || trainForCart(seat) != train) throw new IllegalArgumentException("error.drive-board");
-            if (trains.get(train.id()) != train) return false;
-            UUID currentDriver = trainDrivers.get(train.id());
-            if (currentDriver != null && !currentDriver.equals(playerId)) {
-                Player currentPlayer = Bukkit.getPlayer(currentDriver);
-                if (currentPlayer != null && currentPlayer.isOnline()) {
-                    return false;
-                }
-                revokeDriver(currentDriver, null, "DISCONNECTED");
-            }
-            if (isDriver(player, train)) return true;
-            revokeDriver(playerId, null, "SEAT_CHANGED");
-            driverTargets.put(playerId, train.id());
-            trainDrivers.put(train.id(), playerId);
-            driverSeats.put(playerId, seat.getUniqueId());
-            driverNames.put(playerId, player.getName());
-            UUID leaseId = UUID.randomUUID();
-            driverLeaseIds.put(playerId, leaseId);
-            train.lastManualDriver = playerId;
-            // A fresh declaration never inherits traction from an earlier driver/session.
-            DriverSafety.brake(train);
-            ScheduledTask check = player.getScheduler().runAtFixedRate(plugin, task -> {
-                synchronized (driverLock) {
-                    if (!DriverSafety.sameSession(leaseId, driverLeaseIds.get(playerId))) { task.cancel(); return; }
-                    if (!isDriver(player, train)) revokeDriver(playerId, null, "SEAT_LOST");
-                }
-            }, () -> revokeDriverLease(playerId, leaseId), 1L, 1L);
-            if (check == null) {
-                revokeDriver(playerId, null, "DISCONNECTED");
-                throw new IllegalArgumentException("error.drive-board");
-            }
-            driverChecks.put(playerId, check);
-            publishDriverEvent(train, playerId, player.getName(), "DRIVER_ACQUIRED", "EXPLICIT_DRIVE");
-            train.driverEmergencyHold = false;
-            save();
-            return true;
-        }
+        return drivers.setDrivingTarget(player, train);
     }
 
     void clearDrivingTarget(Player player) {
-        if (player != null) revokeDriver(player.getUniqueId(), null, "SEAT_LOST");
+        drivers.clearDrivingTarget(player);
     }
 
     void revokeDriver(UUID playerId, UUID expectedSeat, String reason) {
-        synchronized (driverLock) {
-            if (expectedSeat != null && !expectedSeat.equals(driverSeats.get(playerId))) return;
-            UUID trainId = driverTargets.remove(playerId);
-            driverSeats.remove(playerId);
-            cancelDriverCheck(playerId);
-            String name = driverNames.remove(playerId);
-            if (trainId == null || !trainDrivers.remove(trainId, playerId)) return;
-            Train train = trains.get(trainId);
-            if (train == null) return;
-            DriverSafety.brake(train);
-            publishDriverEvent(train, playerId, name, "DRIVER_UNAVAILABLE", reason);
-            save();
-        }
-    }
-
-    private void revokeDriverLease(UUID playerId, UUID leaseId) {
-        synchronized (driverLock) {
-            if (DriverSafety.sameSession(leaseId, driverLeaseIds.get(playerId))) revokeDriver(playerId, null, "DISCONNECTED");
-        }
-    }
-
-    private void cancelDriverCheck(UUID playerId) {
-        driverLeaseIds.remove(playerId);
-        ScheduledTask task = driverChecks.remove(playerId);
-        if (task != null) task.cancel();
-    }
-
-    private void publishDriverEvent(Train train, UUID driver, String name, String type, String reason) {
-        plugin.getLogger().info(type + " train=" + train.name() + " driver=" + driver + " reason=" + reason);
-        TelemetrySink sink = plugin.telemetrySink();
-        if (sink != null) sink.driverEvent(train, driver, name, type, reason);
+        drivers.revokeDriver(playerId, expectedSeat, reason);
     }
 
     Player clearDriver(Train train) {
-        if (train == null) {
-            return null;
-        }
-        synchronized (driverLock) {
-            UUID playerId = trainDrivers.remove(train.id());
-            if (playerId == null) {
-                return null;
-            }
-            driverTargets.remove(playerId, train.id());
-            driverSeats.remove(playerId);
-            cancelDriverCheck(playerId);
-            String name = driverNames.remove(playerId);
-            DriverSafety.brake(train);
-            publishDriverEvent(train, playerId, name, "DRIVER_RELEASED", "ADMIN_RELEASE");
-            return Bukkit.getPlayer(playerId);
-        }
+        return drivers.clearDriver(train);
     }
 
     boolean isDriver(Player player, Train train) {
-        if (player == null || train == null) return false;
-        Entity seat = player.getVehicle();
-        return DriverSafety.ownsSeat(trainDrivers.get(train.id()), player.getUniqueId(),
-                driverSeats.get(player.getUniqueId()), seat == null ? null : seat.getUniqueId(),
-                player.isOnline() && !player.isDead());
+        return drivers.isDriver(player, train);
     }
 
     List<net.skyworld.sta.api.v4.DriverDeskService.Desk> driverDesks() {
-        synchronized (driverLock) {
-            List<net.skyworld.sta.api.v4.DriverDeskService.Desk> result = new ArrayList<>();
-            trainDrivers.forEach((trainId, driverId) -> {
-                Train train = trains.get(trainId);
-                UUID lease = driverLeaseIds.get(driverId);
-                if (train != null && lease != null) result.add(new net.skyworld.sta.api.v4.DriverDeskService.Desk(
-                        trainId, driverId, lease, train.protectionMode.name()));
-            });
-            return List.copyOf(result);
-        }
+        return drivers.driverDesks();
     }
 
     void requireDriver(Player player, Train train) {
-        if (isDriver(player, train)) return;
-        Train old = drivingTarget(player);
-        if (old != null && !isDriver(player, old)) clearDrivingTarget(player);
-        throw new IllegalArgumentException("error.drive-declare");
+        drivers.requireDriver(player, train);
     }
 
-    String driverName(Train train) {
-        if (train == null) {
-            return null;
-        }
-        synchronized (driverLock) {
-            UUID playerId = trainDrivers.get(train.id());
-            Player player = playerId == null ? null : Bukkit.getPlayer(playerId);
-            if (player == null || !player.isOnline()) {
-                if (playerId != null) {
-                    revokeDriver(playerId, null, "DISCONNECTED");
-                }
-                return null;
-            }
-            return player.getName();
-        }
+    @Override
+    public String driverName(Train train) {
+        return drivers.driverName(train);
     }
 
     Train train(UUID id) {
@@ -1098,218 +735,75 @@ final class TrainManager {
     }
 
     Train drivingTarget(Player player) {
-        if (player == null) {
-            return null;
-        }
-        UUID trainId = driverTargets.get(player.getUniqueId());
-        Train train = trainId == null ? null : trains.get(trainId);
-        if (train == null && trainId != null) {
-            driverTargets.remove(player.getUniqueId());
-            driverSeats.remove(player.getUniqueId());
-            cancelDriverCheck(player.getUniqueId());
-            driverNames.remove(player.getUniqueId());
-        }
-        return train;
+        return drivers.drivingTarget(player);
     }
 
     void start(String name, Double speed) {
-        Train train = requireTrain(name);
-        train.driverEmergencyHold = false;
-        startTrain(train, speed);
-        save();
+        controls.start(name, speed);
     }
 
     void stop(String name) {
-        Train train = requireTrain(name);
-        stopTrain(train);
-        save();
+        controls.stop(name);
     }
 
     void reverse(String name) {
-        Train train = requireTrain(name);
-        reverseTrain(train, System.currentTimeMillis());
-        save();
+        controls.reverse(name);
     }
 
     void speed(String name, double speed) {
-        Train train = requireTrain(name);
-        train.targetSpeed = RailMath.clamp(speed, 0.0, train.maxSpeed);
-        save();
+        controls.speed(name, speed);
     }
 
     void setMaxSpeed(String name, double speed) {
-        Train train = requireTrain(name);
-        setTrainMaxSpeed(train, speed);
-        save();
-    }
-
-    private void setTrainMaxSpeed(Train train, double speed) {
-        double newMaxSpeed = RailMath.clamp(speed, 0.05, maxAllowedSpeed());
-        double currentPhysicalSpeed = Math.max(train.currentSpeed(), train.maxMemberSpeed());
-        train.maxSpeed = newMaxSpeed;
-        train.targetSpeed = RailMath.clamp(train.targetSpeed, 0.0, train.maxSpeed);
-        train.seedEffectiveMaxSpeed(train.moving || currentPhysicalSpeed > 0.001
-                ? Math.max(0.05, Math.min(maxAllowedSpeed(), currentPhysicalSpeed + 0.10))
-                : newMaxSpeed);
+        controls.setMaxSpeed(name, speed);
     }
 
     void setSpacing(String name, double spacing) {
-        Train train = requireTrain(name);
-        train.spacing = RailMath.clamp(spacing, 0.8, 8.0);
-        save();
+        controls.setSpacing(name, spacing);
     }
 
     void applyPlayerPush(Train train, Minecart cart, Player player) {
-        double currentSpeed = train == null ? 0.0 : Math.max(train.currentSpeed(), train.maxMemberSpeed());
-        if (train == null || cart == null || player == null || !train.properties().pushable
-                || train.moving || train.driveControlEnabled
-                || (!train.playerPushActive && currentSpeed > playerPushActivationSpeed())) {
-            return;
-        }
-
-        RailInfo rail = RailMath.findRail(cart.getLocation());
-        if (rail == null) {
-            return;
-        }
-
-        Vector playerVelocity = player.getVelocity().clone().setY(0.0);
-        Vector pushPreference = playerVelocity.lengthSquared() > 0.0004
-                ? playerVelocity
-                : cart.getLocation().toVector().subtract(player.getLocation().toVector()).setY(0.0);
-        if (pushPreference.lengthSquared() < 0.0001) {
-            pushPreference = player.getLocation().getDirection().setY(0.0);
-        }
-        Vector direction = RailMath.direction(rail.rail.getShape(), pushPreference);
-        if (direction.lengthSquared() < 0.0001) {
-            return;
-        }
-
-        Vector previousDirection = train.rememberedDirection();
-        boolean oppositeDirection = previousDirection.lengthSquared() >= 0.0001
-                && previousDirection.dot(direction) < 0.0;
-        if (oppositeDirection && currentSpeed > playerPushActivationSpeed()) {
-            return;
-        }
-        if (oppositeDirection) {
-            train.reversed = !train.reversed;
-            train.reverseMileageDirection();
-            refreshMemberIndexes(train);
-        }
-
-        double movementBonus = Math.min(playerPushMovementBonus(), horizontalSpeed(playerVelocity));
-        train.rememberDirection(direction);
-        train.clearSnapshots();
-        train.clearMemberSpeeds();
-        train.clearMemberTargets();
-        train.clearTrackPath();
-        train.applyPlayerPush(playerPushImpulse() + movementBonus, playerPushMaxSpeed());
+        controls.applyPlayerPush(train, cart, player);
     }
 
     void setReverser(Train train, Reverser reverser) {
-        Reverser target = reverser == null ? Reverser.NEUTRAL : reverser;
-        if (target != Reverser.NEUTRAL
-                && train.reverser != target
-                && !canChangeReverser(train)) {
-            throw new IllegalArgumentException("列车未停稳，不能切换换向器。");
-        }
-        takeManualControl(train);
-        train.clearPlayerPush();
-        train.driveControlEnabled = true;
-        train.reverser = target;
-        if (train.reverser == Reverser.NEUTRAL) {
-            train.powerNotch = 0;
-        }
-        train.moving = true;
-        save();
+        controls.setReverser(train, reverser);
     }
 
     boolean canChangeReverser(Train train) {
-        return Math.max(train.currentSpeed(), train.maxMemberSpeed()) <= driveDirectionChangeSpeed();
+        return controls.canChangeReverser(train);
     }
 
     Reverser reverseReverserTarget(Train train) {
-        if (train.reverser == Reverser.FORWARD) {
-            return Reverser.BACKWARD;
-        }
-        if (train.reverser == Reverser.BACKWARD) {
-            return Reverser.FORWARD;
-        }
-        return train.reversed ? Reverser.FORWARD : Reverser.BACKWARD;
+        return controls.reverseReverserTarget(train);
     }
 
     Reverser cycleReverserTarget(Train train) {
-        if (train.reverser != Reverser.NEUTRAL) {
-            return Reverser.NEUTRAL;
-        }
-        return train.reversed ? Reverser.FORWARD : Reverser.BACKWARD;
+        return controls.cycleReverserTarget(train);
     }
 
     void setPowerNotch(Train train, int notch) {
-        train.protectionMode.requireTraction();
-        if (train.driverEmergencyHold) throw new IllegalArgumentException("error.drive-declare");
-        takeManualControl(train);
-        train.clearPlayerPush();
-        train.driveControlEnabled = true;
-        train.powerNotch = Math.max(0, Math.min(4, notch));
-        train.brakeNotch = 0;
-        train.emergencyBrake = false;
-        train.moving = true;
-        save();
+        controls.setPowerNotch(train, notch);
     }
 
     void setBrakeNotch(Train train, int notch) {
-        takeManualControl(train);
-        train.clearPlayerPush();
-        train.driveControlEnabled = true;
-        train.powerNotch = 0;
-        train.brakeNotch = Math.max(0, Math.min(7, notch));
-        train.emergencyBrake = false;
-        train.moving = true;
-        save();
+        controls.setBrakeNotch(train, notch);
     }
 
     void neutralHandle(Train train) {
-        takeManualControl(train);
-        train.clearPlayerPush();
-        train.driveControlEnabled = true;
-        train.powerNotch = 0;
-        train.brakeNotch = 0;
-        train.emergencyBrake = false;
-        train.moving = true;
-        save();
+        controls.neutralHandle(train);
     }
 
     void emergencyBrake(Train train) {
-        takeManualControl(train);
-        train.clearPlayerPush();
-        train.driveControlEnabled = true;
-        train.powerNotch = 0;
-        train.brakeNotch = 7;
-        train.emergencyBrake = true;
-        train.moving = true;
-        save();
+        controls.emergencyBrake(train);
     }
 
     String driveStatus(Train train) {
-        return "&e" + train.name()
-                + " &7| 换向器: &f" + train.reverser.displayName()
-                + " &7| 牵引: &fP" + train.powerNotch
-                + " &7| 制动: &f" + (train.emergencyBrake ? "EB" : "B" + train.brakeNotch)
-                + " &7| 速度: &f" + trim(Math.max(train.currentSpeed(), train.maxMemberSpeed()));
-    }
-
-    private void takeManualControl(Train train) {
-        synchronized (driverLock) {
-            train.manualTakeover = true;
-            train.manualReleaseConfirmed = false;
-            cancelStationMotion(train);
-        }
+        return controls.driveStatus(train);
     }
 
     void confirmManualRelease(Train train) {
-        if (train == null) return;
-        synchronized (driverLock) { train.manualReleaseConfirmed = true; }
-        save();
+        controls.confirmManualRelease(train);
     }
 
     static boolean permanentRemoval(org.bukkit.event.entity.EntityRemoveEvent.Cause cause) {
@@ -1318,7 +812,7 @@ final class TrainManager {
     }
 
     static void haltForMissingMember(Train train) {
-        stopTrain(train);
+        TrainDrivingControls.stopTrain(train);
         train.seedCurrentSpeed(0);
         train.clearMemberSpeeds();
         train.clearSnapshots();
@@ -1333,8 +827,8 @@ final class TrainManager {
         if (retiringCarts.contains(cart.getUniqueId())) return;
         Train train = trainForCart(cart);
         if (train == null) return;
-        UUID driver = trainDrivers.get(train.id());
-        if (driver != null) revokeDriver(driver, cart.getUniqueId(), "VEHICLE_REMOVED");
+        UUID driver = drivers.driverId(train.id());
+        if (driver != null) drivers.revokeDriver(driver, cart.getUniqueId(), "VEHICLE_REMOVED");
         train.recordMemberRemoval(cart.getUniqueId(), permanentRemoval(cause) ? "REMOVED"
                 : cause == org.bukkit.event.entity.EntityRemoveEvent.Cause.UNLOAD ? "UNLOADED" : "PLAYER_QUIT",
                 System.currentTimeMillis());
@@ -1343,7 +837,7 @@ final class TrainManager {
             else {
                 // Preserve the slot for unload/reload, but never keep displaying or commanding old speed.
                 haltForMissingMember(train);
-                forgetDisplay(cart.getUniqueId());
+                actuator.forgetDisplay(cart.getUniqueId());
             }
         }
         plugin.getLogger().warning("Train " + train.name() + " stopped after member " + cart.getUniqueId()
@@ -1351,86 +845,15 @@ final class TrainManager {
     }
 
     static boolean mayRelease(UUID requester, UUID driver, UUID lastDriver, boolean admin) {
-        if (driver != null) return driver.equals(requester);
-        return admin || requester.equals(lastDriver);
+        return DriverControlService.mayRelease(requester, driver, lastDriver, admin);
     }
 
     void releaseManualControl(Player player, Train train) {
-        if (train == null) throw new IllegalArgumentException("没有找到要释放的列车，请靠近列车后重试。");
-        synchronized (driverLock) {
-            if (trains.get(train.id()) != train) throw new IllegalArgumentException("列车已不存在。");
-            UUID playerId = player.getUniqueId();
-            UUID driver = trainDrivers.get(train.id());
-            if (!mayRelease(playerId, driver, train.lastManualDriver, player.hasPermission("skytrain.admin"))) {
-                throw new IllegalArgumentException(driver != null
-                        ? "这列车由其他司机控制；管理员请使用 /st admin release <列车名>。"
-                        : "无法确认你是上一位司机；请重新 /st drive 后 /st release，或由管理员释放列车。");
-            }
-            DriverSafety.brake(train);
-            train.manualReleaseConfirmed = true;
-            trainDrivers.remove(train.id(), playerId);
-            driverTargets.remove(playerId, train.id());
-            driverSeats.remove(playerId);
-            driverNames.remove(playerId);
-            cancelDriverCheck(playerId);
-            if (driver != null) publishDriverEvent(train, playerId, player.getName(), "DRIVER_RELEASED", "EXPLICIT_RELEASE");
-        }
-        save();
+        drivers.releaseManualControl(player, train);
     }
 
     static void authorizeAutomatic(Train train, boolean hasDriver, double stopThreshold) {
-        if (hasDriver) throw new IllegalArgumentException("请先 /st release 释放司机控制权，再设置 auto。");
-        if (train.manualTakeover && !train.manualReleaseConfirmed)
-            throw new IllegalArgumentException("手动接管尚未明确释放。请先 /st release，或 /st admin release <列车名>。");
-        if (Math.max(train.currentSpeed(), train.maxMemberSpeed()) > stopThreshold)
-            throw new IllegalArgumentException("列车尚未停稳，不能启用 auto。");
-        stopTrain(train);
-        train.driverEmergencyHold = false;
-        train.manualTakeover = false;
-        train.reverser = train.reversed ? Reverser.BACKWARD : Reverser.FORWARD;
-        train.properties().conductionMode = ConductionMode.AUTOMATIC;
-    }
-
-    private void startTrain(Train train, Double speed) {
-        if (speed != null) {
-            train.targetSpeed = RailMath.clamp(speed, 0.0, train.maxSpeed);
-        }
-        cancelStationMotion(train);
-        train.driveControlEnabled = false;
-        train.powerNotch = 0;
-        train.brakeNotch = 0;
-        train.emergencyBrake = false;
-        train.reverser = train.reversed ? Reverser.BACKWARD : Reverser.FORWARD;
-        train.pauseUntilMillis = 0L;
-        train.reverseSettleUntilMillis = 0L;
-        train.reverseBrakeDeadlineMillis = 0L;
-        train.reversePending = false;
-        train.clearPlayerPush();
-        train.moving = true;
-    }
-
-    private static void stopTrain(Train train) {
-        cancelStationMotion(train);
-        train.driveControlEnabled = false;
-        train.powerNotch = 0;
-        train.brakeNotch = 0;
-        train.emergencyBrake = false;
-        train.pauseUntilMillis = 0L;
-        train.reverseSettleUntilMillis = 0L;
-        train.reverseBrakeDeadlineMillis = 0L;
-        train.reversePending = false;
-        train.clearPlayerPush();
-        train.moving = false;
-    }
-
-    private static void cancelStationMotion(Train train) {
-        train.automaticRun = null;
-        train.clearStationMotion();
-        train.pauseUntilMillis = 0L;
-    }
-
-    private void reverseTrain(Train train, long now) {
-        setReverser(train, reverseReverserTarget(train));
+        TrainDrivingControls.authorizeAutomatic(train, hasDriver, stopThreshold);
     }
 
     SavedTrainDefinition saveTrainTemplate(String trainName, String savedName) {
@@ -1438,7 +861,7 @@ final class TrainManager {
         String cleanName = cleanName(savedName);
         SavedTrainDefinition saved = SavedTrainDefinition.fromTrain(cleanName, train);
         savedTrains.put(Train.normalizeName(cleanName), saved);
-        save();
+        persistence.save();
         return saved;
     }
 
@@ -1479,11 +902,11 @@ final class TrainManager {
 
         Train train = createTrain(actualTrainName, carts);
         train.targetSpeed = saved.targetSpeed;
-        setTrainMaxSpeed(train, saved.maxSpeed);
+        controls.setTrainMaxSpeed(train, saved.maxSpeed);
         train.spacing = saved.spacing;
         train.properties().copyFrom(saved.properties);
         arrangeTrainCarts(train, carts, base);
-        save();
+        persistence.save();
         return train;
     }
 
@@ -1512,11 +935,11 @@ final class TrainManager {
                 ConductionMode mode=ConductionMode.parse(cleanValue);
                 synchronized(driverLock) {
                     if(mode.automatic()) {
-                        authorizeAutomatic(train, trainDrivers.containsKey(train.id()), driveDirectionChangeSpeed());
+                        TrainDrivingControls.authorizeAutomatic(train, drivers.hasDriver(train.id()), settings.driveDirectionChangeSpeed());
                         automaticSigns.forget(train.id());
                     } else {
                         train.manualTakeover=true;
-                        stopTrain(train);
+                        TrainDrivingControls.stopTrain(train);
                     }
                     properties.conductionMode=mode;
                 }
@@ -1525,12 +948,12 @@ final class TrainManager {
             case "friction" -> properties.friction = RailMath.clamp(parseDouble(cleanValue, key), 0.0, 4.0);
             case "wait", "waitticks" -> properties.waitTicks = Math.max(0, (int) parseDouble(cleanValue, key));
             case "speed", "targetspeed" -> train.targetSpeed = RailMath.clamp(parseDouble(cleanValue, key), 0.0, train.maxSpeed);
-            case "maxspeed" -> setTrainMaxSpeed(train, parseDouble(cleanValue, key));
+            case "maxspeed" -> controls.setTrainMaxSpeed(train, parseDouble(cleanValue, key));
             case "spacing" -> train.spacing = RailMath.clamp(parseDouble(cleanValue, key), 0.8, 8.0);
             default -> throw new IllegalArgumentException("暂不支持的列车属性: " + property);
         }
 
-        save();
+        persistence.save();
         return "&a已设置 &e" + train.name() + " &a的属性 &e" + property + " &a= &f" + cleanValue;
     }
 
@@ -1580,7 +1003,7 @@ final class TrainManager {
         } else {
             throw new IllegalArgumentException("用法: /st tag <列车> add|remove|list <标签>");
         }
-        save();
+        persistence.save();
         return "&aTags: &f" + String.join(", ", properties.tags());
     }
 
@@ -1597,7 +1020,7 @@ final class TrainManager {
         } else {
             throw new IllegalArgumentException("用法: /st owner <列车> add|remove|list <玩家>");
         }
-        save();
+        persistence.save();
         return "&aOwners: &f" + String.join(", ", properties.owners());
     }
 
@@ -1618,142 +1041,17 @@ final class TrainManager {
         } else {
             throw new IllegalArgumentException("用法: /st route <列车> set|add|clear|list <目的地...>");
         }
-        save();
+        persistence.save();
         return "&aRoute: &f" + String.join(" -> ", properties.route());
     }
 
     int activateSignForNearbyTrain(Player player, Block signBlock, String actionLine,
             String valueLine, String modifierLine) {
-        String action = firstToken(actionLine);
-        if (!isSignAction(action)) {
-            return 0;
-        }
-
-        Location signLocation = signBlock.getLocation().add(0.5, 0.5, 0.5);
-        double radius = signActivationRadius();
-        List<Minecart> nearby = minecartsNear(player, signLocation, radius);
-        if (nearby.isEmpty()) {
-            return 0;
-        }
-
-        for (Minecart minecart : nearby) {
-            refreshCart(minecart);
-        }
-
-        Train target = null;
-        for (Minecart minecart : nearby) {
-            target = trainForCart(minecart);
-            if (target != null) {
-                break;
-            }
-        }
-        if (target == null) {
-            connectCarts(nearby, signLocation, true);
-            for (Minecart minecart : nearby) {
-                target = trainForCart(minecart);
-                if (target != null) {
-                    break;
-                }
-            }
-        }
-        if (target == null) {
-            return 0;
-        }
-
-        long now = System.currentTimeMillis();
-        Location leaderLocation = activeLeaderLocation(target);
-        Vector travelDirection = activeLeaderDirection(target, leaderLocation);
-        triggerSign(target, actionLine, valueLine, modifierLine, signBlock, signKey(signBlock),
-                leaderLocation, travelDirection, now);
-        for (Minecart minecart : nearby) {
-            if (trainForCart(minecart) == target) {
-                ensureTask(minecart, target);
-            }
-        }
-        save();
-        return 1;
+        return signActions.activateSignForNearbyTrain(player, signBlock, actionLine, valueLine, modifierLine);
     }
 
     void activateStationsFromRedstone(Block poweredBlock) {
-        if (poweredBlock == null) {
-            return;
-        }
-        Set<String> visited = new HashSet<>();
-        for (int x = -2; x <= 2; x++) {
-            for (int y = -2; y <= 2; y++) {
-                for (int z = -2; z <= 2; z++) {
-                    Block candidate = poweredBlock.getRelative(x, y, z);
-                    if (!(candidate.getState() instanceof Sign sign)) {
-                        continue;
-                    }
-                    String header = plain(sign.getLine(0));
-                    if (!SignHeaders.isSkyTrain(header) || !isHeaderActive(header, candidate)
-                            || !"station".equals(firstToken(sign.getLine(1)))) {
-                        continue;
-                    }
-                    String key = signKey(candidate);
-                    if (visited.add(key)) {
-                        activateStationForNearbyTrain(candidate, sign);
-                    }
-                }
-            }
-        }
-    }
-
-    private void activateStationForNearbyTrain(Block signBlock, Sign sign) {
-        Location center = signBlock.getLocation().add(0.5, 0.5, 0.5);
-        double radius = signActivationRadius();
-        Collection<Entity> nearby;
-        try {
-            nearby = center.getWorld().getNearbyEntities(center, radius, radius, radius,
-                    entity -> entity instanceof Minecart);
-        } catch (RuntimeException ex) {
-            plugin.getLogger().log(Level.FINE, "Failed to scan station redstone area.", ex);
-            return;
-        }
-        Train target = nearby.stream().filter(Minecart.class::isInstance).map(Minecart.class::cast)
-                .peek(this::refreshCart).map(this::trainForCart).filter(java.util.Objects::nonNull)
-                .findFirst().orElse(null);
-        if (target == null) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        Location leaderLocation = activeLeaderLocation(target);
-        Vector travelDirection = activeLeaderDirection(target, leaderLocation);
-        triggerSign(target, sign.getLine(1), sign.getLine(2), sign.getLine(3), signBlock,
-                signKey(signBlock), leaderLocation, travelDirection, now);
-        save();
-    }
-
-    private boolean isHeaderActive(String header, Block signBlock) {
-        if (SignHeaders.isNeverActive(header)) {
-            return false;
-        }
-        if (SignHeaders.isAlwaysActive(header)) {
-            return true;
-        }
-        boolean powered = readSignPowered(signBlock);
-        return SignHeaders.isInverted(header) ? !powered : powered;
-    }
-
-    private boolean readSignPowered(Block signBlock) {
-        if (signBlock == null) {
-            return false;
-        }
-        Block support = null;
-        if (signBlock.getBlockData() instanceof WallSign wallSign) {
-            support = signBlock.getRelative(wallSign.getFacing().getOppositeFace());
-        }
-        return signBlock.isBlockPowered() || signBlock.isBlockIndirectlyPowered() || signBlock.getBlockPower() > 0
-                || (support != null && (support.isBlockPowered()
-                || support.isBlockIndirectlyPowered() || support.getBlockPower() > 0));
-    }
-
-    private boolean signPropertyAllowed(String property) {
-        return switch (normalizeProperty(property)) {
-            case "name", "destination", "dest", "route", "tags", "owners" -> false;
-            default -> true;
-        };
+        signActions.activateStationsFromRedstone(poweredBlock);
     }
 
     Train requireTrain(String name) {
@@ -1788,7 +1086,7 @@ final class TrainManager {
                         + " (" + trim(train.automaticRun.remaining) + " blocks)");
     }
 
-    private void ensureTask(Minecart cart, Train train) {
+    void ensureTask(Minecart cart, Train train) {
         UUID entityId = cart.getUniqueId();
         ScheduledTask existing = memberTasks.get(entityId);
         if (existing != null && !existing.isCancelled() && managedCarts.get(entityId) == cart) {
@@ -1800,15 +1098,15 @@ final class TrainManager {
             managedCarts.put(entityId, cart);
             ScheduledTask task = cart.getScheduler().runAtFixedRate(
                     plugin,
-                    scheduledTask -> tickMember(train, cart, scheduledTask),
+                    scheduledTask -> motion.tickMember(train, cart, scheduledTask),
                     () -> {
                         if (managedCarts.remove(entityId, cart)) {
                             memberTasks.remove(entityId);
-                            forgetDisplay(entityId);
+                            actuator.forgetDisplay(entityId);
                         }
                     },
                     1L,
-                    tickInterval());
+                    settings.tickInterval());
             if (task != null) {
                 memberTasks.put(entityId, task);
             }
@@ -1818,746 +1116,16 @@ final class TrainManager {
         }
     }
 
-    private void tickMember(Train train, Minecart cart, ScheduledTask task) {
-        UUID entityId = cart.getUniqueId();
-        if (!cart.isValid() || cart.isDead()) {
-            forgetDisplay(entityId);
-            train.memberSpeed(entityId, 0.0);
-            memberTasks.remove(entityId);
-            managedCarts.remove(entityId);
-            pendingTeleports.remove(entityId);
-            task.cancel();
-            return;
-        }
-
-        if (trains.get(train.id()) != train || !train.contains(entityId)) {
-            forgetDisplay(entityId);
-            train.memberSpeed(entityId, 0.0);
-            clearCartMark(cart);
-            cartIndex.remove(entityId);
-            memberTasks.remove(entityId);
-            managedCarts.remove(entityId);
-            pendingTeleports.remove(entityId);
-            task.cancel();
-            return;
-        }
-
-        // Never mutate a cart while its asynchronous relocation is still in flight.
-        CompletableFuture<Boolean> pendingMove = pendingTeleports.get(entityId);
-        if (pendingMove != null && !pendingMove.isDone()) return;
-        if (plugin.displaySync() != null) plugin.displaySync().observe(train.id(), cart);
-        long now = System.currentTimeMillis();
-        long currentTick = Bukkit.getCurrentTick();
-        if (train.driverEmergencyHold) DriverSafety.maintainBrake(train);
-        if (train.protectionMode == ProtectionMode.RECOVERING) {
-            train.automaticRun = null;
-            train.powerNotch = 0;
-            train.brakeNotch = 7;
-            train.emergencyBrake = true;
-            train.driveControlEnabled = true;
-        }
-        applyForcedSpacing(train);
-        int index = train.indexOf(entityId);
-        if (index == activeLeaderIndex(train)) {
-            if (chunkLoadingEnabled()) {
-                chunkLoader.update(train, cart.getLocation(), chunkLoadingRadius());
-            } else {
-                chunkLoader.release(train.id());
-            }
-        }
-        cart.setSlowWhenEmpty(false);
-        removeNonPlayerPassengers(cart);
-        boolean playerPassenger = hasPlayerPassenger(cart);
-        boolean smoothPassenger = playerPassenger
-                && (trainPhysicsHardLock() || passengerSmoothingEnabled());
-        double trainSpeedLimit = plugin.trainSpeedLimit(train);
-        double entityMaxSpeed = train.updateEffectiveMaxSpeed(now, trainSpeedLimit, maxSpeedChangePerTick());
-        double passengerMotionFactor = passengerVanillaMotionFactor();
-        double controlledEntityMaxSpeed = smoothPassenger
-                ? RailMath.clamp(
-                        Math.max(0.4, (entityMaxSpeed + passengerMaxCorrectionPerTick()) / passengerMotionFactor),
-                        0.05,
-                        VehicleProfile.MAX_SPEED * 2)
-                : 0.0;
-        cart.setMaxSpeed(smoothPassenger
-                ? controlledEntityMaxSpeed
-                : (trainPhysicsHardLock() ? 0.0 : RailMath.clamp(entityMaxSpeed, 0.05, VehicleProfile.MAX_SPEED)));
-        cart.setGravity(!trainPhysicsHardLock() && train.properties().gravity > 0.0);
-        cart.setInvulnerable(train.properties().invincible);
-        cart.setSilent(!train.properties().soundEnabled);
-
-        Location location = cart.getLocation();
-        RailInfo rail = RailMath.findRail(location);
-
-        if (rail == null) {
-            TrainMemberTarget target = train.memberTarget(entityId, currentTick);
-            if (trainPhysicsHardLock()) {
-                if (target != null && now - target.updatedAtMillis <= 1000L) {
-                    applyTrainTarget(train, cart, entityId, target, location, now);
-                } else {
-                    cart.setVelocity(new Vector());
-                    train.memberSpeed(entityId, 0.0);
-                    train.snapshot(entityId, new MemberSnapshot(entityId, location, new Vector(), now));
-                }
-                return;
-            }
-
-            Vector velocity = cart.getVelocity().multiply(0.7 * RailMath.clamp(train.properties().friction, 0.0, 4.0));
-            if (velocity.lengthSquared() < 0.001) {
-                velocity.zero();
-            }
-            cart.setVelocity(velocity);
-            train.memberSpeed(entityId, horizontalSpeed(velocity));
-            train.snapshot(entityId, new MemberSnapshot(entityId, location, velocity, now));
-            return;
-        }
-
-        applyReverserDirection(train, now);
-        Vector preference = cart.getVelocity();
-        if (preference.lengthSquared() < 0.0001) {
-            preference = train.rememberedDirection();
-        }
-        if (preference.lengthSquared() < 0.0001) {
-            preference = RailMath.yawDirection(location.getYaw());
-            if (train.reversed) {
-                preference.multiply(-1.0);
-            }
-        }
-        Vector direction = RailMath.direction(rail.rail.getShape(), preference);
-
-        if (index == activeLeaderIndex(train)) {
-            refreshStationLatches(train);
-            synchronized (driverLock) {
-                if (automaticSigns.tick(train, rail.block, location, direction, now)) return;
-            }
-            if (handleSignActions(train, rail.block, location, direction, now)) {
-                return;
-            }
-            prepareStationDeparture(train, now);
-        }
-
-        StationMotion stationMotion = train.stationMotion();
-        boolean stationMoving = stationMotion != null && stationMotion.isMoving();
-        boolean stationWaiting = stationMotion != null && stationMotion.isWaiting();
-        boolean waiting = stationWaiting || train.pauseUntilMillis > now;
-        if (!waiting && train.pauseUntilMillis > 0L) {
-            train.pauseUntilMillis = 0L;
-        }
-        boolean settlingReverse = reverseBraking(train, now);
-
-        boolean controlledStop = (!train.driveControlEnabled && !train.moving) || waiting || settlingReverse
-                || train.emergencyBrake;
-        boolean playerPushCoasting = controlledStop && train.playerPushActive;
-        boolean automaticHandle = train.automaticRun != null && automaticEligible(train);
-        double desiredTrainSpeed = controlledStop ? 0.0
-                : stationMoving ? stationMotion.commandedSpeed(stationMotionMinimumSpeed(stationMotion))
-                : (train.driveControlEnabled || automaticHandle ? train.maxSpeed : train.targetSpeed);
-
-        if (!controlledStop && !stationMoving && index == activeLeaderIndex(train) && rail.poweredRail && rail.powered) {
-            desiredTrainSpeed = Math.max(desiredTrainSpeed, poweredRailBoostSpeed());
-        }
-        if (!controlledStop && !stationMoving && index == activeLeaderIndex(train)
-                && rail.poweredRail && !rail.powered && brakeOnUnpoweredRail()) {
-            desiredTrainSpeed *= 0.25;
-        }
-        desiredTrainSpeed *= RailMath.clamp(train.properties().friction, 0.0, 4.0);
-        desiredTrainSpeed = RailMath.clamp(desiredTrainSpeed, 0.0, trainSpeedLimit);
-        SpeedLimit obstacleLimit = index == activeLeaderIndex(train)
-                ? frontMinecartSpeedLimit(train, cart, location, direction, desiredTrainSpeed)
-                : new SpeedLimit(desiredTrainSpeed, false);
-        VehicleProfile vehicle = plugin.vehicleProfile();
-        boolean speedController = index == activeLeaderIndex(train) && !train.speedControlledRecently(now);
-        double speed;
-        if (speedController && stationMoving && !controlledStop) {
-            speed = Math.min(obstacleLimit.speed,
-                    stationMotion.commandedSpeed(stationMotionMinimumSpeed(stationMotion)));
-            train.seedCurrentSpeed(speed);
-        } else if (speedController && (train.driveControlEnabled || automaticHandle)) {
-            boolean tractionAllowed = !controlledStop
-                    && train.moving
-                    && train.reverser != Reverser.NEUTRAL
-                    && train.reverser.wantsBackward() == train.reversed
-                    && train.powerNotch > 0
-                    && train.brakeNotch == 0
-                    && !train.emergencyBrake
-                    && train.currentSpeed() <= obstacleLimit.speed + 0.001;
-            if (vehicle.forceMode()) {
-                speed = train.updateDrivenForceSpeed(
-                        now,
-                        obstacleLimit.speed,
-                        vehicle.tractionForce(train.powerNotch),
-                        vehicle.brakeForce(train.brakeNotch),
-                        vehicle.mass(),
-                        vehicle.rollingForce(),
-                        vehicle.airForceFactor(),
-                        vehicle.grade(),
-                        direction.getY(),
-                        vehicle.baseSpeed(),
-                        vehicle.weakeningSpeed(),
-                        vehicle.minimumRatio(),
-                        vehicle.autoDeceleration(),
-                        vehicle.emergencyForce(),
-                        obstacleLimit.emergencyBrake || settlingReverse,
-                        tractionAllowed);
-            } else {
-                speed = train.updateDrivenSpeed(
-                        now,
-                        obstacleLimit.speed,
-                        vehicle.powerAcceleration(train.powerNotch),
-                        vehicle.brakeAcceleration(train.brakeNotch),
-                        vehicle.rolling(),
-                        vehicle.air(),
-                        vehicle.autoDeceleration(),
-                        vehicle.autoEmergency(),
-                        obstacleLimit.emergencyBrake || settlingReverse,
-                        tractionAllowed);
-            }
-        } else if (speedController) {
-            speed = train.updateCurrentSpeed(
-                    now,
-                    obstacleLimit.speed,
-                    vehicle.autoAcceleration(),
-                    playerPushCoasting ? playerPushDecelerationPerTick() : vehicle.autoDeceleration(),
-                    vehicle.autoEmergency(),
-                    obstacleLimit.emergencyBrake || settlingReverse);
-            if (playerPushCoasting && speed <= 0.001) {
-                train.clearPlayerPush();
-            }
-        } else {
-            speed = train.currentSpeed();
-        }
-
-        if (index == activeLeaderIndex(train)) {
-            playTracksideRunningSound(train, cart, speed, currentTick);
-            playBrakeSound(train, cart, now);
-        }
-
-        if (index == activeLeaderIndex(train) && !train.targetLayoutUpdatedRecently(now)) {
-            layoutTrainTargets(train, location, direction, speed, now, currentTick);
-        }
-
-        TrainMemberTarget target = train.memberTarget(entityId, currentTick);
-        if (target == null || now - target.updatedAtMillis > 1000L) {
-            if (trainPhysicsHardLock()) {
-                cart.setVelocity(new Vector());
-                train.memberSpeed(entityId, 0.0);
-                train.snapshot(entityId, new MemberSnapshot(entityId, location, new Vector(), now));
-                return;
-            }
-            Vector velocity = direction.lengthSquared() < 0.0001 || speed <= 0.001
-                    ? new Vector()
-                    : direction.clone().multiply(speed);
-            cart.setVelocity(velocity);
-            train.memberSpeed(entityId, speed);
-            train.snapshot(entityId, new MemberSnapshot(entityId, location, velocity, now));
-            return;
-        }
-
-        applyTrainTarget(train, cart, entityId, target, location, now);
-    }
-
-    private void layoutTrainTargets(Train train, Location leaderLocation, Vector direction, double speed,
-            long now, long currentTick) {
-        List<UUID> members = train.members();
-        if (members.isEmpty()) {
-            return;
-        }
-
-        double consistLength = Math.max(0.0, train.spacing * (members.size() - 1));
-        TrainRailPath trackPath = train.trackPath();
-        if (trackPath == null || !trackPath.isCompatible(leaderLocation, train.reversed, consistLength)) {
-            trackPath = TrainRailPath.create(leaderLocation, direction, train.reversed, consistLength);
-            if (trackPath == null) {
-                train.seedCurrentSpeed(0.0);
-                return;
-            }
-            train.trackPath(trackPath);
-        }
-
-        double elapsedTicks = train.beginMotionFrame(now);
-        double plannedDistance = speed * elapsedTicks;
-        AutomaticRun automaticRun = train.automaticRun;
-        if (automaticRun != null && automaticRun.phase == AutomaticRun.Phase.APPROACH) {
-            plannedDistance = Math.min(plannedDistance, automaticRun.remaining);
-        }
-        double movedThisFrame = 0.0;
-        StationMotion stationMotion = train.stationMotion();
-        if (stationMotion != null && stationMotion.isMoving()) {
-            plannedDistance = Math.min(plannedDistance, stationMotion.remainingDistance());
-        }
-        if (speed > 0.001 && !switchManager.prepareTrain(
-                train, trackPath, leaderLocation, plannedDistance)) {
-            train.seedCurrentSpeed(0.0);
-            speed = 0.0;
-        }
-        if (speed > 0.001) {
-            if (!trackPath.move(plannedDistance, train.reversed)) {
-                train.seedCurrentSpeed(0.0);
-                speed = 0.0;
-            }
-            movedThisFrame = trackPath.lastMoveDistance();
-            if (automaticRun != null && train.automaticRun == automaticRun) {
-                automaticRun.moved(movedThisFrame);
-                if (automaticRun.phase == AutomaticRun.Phase.APPROACH && automaticRun.remaining <= 0.02) {
-                    automaticRun.arrived(now);
-                    train.seedCurrentSpeed(0);
-                    speed = 0;
-                }
-            }
-            infrastructureManager.observeTrainMovement(
-                    train, trackPath.lastMoveProbes(), trackPath.lastMoveDistance());
-            if (stationMotion != null && train.stationMotion() == stationMotion) {
-                StationMotion.AdvanceResult result = stationMotion.advance(trackPath.lastMoveDistance(), now);
-                if (result == StationMotion.AdvanceResult.DOCKED) {
-                    train.seedCurrentSpeed(0.0);
-                    train.pauseUntilMillis = stationMotion.dwellUntilMillis();
-                    speed = 0.0;
-                } else if (result == StationMotion.AdvanceResult.COMPLETE) {
-                    train.clearStationMotion(stationMotion);
-                    train.pauseUntilMillis = 0L;
-                }
-            }
-        } else {
-            infrastructureManager.observeTrainMovement(
-                    train, trackPath.probeAhead(0.0, train.reversed), 0.0);
-        }
-        Map<UUID, TrainMemberTarget> targets = new LinkedHashMap<>();
-        List<TrainRailPath.MemberPlacement> placements = trackPath.placements(
-                members.size(), train.spacing, train.reversed);
-        switchManager.observeTrainLayout(train, placements, now);
-        for (int memberIndex = 0; memberIndex < members.size(); memberIndex++) {
-            TrainRailPath.MemberPlacement placement = placements.get(memberIndex);
-            Location targetLocation = placement.location();
-            Vector targetDirection = placement.direction();
-            targetLocation.setYaw(yawFromDirection(targetDirection));
-            targetLocation.setPitch(0.0F);
-            targets.put(members.get(memberIndex),
-                    new TrainMemberTarget(targetLocation, targetDirection, speed, now));
-        }
-        train.publishMotionFrame(targets, now, currentTick);
-        if (plugin.displaySync() != null) plugin.displaySync().publish(train.id(), targets);
-        if (speed > 0.001) {
-            int leaderIndex = activeLeaderIndex(train);
-            train.rememberDirection(placements.get(leaderIndex).direction());
-        }
-        if (plugin.getConfig().getBoolean("settings.stcs-telemetry-enabled", true)) {
-            long publishTicks = Math.max(1L,
-                    plugin.getConfig().getLong("settings.stcs-telemetry-publish-interval-ticks", 5L));
-            long reconcileTicks = Math.max(20L,
-                    plugin.getConfig().getLong("settings.stcs-telemetry-reconcile-interval-ticks",
-                            plugin.getConfig().getLong("settings.stcs-telemetry-heartbeat-ticks", 100L)));
-            stcsTelemetry.observe(train, driverName(train), movedThisFrame,
-                    now, publishTicks * 50L, reconcileTicks * 50L);
-        }
-    }
-
-    private void applyTrainTarget(Train train, Minecart cart, UUID entityId, TrainMemberTarget target,
-            Location currentLocation, long now) {
-        if (currentLocation.getWorld() == null || !currentLocation.getWorld().equals(target.location.getWorld())) {
-            return;
-        }
-
-        Vector trackVelocity = target.direction.lengthSquared() < 0.0001
-                ? new Vector()
-                : target.direction.clone().normalize().multiply(target.speed);
-        if (trainPhysicsHardLock() && tryOwnedMove(cart, target.location)) {
-            passengerRecoveries.remove(entityId);
-            train.memberSpeed(entityId, target.speed);
-            train.snapshot(entityId, new MemberSnapshot(entityId, cart.getLocation(), trackVelocity, now));
-            return;
-        }
-        if (hasPlayerPassenger(cart) && (trainPhysicsHardLock() || passengerSmoothingEnabled())) {
-            applyPassengerTarget(train, cart, entityId, target, currentLocation, trackVelocity, now);
-            return;
-        }
-        if (trainPhysicsHardLock()) {
-            Location lockedLocation = target.location.clone();
-            boolean completed = teleportTrainMember(cart, lockedLocation, false);
-            if (completed) cart.setVelocity(new Vector());
-            train.memberSpeed(entityId, target.speed);
-            train.snapshot(entityId, new MemberSnapshot(entityId,
-                    completed ? cart.getLocation() : currentLocation, trackVelocity, now));
-            return;
-        }
-
-        double distance = currentLocation.distance(target.location);
-        if (distance > trainPhysicsTeleportDistance() || target.speed <= 0.001) {
-            try {
-                cart.teleport(target.location);
-            } catch (RuntimeException ex) {
-                plugin.getLogger().log(Level.FINE, "Failed to move train member to rail target.", ex);
-            }
-            cart.setVelocity(new Vector());
-            train.memberSpeed(entityId, target.speed);
-            train.snapshot(entityId, new MemberSnapshot(entityId, target.location, new Vector(), now));
-            return;
-        }
-
-        Vector velocity = trackVelocity;
-        Vector correction = target.location.toVector().subtract(currentLocation.toVector())
-                .multiply(trainPhysicsPositionCorrection());
-        double maxCorrection = trainPhysicsMaxCorrectionPerTick();
-        correction.setX(RailMath.clamp(correction.getX(), -maxCorrection, maxCorrection));
-        correction.setY(RailMath.clamp(correction.getY(), -maxCorrection, maxCorrection));
-        correction.setZ(RailMath.clamp(correction.getZ(), -maxCorrection, maxCorrection));
-        velocity.add(correction);
-
-        cart.setVelocity(velocity);
-        train.memberSpeed(entityId, horizontalSpeed(velocity));
-        train.snapshot(entityId, new MemberSnapshot(entityId, currentLocation, velocity, now));
-    }
-
-    private void applyPassengerTarget(Train train, Minecart cart, UUID entityId, TrainMemberTarget target,
-            Location currentLocation, Vector trackVelocity, long now) {
-        // Zero commanded speed is a hold, not permission to drive backwards toward an unreachable
-        // arc target. This also prevents recovery teleports after EB has already stopped the train.
-        if (target.speed <= 0.001) {
-            passengerRecoveries.remove(entityId);
-            cart.setMaxSpeed(0.0);
-            cart.setVelocity(new Vector());
-            train.memberSpeed(entityId, 0.0);
-            train.snapshot(entityId, new MemberSnapshot(entityId, currentLocation, new Vector(), now));
-            return;
-        }
-        double distance = currentLocation.distance(target.location);
-        PassengerRecovery recovery = passengerRecoveries.computeIfAbsent(entityId, ignored -> new PassengerRecovery());
-        boolean guarded = plugin.getConfig().getBoolean("settings.passenger-recovery-guard-enabled", true);
-        double hardLimit = Math.max(passengerTeleportDistance(),
-                plugin.getConfig().getDouble("settings.passenger-recovery-hard-distance", 4.0));
-        double softLimit = Math.min(hardLimit * 0.75,
-                Math.max(passengerTeleportDistance(), target.speed * 2.0));
-        long graceNanos = Math.max(0L, Math.min(40L,
-                plugin.getConfig().getLong("settings.passenger-recovery-grace-ticks", 6L))) * 50_000_000L;
-        boolean recover = guarded
-                ? recovery.shouldRecover(distance, softLimit, hardLimit, graceNanos, System.nanoTime())
-                : distance > passengerTeleportDistance();
-        if (recover) {
-            recovery.reset();
-            passengerRecoveryTeleports.increment();
-            boolean completed = teleportTrainMember(cart, target.location, true);
-            Vector compensatedVelocity = trackVelocity.clone().multiply(1.0 / passengerVanillaMotionFactor());
-            if (completed) cart.setVelocity(compensatedVelocity);
-            train.memberSpeed(entityId, target.speed);
-            train.snapshot(entityId, new MemberSnapshot(entityId,
-                    completed ? cart.getLocation() : currentLocation, compensatedVelocity, now));
-            return;
-        }
-
-        Vector correction = target.location.toVector().subtract(currentLocation.toVector())
-                .multiply(passengerPositionCorrection());
-        double maxCorrection = passengerMaxCorrectionPerTick();
-        correction.setX(RailMath.clamp(correction.getX(), -maxCorrection, maxCorrection));
-        correction.setY(RailMath.clamp(correction.getY(), -maxCorrection, maxCorrection));
-        correction.setZ(RailMath.clamp(correction.getZ(), -maxCorrection, maxCorrection));
-
-        // The previous per-axis cap allowed sqrt(3) times the configured correction on diagonals.
-        if (guarded && correction.lengthSquared() > maxCorrection * maxCorrection) {
-            correction.normalize().multiply(maxCorrection);
-        }
-
-        Vector velocity = trackVelocity.clone().add(correction);
-        if (velocity.lengthSquared() > 0.0000001) {
-            velocity.multiply(1.0 / passengerVanillaMotionFactor());
-        }
-        cart.setVelocity(velocity);
-        train.memberSpeed(entityId, target.speed);
-        train.snapshot(entityId, new MemberSnapshot(entityId, currentLocation, velocity, now));
-    }
-
-    private boolean tryOwnedMove(Minecart cart, Location target) {
-        if (ownedMoverFailed || !plugin.getConfig().getBoolean("settings.owned-region-movement-enabled", true)
-                || !Bukkit.getMinecraftVersion().equals("26.2")) return false;
-        try {
-            boolean passenger = hasPlayerPassenger(cart);
-            if (OwnedTrainMover.move(cart, target, passenger)) {
-                ownedMoves.increment();
-                if (passenger) ownedPassengerMoves.increment();
-                return true;
-            }
-            ownedMoveFallbacks.increment();
-        } catch (RuntimeException | LinkageError ex) {
-            ownedMoverFailed = true;
-            plugin.getLogger().log(Level.WARNING,
-                    "Owned-region movement disabled after failure; retaining original Folia relocation path.", ex);
-        }
-        return false;
-    }
-
-    private boolean teleportTrainMember(Minecart cart, Location target, boolean preserveView) {
-        UUID entityId = cart.getUniqueId();
-        CompletableFuture<Boolean> pending = pendingTeleports.get(entityId);
-        if (pending != null && !pending.isDone()) {
-            return false;
-        }
-        if (pending != null) {
-            pendingTeleports.remove(entityId, pending);
-        }
-
-        Location destination = target.clone();
-        physicalTeleports.increment();
-        if (preserveView) {
-            destination.setYaw(cart.getYaw());
-            destination.setPitch(cart.getPitch());
-        }
-
-        try {
-            if (cart.teleport(destination, TeleportFlag.EntityState.RETAIN_PASSENGERS)) {
-                return true;
-            }
-        } catch (RuntimeException ex) {
-            plugin.getLogger().log(Level.FINEST,
-                    "Synchronous train-member teleport crossed a region boundary; using async teleport.", ex);
-        }
-
-        CompletableFuture<Boolean> reservation = new CompletableFuture<>();
-        if (pendingTeleports.putIfAbsent(entityId, reservation) != null) {
-            return false;
-        }
-        try {
-            cart.teleportAsync(destination, TeleportFlag.EntityState.RETAIN_PASSENGERS)
-                    .whenComplete((success, error) -> {
-                        if (error != null) {
-                            plugin.getLogger().log(Level.FINE,
-                                    "Failed to move train member " + entityId + " across a region boundary.", error);
-                            reservation.completeExceptionally(error);
-                        } else {
-                            reservation.complete(Boolean.TRUE.equals(success));
-                        }
-                        pendingTeleports.remove(entityId, reservation);
-                    });
-        } catch (RuntimeException ex) {
-            pendingTeleports.remove(entityId, reservation);
-            reservation.completeExceptionally(ex);
-            plugin.getLogger().log(Level.FINE, "Failed to schedule train-member teleport.", ex);
-        }
-        return false;
-    }
-
-    private Vector bindVelocityToRail(Minecart cart, RailInfo rail, Location location, Vector velocity, boolean stopped) {
-        if (!railBindEnabled() || rail == null || location == null) {
-            return velocity;
-        }
-
-        double centerX = rail.block.getX() + 0.5;
-        double centerZ = rail.block.getZ() + 0.5;
-        double offsetX = centerX - location.getX();
-        double offsetZ = centerZ - location.getZ();
-        double distanceSquared = offsetX * offsetX + offsetZ * offsetZ;
-        if (distanceSquared < 0.0004) {
-            return velocity;
-        }
-        if (stopped) {
-            return new Vector();
-        }
-
-        double teleportDistance = railBindTeleportDistance();
-        if (distanceSquared > teleportDistance * teleportDistance) {
-            Location target = location.clone();
-            target.setX(centerX);
-            target.setZ(centerZ);
-            target.setYaw(yawFromDirection(velocity.lengthSquared() < 0.0001 ? trainDirectionFallback(cart) : velocity));
-            try {
-                cart.teleportAsync(target);
-            } catch (RuntimeException ex) {
-                plugin.getLogger().log(Level.FINE, "Failed to bind minecart to rail center.", ex);
-            }
-            return velocity;
-        }
-
-        double strength = railBindStrength();
-        double maxCorrection = railBindMaxCorrectionPerTick();
-        double correctionX = RailMath.clamp(offsetX * strength, -maxCorrection, maxCorrection);
-        double correctionZ = RailMath.clamp(offsetZ * strength, -maxCorrection, maxCorrection);
-        return velocity.clone().add(new Vector(correctionX, 0.0, correctionZ));
-    }
-
-    private void applyReverserDirection(Train train, long now) {
-        if (!train.driveControlEnabled || train.reverser == Reverser.NEUTRAL) {
-            return;
-        }
-        boolean desiredReversed = train.reverser.wantsBackward();
-        if (train.reversed == desiredReversed) {
-            return;
-        }
-        if (Math.max(train.currentSpeed(), train.maxMemberSpeed()) > driveDirectionChangeSpeed()) {
-            return;
-        }
-
-        train.reversed = desiredReversed;
-        refreshMemberIndexes(train);
-        train.reverseRememberedDirection();
-        train.reverseMileageDirection();
-        train.clearSnapshots();
-        train.clearMemberSpeeds();
-        train.clearMemberTargets();
-        train.seedCurrentSpeed(0.0);
-        train.reverseSettleUntilMillis = Math.max(train.reverseSettleUntilMillis, now + reverseSettleTicks() * 50L);
-    }
-
-    private void removeNonPlayerPassengers(Minecart cart) {
-        for (Entity passenger : cart.getPassengers()) {
-            if (!(passenger instanceof Player)) {
-                cart.removePassenger(passenger);
-            }
-        }
-    }
-
-    private boolean hasPlayerPassenger(Minecart cart) {
-        for (Entity passenger : cart.getPassengers()) {
-            if (passenger instanceof Player) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean reverseBraking(Train train, long now) {
-        if (!train.reversePending && train.reverseSettleUntilMillis <= 0L && train.reverseBrakeDeadlineMillis <= 0L) {
-            return false;
-        }
-        if (now < train.reverseSettleUntilMillis) {
-            return true;
-        }
-        if (now < train.reverseBrakeDeadlineMillis
-                && Math.max(train.currentSpeed(), train.maxMemberSpeed()) > reverseReleaseSpeed()) {
-            return true;
-        }
-
-        train.reverseSettleUntilMillis = 0L;
-        train.reverseBrakeDeadlineMillis = 0L;
-        if (train.reversePending) {
-            train.reversePending = false;
-            train.reversed = !train.reversed;
-            refreshMemberIndexes(train);
-            train.reverseRememberedDirection();
-            train.reverseMileageDirection();
-            train.clearSnapshots();
-            train.clearMemberSpeeds();
-            train.clearMemberTargets();
-            train.seedCurrentSpeed(0.0);
-            return true;
-        }
-        return false;
-    }
-
-    private SpeedLimit frontMinecartSpeedLimit(Train train, Minecart cart, Location location, Vector direction,
-            double desiredSpeed) {
-        if (!frontMinecartDetectionEnabled() || desiredSpeed <= 0.001 || direction.lengthSquared() < 0.0001) {
-            return new SpeedLimit(desiredSpeed, false);
-        }
-
-        Vector forward = direction.clone().setY(0.0);
-        if (forward.lengthSquared() < 0.0001) {
-            return new SpeedLimit(desiredSpeed, false);
-        }
-        forward.normalize();
-
-        double detectionDistance = frontMinecartDetectionDistance();
-        double stopDistance = Math.min(frontMinecartStopDistance(), detectionDistance - 0.1);
-        double lateralDistance = frontMinecartLateralDistance();
-        double closest = Double.MAX_VALUE;
-
-        for (Entity entity : cart.getNearbyEntities(detectionDistance, 2.0, detectionDistance)) {
-            if (!(entity instanceof Minecart other) || !other.isValid() || other.isDead()) {
-                continue;
-            }
-            if (other.getUniqueId().equals(cart.getUniqueId()) || train.contains(other.getUniqueId())
-                    || isSameTrain(cart, other)) {
-                continue;
-            }
-            if (!other.getWorld().equals(cart.getWorld())) {
-                continue;
-            }
-
-            Vector offset = other.getLocation().toVector().subtract(location.toVector());
-            if (Math.abs(offset.getY()) > 1.75) {
-                continue;
-            }
-            Vector flat = offset.clone().setY(0.0);
-            double aheadDistance = flat.dot(forward);
-            if (aheadDistance <= 0.0 || aheadDistance > detectionDistance) {
-                continue;
-            }
-            double lateralSquared = Math.max(0.0, flat.lengthSquared() - aheadDistance * aheadDistance);
-            if (lateralSquared > lateralDistance * lateralDistance) {
-                continue;
-            }
-            closest = Math.min(closest, aheadDistance);
-        }
-
-        if (closest == Double.MAX_VALUE) {
-            return new SpeedLimit(desiredSpeed, false);
-        }
-        if (closest <= stopDistance) {
-            return new SpeedLimit(0.0, true);
-        }
-
-        double range = Math.max(0.1, detectionDistance - stopDistance);
-        double ratio = RailMath.clamp((closest - stopDistance) / range, 0.0, 1.0);
-        boolean emergencyBrake = closest <= stopDistance + 0.75;
-        return new SpeedLimit(Math.min(desiredSpeed, desiredSpeed * ratio), emergencyBrake);
-    }
-
-    private double coupledMemberSpeed(Train train, double baseSpeed, MemberSnapshot target, double followDistance,
-            boolean controlledStop) {
-        if (target == null || followDistance < 0.0) {
-            return baseSpeed;
-        }
-
-        double spacing = Math.max(0.1, train.spacing);
-        double targetSpeed = horizontalSpeed(target.velocity);
-        double hardStopDistance = spacing * coupledHardStopRatio();
-
-        if (followDistance <= hardStopDistance) {
-            return 0.0;
-        }
-        if (controlledStop || train.reversePending) {
-            return RailMath.clamp(Math.min(baseSpeed, targetSpeed + coupledBrakeSpeedBuffer()), 0.0, train.maxSpeed);
-        }
-
-        return RailMath.clamp(baseSpeed, 0.0, train.maxSpeed);
-    }
-
-    private Vector trainDirectionFallback(Minecart cart) {
-        Vector velocity = cart.getVelocity();
-        if (velocity.lengthSquared() > 0.0001) {
-            return velocity;
-        }
-        return RailMath.yawDirection(cart.getLocation().getYaw());
-    }
-
-    private double horizontalSpeed(Vector velocity) {
-        if (velocity == null) {
-            return 0.0;
-        }
-        return Math.sqrt(velocity.getX() * velocity.getX() + velocity.getZ() * velocity.getZ());
-    }
-
-    private int activeLeaderIndex(Train train) {
-        return train.reversed ? Math.max(0, train.memberCount() - 1) : 0;
-    }
-
     void playLeaderSound(Train train, Sound sound, SoundCategory category, float volume, float pitch) {
-        List<UUID> members = train.members();
-        if (members.isEmpty()) return;
-        UUID leaderId = members.get(train.reversed ? members.size() - 1 : 0);
-        Minecart leader = managedCarts.get(leaderId);
-        if (leader == null) return;
-        // Resolve world state only on the selected emitter's owning region.
-        leader.getScheduler().run(plugin, task -> {
-            if (leader.isValid() && !leader.isDead() && trainForCart(leader) == train
-                    && train.properties().soundEnabled) {
-                leader.getWorld().playSound(leader, sound, category, volume, pitch);
-            }
-        }, null);
+        audio.playLeaderSound(train, sound, category, volume, pitch);
     }
 
-    private Location activeLeaderLocation(Train train) {
+    Location activeLeaderLocation(Train train) {
         List<UUID> members = train.members();
         if (members.isEmpty()) {
             return null;
         }
-        UUID leaderId = members.get(activeLeaderIndex(train));
+        UUID leaderId = members.get(motion.activeLeaderIndex(train));
         Minecart leader = managedCarts.get(leaderId);
         if (leader != null && leader.isValid() && !leader.isDead()) {
             return leader.getLocation();
@@ -2567,7 +1135,7 @@ final class TrainManager {
         return world == null ? null : new Location(world, snapshot.x, snapshot.y, snapshot.z);
     }
 
-    private Vector activeLeaderDirection(Train train, Location leaderLocation) {
+    Vector activeLeaderDirection(Train train, Location leaderLocation) {
         TrainRailPath trackPath = train.trackPath();
         TrainTrackPosition trackPosition = trackPath == null
                 ? null : trackPath.activeLeaderTrackPosition(train.reversed);
@@ -2582,7 +1150,8 @@ final class TrainManager {
                 : RailMath.yawDirection(leaderLocation.getYaw());
     }
 
-    private void refreshMemberIndexes(Train train) {
+    @Override
+    public void refreshMemberIndexes(Train train) {
         List<UUID> members = train.members();
         for (int i = 0; i < members.size(); i++) {
             UUID entityId = members.get(i);
@@ -2590,203 +1159,8 @@ final class TrainManager {
         }
     }
 
-    private boolean handleSignActions(Train train, Block railBlock, Location leaderLocation,
-            Vector travelDirection, long now) {
-        for (Block block : nearbySignBlocks(railBlock)) {
-            if (!RailSignAccess.readable(block)) continue;
-            BlockState state = block.getState();
-            if (!(state instanceof Sign sign)) {
-                continue;
-            }
-
-            String header = plain(sign.getLine(0));
-            if (!SignHeaders.isSkyTrain(header) || !isHeaderActive(header, block)) {
-                continue;
-            }
-
-            String key = signKey(block);
-            String actionLine = plain(sign.getLine(1));
-            if (AutomaticSigns.action(actionLine)) continue;
-            if ("station".equals(firstToken(actionLine)) && train.stationLatched(key)) {
-                continue;
-            }
-            if (!train.canTriggerSign(key, now, signCooldownMillis())) {
-                continue;
-            }
-
-            if (triggerSign(train, actionLine, plain(sign.getLine(2)), plain(sign.getLine(3)),
-                    block, key, leaderLocation, travelDirection, now)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private List<Block> nearbySignBlocks(Block railBlock) {
-        List<Block> blocks = new ArrayList<>(27);
-        for (int y = -1; y <= 1; y++) {
-            for (int x = -1; x <= 1; x++) {
-                for (int z = -1; z <= 1; z++) {
-                    blocks.add(railBlock.getRelative(x, y, z));
-                }
-            }
-        }
-        return blocks;
-    }
-
-    private boolean triggerSign(Train train, String actionLine, String valueLine,
-            String modifierLine, Block signBlock, String signKey, Location leaderLocation,
-            Vector travelDirection, long now) {
-        String[] tokens = actionLine.trim().split("\\s+");
-        if (tokens.length == 0 || tokens[0].isBlank()) {
-            return false;
-        }
-
-        String action = tokens[0].toLowerCase(Locale.ROOT);
-        String value = tokens.length >= 2 ? tokens[1] : valueLine;
-        if ("station".equals(action) && train.stationLatched(signKey)) {
-            return false;
-        }
-        if (AutomaticSigns.action(actionLine)) return false;
-        switch (action) {
-            case "station":
-                train.latchStation(signKey);
-                if (!train.properties().conductionMode.automatic()) {
-                    break;
-                }
-                long waitTicks = stationWaitTicks(value, train);
-                double dockingDistance = stationDockingDistance(
-                        train, signKey, leaderLocation, travelDirection);
-                boolean reverseOnDeparture = stationDepartureReverses(
-                        train, signBlock, modifierLine, travelDirection);
-                train.clearPlayerPush();
-                train.driveControlEnabled = false;
-                train.moving = true;
-                train.pauseUntilMillis = 0L;
-                train.beginStationMotion(signKey, dockingDistance,
-                        Math.max(train.currentSpeed(), train.maxMemberSpeed()),
-                        waitTicks * 50L, reverseOnDeparture, now);
-                StationMotion stationMotion = train.stationMotion();
-                if (stationMotion != null && stationMotion.isWaiting()) {
-                    train.seedCurrentSpeed(0.0);
-                    train.pauseUntilMillis = stationMotion.dwellUntilMillis();
-                }
-                break;
-            case "property":
-                if (value != null && !value.isBlank() && signPropertyAllowed(value)) {
-                    setProperty(train.name(), value, modifierLine);
-                }
-                break;
-            default:
-                break;
-        }
-        return false;
-    }
-
-    private boolean stationDepartureReverses(Train train, Block signBlock, String modifierLine,
-            Vector travelDirection) {
-        String departure = modifierLine == null ? "continue" : modifierLine.trim().toLowerCase(Locale.ROOT);
-        boolean reverse = "reverse".equals(departure);
-        if ("left".equals(departure) || "right".equals(departure)) {
-            Vector wanted = stationManager.departureDirection(signBlock, departure);
-            Vector current = travelDirection == null || travelDirection.lengthSquared() < 0.0001
-                    ? train.rememberedDirection() : travelDirection;
-            reverse = wanted.lengthSquared() >= 0.0001 && current.lengthSquared() >= 0.0001
-                    && wanted.dot(current) < 0.0;
-        }
-        return reverse;
-    }
-
-    private double stationDockingDistance(Train train, String signKey, Location leaderLocation,
-            Vector travelDirection) {
-        double consistCenterOffset = Math.max(0.0, train.spacing * (train.memberCount() - 1) * 0.5);
-        double stationOffset = 0.0;
-        Location stopLocation = stationManager.stopLocation(signKey, travelDirection);
-        if (stopLocation != null && leaderLocation != null && leaderLocation.getWorld() != null
-                && leaderLocation.getWorld().equals(stopLocation.getWorld())
-                && travelDirection != null && travelDirection.lengthSquared() >= 0.0001) {
-            Vector direction = travelDirection.clone().normalize();
-            stationOffset = stopLocation.toVector().subtract(leaderLocation.toVector()).dot(direction);
-        }
-        return RailMath.clamp(
-                stationOffset + consistCenterOffset + stationDockingStopOffset(),
-                0.0,
-                stationDockingMaxDistance());
-    }
-
-    private void prepareStationDeparture(Train train, long now) {
-        StationMotion stationMotion = train.stationMotion();
-        if (stationMotion == null || !stationMotion.dwellExpired(now)) {
-            return;
-        }
-        if (stationMotion.needsDepartureReverse(train.reversed)) {
-            if (!train.reversePending) {
-                train.reversePending = true;
-                train.reverseBrakeDeadlineMillis = Math.max(train.reverseBrakeDeadlineMillis,
-                        now + reverseMaxBrakeTicks() * 50L);
-            }
-            return;
-        }
-        if (train.reversePending || train.reverseSettleUntilMillis > now) {
-            return;
-        }
-        train.pauseUntilMillis = 0L;
-        stationMotion.beginDeparture(train.targetSpeed, stationDepartureDistance());
-        if (stationMotion.phase() == StationMotion.Phase.COMPLETE) {
-            train.clearStationMotion(stationMotion);
-        }
-    }
-
-    private double stationMotionMinimumSpeed(StationMotion stationMotion) {
-        return stationMotion.phase() == StationMotion.Phase.DOCKING
-                ? stationDockingMinSpeed() : stationDepartureMinSpeed();
-    }
-
-    private void refreshStationLatches(Train train) {
-        if (train.stationLatches().isEmpty()) {
-            return;
-        }
-        double releaseDistanceSquared = stationReleaseDistance() * stationReleaseDistance();
-        List<MemberSnapshot> snapshots = train.snapshots();
-        for (String key : train.stationLatches()) {
-            Location sign = stationManager.signLocation(key);
-            if (sign == null) {
-                train.releaseStation(key);
-                continue;
-            }
-            boolean occupied = snapshots.stream().anyMatch(snapshot ->
-                    snapshot.worldName.equals(sign.getWorld().getName())
-                            && square(snapshot.x - sign.getX())
-                                    + square(snapshot.y - sign.getY())
-                                    + square(snapshot.z - sign.getZ()) <= releaseDistanceSquared);
-            if (!occupied) {
-                train.releaseStation(key);
-            }
-        }
-    }
-
-    private void nextRouteDestination(Train train) {
-        List<String> route = train.properties().route();
-        if (route.isEmpty()) {
-            return;
-        }
-        String current = train.properties().destination;
-        int nextIndex = 0;
-        for (int i = 0; i < route.size(); i++) {
-            if (route.get(i).equalsIgnoreCase(current)) {
-                nextIndex = (i + 1) % route.size();
-                break;
-            }
-        }
-        train.properties().destination = route.get(nextIndex);
-    }
-
-    private String signKey(Block block) {
-        return block.getWorld().getName() + ':' + block.getX() + ':' + block.getY() + ':' + block.getZ();
-    }
-
     private void arrangeTrainCarts(Train train, List<Minecart> carts, Location origin) {
-        if (!autoArrangeEnabled() || train == null || carts == null || carts.size() < 2) {
+        if (!settings.autoArrangeEnabled() || train == null || carts == null || carts.size() < 2) {
             return;
         }
 
@@ -2820,9 +1194,9 @@ final class TrainManager {
 
         Minecart anchor = ordered.get(0);
         Location anchorLocation = anchor.getLocation();
-        double spacing = autoArrangeSpacing();
-        if (forceTightSpacing()) {
-            spacing = tightSpacing();
+        double spacing = settings.autoArrangeSpacing();
+        if (settings.forceTightSpacing()) {
+            spacing = settings.tightSpacing();
         }
         train.spacing = spacing;
         train.clearMemberTargets();
@@ -2832,86 +1206,15 @@ final class TrainManager {
             markCart(cart, train, i);
             ensureTask(cart, train);
             Location target = anchorLocation.clone().add(direction.clone().multiply(-spacing * i));
-            target.setYaw(yawFromDirection(direction));
+            target.setYaw(actuator.yawFromDirection(direction));
             target.setPitch(0.0F);
-            scheduleTeleportAndStop(cart, target);
+            actuator.scheduleTeleportAndStop(cart, target);
         }
-        showConsistLabels(train, ordered);
+        labels.showConsistLabels(train, ordered);
     }
 
     void showConsistLabels(Train train) {
-        if (train == null) {
-            return;
-        }
-        List<Minecart> carts = train.members().stream()
-                .map(managedCarts::get)
-                .filter(java.util.Objects::nonNull)
-                .toList();
-        showConsistLabels(train, carts);
-    }
-
-    private void showConsistLabels(Train train, List<Minecart> carts) {
-        if (train == null || carts == null || carts.isEmpty()) {
-            return;
-        }
-
-        long visibleTicks = consistLabelVisibleTicks();
-        if (visibleTicks <= 0L) {
-            return;
-        }
-
-        for (Minecart cart : carts) {
-            if (cart == null || !cart.isValid() || cart.isDead()) {
-                continue;
-            }
-            int index = train.indexOf(cart.getUniqueId());
-            if (index < 0) {
-                continue;
-            }
-            try {
-                cart.getScheduler().run(
-                        plugin,
-                        task -> {
-                            if (!cart.isValid() || cart.isDead()) {
-                                return;
-                            }
-                            ConsistLabelState original = consistLabelStates.computeIfAbsent(
-                                    cart.getUniqueId(),
-                                    ignored -> new ConsistLabelState(cart.getCustomName(), cart.isCustomNameVisible()));
-                            long version = consistLabelVersions.merge(cart.getUniqueId(), 1L, Long::sum);
-                            cart.setCustomName(ChatColor.AQUA + Integer.toString(index + 1) + "车");
-                            cart.setCustomNameVisible(true);
-                            scheduleConsistLabelReset(cart, original, version, visibleTicks);
-                        },
-                        () -> {
-                            consistLabelStates.remove(cart.getUniqueId());
-                            consistLabelVersions.remove(cart.getUniqueId());
-                        });
-            } catch (RuntimeException ex) {
-                plugin.getLogger().log(Level.FINE, "Failed to show train consist label.", ex);
-            }
-        }
-    }
-
-    private void scheduleConsistLabelReset(Minecart cart, ConsistLabelState original, long version,
-            long visibleTicks) {
-        cart.getScheduler().runDelayed(
-                plugin,
-                task -> {
-                    if (!cart.isValid() || cart.isDead()
-                            || consistLabelVersions.getOrDefault(cart.getUniqueId(), 0L) != version) {
-                        return;
-                    }
-                    cart.setCustomName(original.name());
-                    cart.setCustomNameVisible(original.visible());
-                    consistLabelVersions.remove(cart.getUniqueId(), version);
-                    consistLabelStates.remove(cart.getUniqueId(), original);
-                },
-                () -> {
-                    consistLabelStates.remove(cart.getUniqueId(), original);
-                    consistLabelVersions.remove(cart.getUniqueId(), version);
-                },
-                visibleTicks);
+        labels.showConsistLabels(train);
     }
 
     private Vector directionPreference(Location anchor, List<Minecart> carts) {
@@ -2932,51 +1235,6 @@ final class TrainManager {
         return RailMath.yawDirection(anchor.getYaw());
     }
 
-    private void scheduleTeleportAndStop(Minecart cart, Location target) {
-        try {
-            cart.getScheduler().run(
-                    plugin,
-                    task -> {
-                        if (!cart.isValid() || cart.isDead()) {
-                            return;
-                        }
-
-                        cart.teleportAsync(target).whenComplete((success, error) -> {
-                            if (error != null) {
-                                plugin.getLogger().log(Level.WARNING,
-                                        "Failed to arrange train cart " + cart.getUniqueId(), error);
-                                return;
-                            }
-                            if (!Boolean.TRUE.equals(success)) {
-                                return;
-                            }
-                            try {
-                                cart.getScheduler().run(
-                                        plugin,
-                                        followUp -> {
-                                            if (cart.isValid() && !cart.isDead()) {
-                                                cart.setVelocity(new Vector());
-                                            }
-                                        },
-                                        () -> {
-                                        });
-                            } catch (RuntimeException ex) {
-                                plugin.getLogger().log(Level.WARNING,
-                                        "Failed to stop arranged train cart " + cart.getUniqueId(), ex);
-                            }
-                        });
-                    },
-                    () -> {
-                    });
-        } catch (RuntimeException ex) {
-            plugin.getLogger().log(Level.WARNING, "Failed to arrange train cart " + cart.getUniqueId(), ex);
-        }
-    }
-
-    private float yawFromDirection(Vector direction) {
-        return (float) Math.toDegrees(Math.atan2(-direction.getX(), direction.getZ()));
-    }
-
     private List<Minecart> nearbyMinecarts(Minecart origin, double radius) {
         List<Minecart> carts = new ArrayList<>();
         for (Entity entity : origin.getNearbyEntities(radius, radius, radius)) {
@@ -2987,7 +1245,7 @@ final class TrainManager {
         return carts;
     }
 
-    private List<Minecart> minecartsNear(Player player, Location center, double radius) {
+    List<Minecart> minecartsNear(Player player, Location center, double radius) {
         List<Minecart> carts = new ArrayList<>();
         Entity vehicle = player.getVehicle();
         if (vehicle instanceof Minecart minecart && isNear(minecart, center, radius)) {
@@ -3020,7 +1278,7 @@ final class TrainManager {
         }
         return unique.values().stream()
                 .sorted(Comparator.comparingDouble(cart -> distanceSquared(origin, cart)))
-                .limit(maxAutoLinkCarts())
+                .limit(settings.maxAutoLinkCarts())
                 .toList();
     }
 
@@ -3048,26 +1306,6 @@ final class TrainManager {
         return prefix + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
-    private String firstToken(String line) {
-        if (line == null) {
-            return "";
-        }
-        String clean = plain(line).trim();
-        if (clean.isEmpty()) {
-            return "";
-        }
-        return clean.split("\\s+")[0].toLowerCase(Locale.ROOT);
-    }
-
-    private boolean isSignAction(String action) {
-        return switch (action) {
-            case "start", "go", "launch", "stop", "halt", "reverse", "back", "speed", "setspeed", "maxspeed",
-                    "station", "wait", "destination", "dest", "clear-destination", "cleardestination",
-                    "next", "next-destination", "nextdestination", "route" -> true;
-            default -> false;
-        };
-    }
-
     private java.util.OptionalDouble parseDouble(String value) {
         if (value == null || value.isBlank()) {
             return java.util.OptionalDouble.empty();
@@ -3076,84 +1314,6 @@ final class TrainManager {
             return java.util.OptionalDouble.of(Double.parseDouble(value.trim()));
         } catch (NumberFormatException ex) {
             return java.util.OptionalDouble.empty();
-        }
-    }
-
-    private long stationWaitTicks(String value, Train train) {
-        java.util.OptionalLong parsed = parseDurationTicks(value);
-        if (parsed.isPresent()) {
-            return parsed.getAsLong();
-        }
-        if (train.properties().waitTicks > 0) {
-            return train.properties().waitTicks;
-        }
-        return defaultStationWaitTicks();
-    }
-
-    private java.util.OptionalLong parseDurationTicks(String value) {
-        if (value == null || value.isBlank()) {
-            return java.util.OptionalLong.empty();
-        }
-
-        String clean = plain(value).trim().toLowerCase(Locale.ROOT);
-        if (clean.isEmpty()) {
-            return java.util.OptionalLong.empty();
-        }
-
-        DurationUnit unit = DurationUnit.AUTO;
-        String number = clean;
-        if (number.endsWith("milliseconds")) {
-            unit = DurationUnit.MILLISECONDS;
-            number = number.substring(0, number.length() - "milliseconds".length());
-        } else if (number.endsWith("millis")) {
-            unit = DurationUnit.MILLISECONDS;
-            number = number.substring(0, number.length() - "millis".length());
-        } else if (number.endsWith("ms")) {
-            unit = DurationUnit.MILLISECONDS;
-            number = number.substring(0, number.length() - "ms".length());
-        } else if (number.endsWith("ticks")) {
-            unit = DurationUnit.TICKS;
-            number = number.substring(0, number.length() - "ticks".length());
-        } else if (number.endsWith("tick")) {
-            unit = DurationUnit.TICKS;
-            number = number.substring(0, number.length() - "tick".length());
-        } else if (number.endsWith("t")) {
-            unit = DurationUnit.TICKS;
-            number = number.substring(0, number.length() - 1);
-        } else if (number.endsWith("seconds")) {
-            unit = DurationUnit.SECONDS;
-            number = number.substring(0, number.length() - "seconds".length());
-        } else if (number.endsWith("second")) {
-            unit = DurationUnit.SECONDS;
-            number = number.substring(0, number.length() - "second".length());
-        } else if (number.endsWith("secs")) {
-            unit = DurationUnit.SECONDS;
-            number = number.substring(0, number.length() - "secs".length());
-        } else if (number.endsWith("sec")) {
-            unit = DurationUnit.SECONDS;
-            number = number.substring(0, number.length() - "sec".length());
-        } else if (number.endsWith("秒")) {
-            unit = DurationUnit.SECONDS;
-            number = number.substring(0, number.length() - 1);
-        } else if (number.endsWith("s")) {
-            unit = DurationUnit.SECONDS;
-            number = number.substring(0, number.length() - 1);
-        }
-
-        try {
-            double amount = Double.parseDouble(number.trim());
-            if (amount <= 0.0) {
-                return java.util.OptionalLong.of(0L);
-            }
-            long ticks = switch (unit) {
-                case MILLISECONDS -> Math.round(amount / 50.0);
-                case SECONDS -> Math.round(amount * 20.0);
-                case TICKS -> Math.round(amount);
-                case AUTO -> amount <= 20.0 ? Math.round(amount * 20.0) : Math.round(amount);
-            };
-            return java.util.OptionalLong.of(Math.max(0L, ticks));
-        } catch (NumberFormatException ex) {
-            return java.util.OptionalLong.empty();
         }
     }
 
@@ -3212,7 +1372,7 @@ final class TrainManager {
     }
 
     private void clearCartMark(Minecart cart) {
-        forgetDisplay(cart.getUniqueId());
+        actuator.forgetDisplay(cart.getUniqueId());
         PersistentDataContainer data = cart.getPersistentDataContainer();
         data.remove(trainIdKey);
         data.remove(trainNameKey);
@@ -3265,12 +1425,6 @@ final class TrainManager {
         cart.setVelocity(new Vector());
     }
 
-    private void applyForcedSpacing(Train train) {
-        if (forceTightSpacing()) {
-            train.spacing = tightSpacing();
-        }
-    }
-
     private UUID readTrainId(Minecart cart) {
         String id = cart.getPersistentDataContainer().get(trainIdKey, PersistentDataType.STRING);
         if (id == null || id.isBlank()) {
@@ -3281,14 +1435,6 @@ final class TrainManager {
         } catch (IllegalArgumentException ex) {
             return null;
         }
-    }
-
-    private static boolean sameWorld(MemberSnapshot snapshot, Location location) {
-        return location.getWorld() != null && snapshot.worldName.equals(location.getWorld().getName());
-    }
-
-    private static String plain(String text) {
-        return ChatColor.stripColor(text == null ? "" : text).trim();
     }
 
     private String cleanName(String name) {
@@ -3302,375 +1448,49 @@ final class TrainManager {
         return clean;
     }
 
-    private String normalizeProperty(String property) {
+    String normalizeProperty(String property) {
         if (property == null || property.isBlank()) {
             throw new IllegalArgumentException("属性名不能为空。");
         }
         return property.toLowerCase(Locale.ROOT).replace("-", "").replace("_", "");
     }
 
-    private double defaultSpeed() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.default-speed", 0.35), 0.0, maxSpeed());
-    }
-
-    private double maxSpeed() {
-        return Math.min(plugin.vehicleProfile().defaultMaxSpeed(), plugin.serverSpeedLimit());
-    }
-
-    private double maxAllowedSpeed() {
-        return Math.min(plugin.vehicleProfile().maxSpeed(), plugin.serverSpeedLimit());
-    }
-
-    private double maxSpeedChangePerTick() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.max-speed-change-per-tick", 0.035), 0.001, 0.5);
-    }
-
-    private double poweredRailBoostSpeed() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.powered-rail-boost-speed", 0.6), 0.0, maxSpeed());
-    }
-
-    private double defaultSpacing() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.default-spacing", 1.10), 0.8, 8.0);
-    }
-
-    private double spacingCorrection() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.spacing-correction", 0.045), 0.0, 0.5);
-    }
-
-    private double spacingFollowCorrection() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.spacing-follow-correction", 0.35), 0.0, 2.0);
-    }
-
-    private boolean forceTightSpacing() {
-        return plugin.getConfig().getBoolean("settings.force-tight-spacing", true);
-    }
-
-    private double tightSpacing() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.tight-spacing", 1.10), 0.6, 2.0);
-    }
-
-    private long reverseSettleTicks() {
-        return Math.max(1L, plugin.getConfig().getLong("settings.reverse-settle-ticks", 12L));
-    }
-
-    private long reverseMaxBrakeTicks() {
-        return Math.max(reverseSettleTicks(), plugin.getConfig().getLong("settings.reverse-max-brake-ticks", 40L));
-    }
-
-    private double reverseReleaseSpeed() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.reverse-release-speed", 0.04), 0.0, maxSpeed());
-    }
-
-    private double minimumFollowDistanceRatio() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.minimum-follow-distance-ratio", 0.72), 0.25, 0.95);
-    }
-
-    private boolean railBindEnabled() {
-        return plugin.getConfig().getBoolean("settings.rail-bind-enabled", true);
-    }
-
-    private double railBindStrength() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.rail-bind-strength", 0.45), 0.0, 1.0);
-    }
-
-    private double railBindMaxCorrectionPerTick() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.rail-bind-max-correction-per-tick", 0.035),
-                0.0,
-                0.2);
-    }
-
-    private double railBindTeleportDistance() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.rail-bind-teleport-distance", 0.55), 0.1, 2.0);
-    }
-
-    private boolean trainPhysicsHardLock() {
-        return plugin.getConfig().getBoolean("settings.track-coordinate-physics", true);
-    }
-
-    private double trainPhysicsPositionCorrection() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.train-physics-position-correction", 0.75), 0.0, 2.0);
-    }
-
-    private double trainPhysicsMaxCorrectionPerTick() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.train-physics-max-correction-per-tick", 0.20), 0.0, 1.0);
-    }
-
-    private double trainPhysicsTeleportDistance() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.train-physics-teleport-distance", 0.45), 0.05, 2.0);
-    }
-
-    private boolean passengerSmoothingEnabled() {
-        return plugin.getConfig().getBoolean("settings.passenger-smoothing-enabled", true);
-    }
-
-    private double passengerPositionCorrection() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.passenger-position-correction", 0.30), 0.0, 1.0);
-    }
-
-    private double passengerMaxCorrectionPerTick() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.passenger-max-correction-per-tick", 0.10), 0.0, 0.5);
-    }
-
-    private double passengerTeleportDistance() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.passenger-teleport-distance", 1.25), 0.25, 4.0);
-    }
-
-    private double passengerSettleDistance() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.passenger-settle-distance", 0.04), 0.005, 0.25);
-    }
-
-    private double passengerVanillaMotionFactor() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.passenger-vanilla-motion-factor", 0.75), 0.25, 1.0);
-    }
-
-    private void playTracksideRunningSound(Train train, Minecart cart, double speed, long currentTick) {
-        if (!train.properties().soundEnabled
-                || !plugin.getConfig().getBoolean("settings.trackside-running-sound-enabled", true)
-                || speed < tracksideRunningSoundMinSpeed()) {
-            return;
-        }
-
-        int interval = tracksideRunningSoundIntervalTicks();
-        if (Math.floorMod(currentTick + train.id().hashCode(), interval) != 0) {
-            return;
-        }
-
-        double start = RailMath.clamp(plugin.getConfig().getDouble("settings.trackside-running-sound-start-kmh", 10), 0, 400);
-        double full = RailMath.clamp(plugin.getConfig().getDouble("settings.trackside-running-sound-full-kmh", 120), start + 1, 1000);
-        double speedRatio = TrainSoundState.level(Math.abs(speed) * 72, start, full);
-        if (speedRatio <= 0) return;
-        double minPitch = tracksideRunningSoundMinPitch();
-        float pitch = (float) (minPitch
-                + (tracksideRunningSoundMaxPitch() - minPitch) * speedRatio);
-        cart.getWorld().playSound(
-                cart,
-                Sound.ENTITY_MINECART_RIDING,
-                SoundCategory.NEUTRAL,
-                (float) (tracksideRunningSoundVolume() * speedRatio),
-                pitch);
-    }
-
-    private void playBrakeSound(Train train, Minecart cart, long now) {
-        boolean enabled = train.properties().soundEnabled
-                && plugin.getConfig().getBoolean("settings.brake-sound-enabled", true);
-        long cooldown = Math.max(0, Math.min(5000, plugin.getConfig().getLong("settings.brake-sound-cooldown-ms", 300)));
-        int event = train.soundState.brakeEvent(train.emergencyBrake ? 8 : train.brakeNotch, now, cooldown, enabled);
-        if (event == 0) return;
-        String type = event > 0 ? "apply" : "release";
-        float volume = (float) RailMath.clamp(plugin.getConfig().getDouble("settings.brake-sound-" + type + "-volume", event > 0 ? .45 : .55), 0, 1);
-        float pitch = (float) RailMath.clamp(plugin.getConfig().getDouble("settings.brake-sound-" + type + "-pitch", event > 0 ? 1.5 : .7), .5, 2);
-        cart.getWorld().playSound(cart, Sound.BLOCK_FIRE_EXTINGUISH, SoundCategory.NEUTRAL, volume, pitch);
-    }
-
-    private int tracksideRunningSoundIntervalTicks() {
-        return Math.max(4, Math.min(100,
-                plugin.getConfig().getInt("settings.trackside-running-sound-interval-ticks", 16)));
-    }
-
-    private double tracksideRunningSoundMinSpeed() {
-        return RailMath.clamp(
-                plugin.getConfig().getDouble("settings.trackside-running-sound-min-speed", 0.025),
-                0.0,
-                1.0);
-    }
-
-    private double tracksideRunningSoundVolume() {
-        return RailMath.clamp(
-                plugin.getConfig().getDouble("settings.trackside-running-sound-volume", 0.85),
-                0.0,
-                4.0);
-    }
-
-    private double tracksideRunningSoundMinPitch() {
-        return RailMath.clamp(
-                plugin.getConfig().getDouble("settings.trackside-running-sound-min-pitch", 0.75),
-                0.5,
-                2.0);
-    }
-
-    private double tracksideRunningSoundMaxPitch() {
-        double minPitch = tracksideRunningSoundMinPitch();
-        return RailMath.clamp(
-                plugin.getConfig().getDouble("settings.trackside-running-sound-max-pitch", 1.20),
-                minPitch,
-                2.0);
-    }
-
-
-    private double playerPushImpulse() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.player-push-impulse", 0.055), 0.005, 0.5);
-    }
-
-    private double playerPushMovementBonus() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.player-push-movement-bonus", 0.045), 0.0, 0.5);
-    }
-
-    private double playerPushMaxSpeed() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.player-push-max-speed", 0.22), 0.01, 1.0);
-    }
-
-    private double playerPushActivationSpeed() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.player-push-activation-speed", 0.035), 0.0, 0.25);
-    }
-
-    private double playerPushDecelerationPerTick() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.player-push-deceleration-per-tick", 0.004), 0.0001, 0.1);
-    }
-
-    private double driveDirectionChangeSpeed() { return plugin.vehicleProfile().reverseSpeed(); }
-
-    private boolean frontMinecartDetectionEnabled() {
-        return plugin.getConfig().getBoolean("settings.front-minecart-detection-enabled", true);
-    }
-
-    private double frontMinecartDetectionDistance() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.front-minecart-detection-distance", 8.0), 2.0, 32.0);
-    }
-
-    private double frontMinecartStopDistance() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.front-minecart-stop-distance", 1.65), 0.6,
-                Math.max(0.7, frontMinecartDetectionDistance() - 0.1));
-    }
-
-    private double frontMinecartLateralDistance() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.front-minecart-lateral-distance", 1.15), 0.3, 4.0);
-    }
-
-    private double coupledHardStopRatio() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.coupled-hard-stop-ratio", 0.78), 0.3, 0.98);
-    }
-
-    private double coupledSlowRatio() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.coupled-slow-ratio", 1.08), coupledHardStopRatio() + 0.02,
-                1.6);
-    }
-
-    private double coupledBrakeSpeedBuffer() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.coupled-brake-speed-buffer", 0.015), 0.0, 0.2);
-    }
-
-    private boolean brakeOnUnpoweredRail() {
-        return plugin.getConfig().getBoolean("settings.unpowered-powered-rail-brake", true);
-    }
-
-    private long signCooldownMillis() {
-        return Math.max(100L, plugin.getConfig().getLong("settings.sign-cooldown-ms", 1000L));
-    }
-
-    private long reverseSignCooldownMillis() {
-        return Math.max(signCooldownMillis(), plugin.getConfig().getLong("settings.reverse-sign-cooldown-ms", 3000L));
-    }
-
-    private long reverseSignBlockMillis() {
-        return reverseSignCooldownMillis() + reverseMaxBrakeTicks() * 50L;
-    }
-
-    private long defaultStationWaitTicks() {
-        return Math.max(0L, plugin.getConfig().getLong("settings.default-station-wait-ticks", 100L));
-    }
-
-    private double stationDockingStopOffset() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.station-docking-stop-offset", 0.0),
-                -8.0, 8.0);
-    }
-
-    private double stationDockingMaxDistance() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.station-docking-max-distance", 64.0),
-                1.0, 256.0);
-    }
-
-    private double stationDockingMinSpeed() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.station-docking-min-speed", 0.020),
-                0.001, 0.20);
-    }
-
-    private double stationDepartureDistance() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.station-departure-distance", 8.0),
-                0.25, 128.0);
-    }
-
-    private double stationDepartureMinSpeed() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.station-departure-min-speed", 0.012),
-                0.001, 0.20);
-    }
-
-    private double stationReleaseDistance() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.station-release-distance", 4.0), 2.0, 16.0);
-    }
-
-    private static double square(double value) {
-        return value * value;
-    }
-
-    private long tickInterval() {
-        return Math.max(1L, plugin.getConfig().getLong("settings.tick-interval", 1L));
-    }
-
-    private boolean autoLinkEnabled() {
-        return plugin.getConfig().getBoolean("settings.auto-link-enabled", true);
-    }
-
-    private double autoLinkRadius() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.auto-link-radius", 2.75), 0.8, 8.0);
-    }
-
-    private long autoLinkDelayTicks() {
-        return Math.max(1L, plugin.getConfig().getLong("settings.auto-link-delay-ticks", 2L));
-    }
-
-    private boolean autoLinkCreateSingleCartTrains() {
-        return plugin.getConfig().getBoolean("settings.auto-link-create-single-cart-trains", false);
-    }
-
-    private long maxAutoLinkCarts() {
-        return Math.max(2L, plugin.getConfig().getLong("settings.auto-link-max-carts-per-pass", 16L));
-    }
-
-    private boolean autoArrangeEnabled() {
-        return plugin.getConfig().getBoolean("settings.auto-arrange-enabled", true);
-    }
-
-    private double autoArrangeSpacing() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.auto-arrange-spacing", 1.10), 0.8, 4.0);
-    }
-
-    private long consistLabelVisibleTicks() {
-        return Math.max(0L, plugin.getConfig().getLong("settings.consist-label-visible-ticks", 120L));
-    }
-
-    private double signActivationRadius() {
-        return RailMath.clamp(plugin.getConfig().getDouble("settings.sign-activation-radius", 6.0), 1.0, 16.0);
-    }
-
-    private boolean chunkLoadingEnabled() {
-        return plugin.getConfig().getBoolean("settings.chunk-loading-enabled", true);
-    }
-
-    private int chunkLoadingRadius() {
-        return Math.max(0, Math.min(2, plugin.getConfig().getInt("settings.chunk-loading-radius", 1)));
-    }
-
     private static String trim(double value) {
         return String.format(Locale.ROOT, "%.2f", value);
     }
 
-    private enum DurationUnit {
-        AUTO,
-        TICKS,
-        SECONDS,
-        MILLISECONDS
+    @Override
+    public boolean validateMemberTick(Train train, Minecart cart, ScheduledTask task) {
+        UUID entityId = cart.getUniqueId();
+        if (!cart.isValid() || cart.isDead()) {
+            actuator.forgetDisplay(entityId);
+            train.memberSpeed(entityId, 0.0);
+            memberTasks.remove(entityId);
+            managedCarts.remove(entityId);
+            actuator.forgetPending(entityId);
+            task.cancel();
+            return false;
+        }
+
+        if (trains.get(train.id()) != train || !train.contains(entityId)) {
+            actuator.forgetDisplay(entityId);
+            train.memberSpeed(entityId, 0.0);
+            clearCartMark(cart);
+            cartIndex.remove(entityId);
+            memberTasks.remove(entityId);
+            managedCarts.remove(entityId);
+            actuator.forgetPending(entityId);
+            task.cancel();
+            return false;
+        }
+
+        return true;
     }
 
-    private record ConsistLabelState(String name, boolean visible) {
-    }
-
-    private static final class SpeedLimit {
-        private final double speed;
-        private final boolean emergencyBrake;
-
-        private SpeedLimit(double speed, boolean emergencyBrake) {
-            this.speed = speed;
-            this.emergencyBrake = emergencyBrake;
+    @Override
+    public boolean tickAutomaticSigns(Train train, Block rail, Location location, Vector direction, long now) {
+        synchronized (driverLock) {
+            return automaticSigns.tick(train, rail, location, direction, now);
         }
     }
 }

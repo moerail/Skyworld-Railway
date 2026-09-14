@@ -169,10 +169,10 @@ final class RailLineIndex {
         Definition definition = definitions.get(node.id());
         Set<String> ports = incidentPorts.getOrDefault(node.id(),Set.of());
         if (definition==null || Math.hypot(definition.directionX(),definition.directionZ())<.001) return ports.size()==1 && ports.contains(port);
-        double sign = "origin".equals(node.type()) ? 1 : -1;
-        double wanted = score(port,definition)*sign;
+        // Both boundaries point into their line: ORIGIN sends, END receives mileage.
+        double wanted = score(port,definition);
         if (wanted<=.001) return false;
-        for (String other : ports) if (!Objects.equals(other,port) && score(other,definition)*sign>=wanted-.001) return false;
+        for (String other : ports) if (!Objects.equals(other,port) && score(other,definition)>=wanted-.001) return false;
         return true;
     }
 

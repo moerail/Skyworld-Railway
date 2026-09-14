@@ -8,7 +8,7 @@ foreach ($directory in @('SkyTrainFolia','STCS','STA','SkyPCC','shared','doc')) 
     $files += Get-ChildItem -LiteralPath (Join-Path $root $directory) -Recurse -File |
         Where-Object { $_.FullName.Substring($root.Length + 1) -notmatch '(^|[\\/])(target|artifacts|dist|node_modules|__pycache__|\.git)([\\/]|$)' }
 }
-foreach ($name in @('LICENSE','ASSET-LICENSE.md','README.md','README.en.md','README.nl.md','.gitignore','.gitattributes','build.ps1','package-source.ps1')) {
+foreach ($name in @('LICENSE','ASSET-LICENSE.md','logo.png','README.md','README.zh.md','README.en.md','README.nl.md','.gitignore','.gitattributes','build.ps1','package-source.ps1')) {
     $files += Get-Item -LiteralPath (Join-Path $root $name)
 }
 $allowed = @('.java','.yml','.yaml','.js','.cjs','.css','.html','.png','.py','.json','.md','.ps1','.txt')

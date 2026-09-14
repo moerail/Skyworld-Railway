@@ -32,7 +32,7 @@ public final class RailLineIndexTest {
         pair(edges,sw,ob,"straight","west"); pair(edges,ob,b,"east","west");
         Map<String,RailLineIndex.Definition> definitions=new HashMap<>();
         definitions.put("OA",definition("A",1,0)); definitions.put("A1",definition("A",0,0));
-        definitions.put("A2",definition("A",0,0)); definitions.put("EA",definition("A",0,1));
+        definitions.put("A2",definition("A",0,0)); definitions.put("EA",definition("A",0,-1));
         definitions.put("outside",definition("A",0,0)); definitions.put("beyond",definition("A",0,0));
         definitions.put("OB",definition("B",1,0)); definitions.put("B1",definition("B",0,0));
         var graph=new RailGraph(71,256,1,nodes,edges,List.of(),definitions);
@@ -43,6 +43,8 @@ public final class RailLineIndexTest {
         status(graph,"OB-B1","CONFIRMED","B");
         status(graph,"outside-OA","UNASSIGNED",""); // Even the same label cannot cross the back of Origin.
         status(graph,"EA-beyond","UNASSIGNED","");
+        status(graph,"A2-EA","CONFIRMED","A");
+        assert graph.edgePosition(71,"A2-EA",10).mileageMeters()==50;
         assert graph.edges.size()==edges.size() : "Line boundaries must not delete physical connections";
         assert graph.edgePosition(71,"SW-A2",5).mileageMeters()==25;
         assert graph.edgePosition(71,"A2-SW",5).mileageMeters()==35;
@@ -86,6 +88,8 @@ public final class RailLineIndexTest {
                 List.of(new Issue("SW","straight","incompatible_rail_geometry",0)),definitions);
         status(failed,"A1-SW","AMBIGUOUS","");
         assert MarkerType.ORIGIN.scansBothDirections() && MarkerType.END.scansBothDirections();
+        assert MarkerType.ORIGIN.isLineBoundary() && MarkerType.END.isLineBoundary();
+        assert !MarkerType.BALISE.isLineBoundary() && !MarkerType.STATION.isLineBoundary();
         System.out.println("PASS oriented Origin/End boundaries, curved main line, branch origin, ambiguity, no-origin mileage, reload and retained geometry");
     }
 }

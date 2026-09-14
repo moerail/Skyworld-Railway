@@ -37,7 +37,7 @@ public final class LineBoundaryExitTest {
         var reverseD = edge("balise-station",balise,station,"north","south");
         var nodes = List.of(main,sw,end,station,balise,mainEnd);
         var definitions = new HashMap<>(RailLineIndex.declared(nodes));
-        definitions.put("END",new RailLineIndex.Definition("autotest",0,-1));
+        definitions.put("END",new RailLineIndex.Definition("autotest",0,1));
         var old = new RailGraph(58,256,1,nodes,List.of(a,b,back,reverse,d,reverseD,mainExit),
                 List.of(new RailGraph.Issue("END","none","chunk_not_loaded",0)),definitions);
         var position = old.query("world",84,64,0,1,0,0);
