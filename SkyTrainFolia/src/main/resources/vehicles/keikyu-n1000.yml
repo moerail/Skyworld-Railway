@@ -1,0 +1,44 @@
+# Keikyu New 1000 game tuning: original brake settings multiplied by 2.25.
+# Braking is tuned for server handling, NOT a claim of real train performance.
+# Traction, mass and speed limits are unchanged; high-speed curves are estimates.
+# Source: https://www.keikyu.co.jp/ride/train/
+# All values describe ONE complete reference train, regardless of Minecraft cart count.
+schema-version: 1
+name: "Keikyu New 1000 stainless (server brake tuning x2.25)"
+physics-mode: force
+mass-tonnes: 250.0
+max-speed-kmh: 130.0
+traction:
+  # Gross acceleration at low speed before resistance (m/s^2).
+  acceleration-mps2:
+    p1: 0.22
+    p2: 0.46
+    p3: 0.73
+    p4: 1
+  base-speed-kmh: 45.0
+  field-weakening-speed-kmh: 100.0
+  minimum-ratio: 0.0
+brake:
+  # Gross brake contribution, before adding resistance (m/s^2).
+  deceleration-mps2:
+    b1: 0.3375
+    b2: 0.675
+    b3: 1.0125
+    b4: 1.395
+    b5: 1.7775
+    b6: 2.115
+    b7: 2.43
+  emergency-mps2: 2.925
+resistance:
+  rolling-mps2: 0.03
+  # Air deceleration at 100 km/h; scales with the square of speed.
+  air-mps2-at-100-kmh: 0.015
+  # Grade acceleration = this value * vertical component of track direction.
+  grade-mps2: 9.81
+control:
+  direction-change-speed-kmh: 1.0
+# Existing automatic target-speed controller; station docking remains distance-controlled.
+automatic:
+  acceleration-mps2: 0.85
+  deceleration-mps2: 2.43
+  emergency-mps2: 2.925

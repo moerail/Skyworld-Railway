@@ -1,0 +1,13 @@
+web:
+  enabled: true
+  # Local-only by default. Use a reverse proxy for authenticated remote access.
+  bind-address: 127.0.0.1
+  port: 8765
+  # Mutations require a loopback HTTP connection, same Origin/Host and a Bearer token.
+  # Remote operators: use an SSH localhost tunnel. Never publish this token in a URL.
+  control-enabled: false
+  control-token: ''
+  # auto: prefer SSE and fall back to polling; sse: SSE only; poll: polling only.
+  update-mode: auto
+  poll-interval-millis: 1000
+  sse-keepalive-seconds: 15

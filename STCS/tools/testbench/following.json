@@ -1,0 +1,23 @@
+{
+  "schema": "stcs-shadow-fixture-v1",
+  "synthetic": true,
+  "name": "Head passed, tail retained, then proven clearance",
+  "resources": ["approach", "R1", "R2"],
+  "independent": [["approach", "R1"], ["approach", "R2"], ["R1", "R2"]],
+  "actions": [
+    {"type": "observe", "train": "front", "session": "demo", "sequence": 1, "quality": "LIVE_CONFIRMED", "occupied": ["R1", "R2"]},
+    {"type": "observe", "train": "rear", "session": "demo", "sequence": 1, "quality": "LIVE_CONFIRMED", "occupied": ["approach"], "front": 72},
+    {
+      "type": "submit", "train": "rear", "session": "demo", "sequence": 1, "revision": 1, "trainLength": 20, "margin": 5,
+      "bundles": [
+        {"segments": [{"id": "approach-edge", "entry": "origin", "exit": "boundary", "length": 100, "resources": ["approach"]}]},
+        {"segments": [{"id": "R1-edge", "entry": "boundary", "exit": "end", "length": 100, "resources": ["R1"]}]}
+      ]
+    },
+    {"type": "commit", "expectReasons": ["RESOURCE_CONFLICT"]},
+    {"type": "observe", "train": "front", "session": "demo", "sequence": 2, "quality": "LIVE_CONFIRMED", "occupied": ["R2"]},
+    {"type": "commit", "expectReasons": ["RESOURCE_CONFLICT"]},
+    {"type": "tail_clear", "train": "front", "session": "demo", "sequence": 2, "resources": ["R1"]},
+    {"type": "commit", "expectReasons": ["PATH_END"]}
+  ]
+}

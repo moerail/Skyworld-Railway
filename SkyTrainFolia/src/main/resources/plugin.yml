@@ -1,0 +1,33 @@
+name: SkyTrainFolia
+version: 2.1.0-alpha.7
+main: net.skyworld.skytrain.SkyTrainPlugin
+api-version: '1.13'
+folia-supported: true
+author: William
+description: Folia-native track-coordinate train, switch, cab, Balise, and railway mileage controller.
+commands:
+  st:
+    description: Manage Folia-native minecart trains.
+    usage: /st help
+  p1: { description: Set traction notch P1, usage: /p1 }
+  p2: { description: Set traction notch P2, usage: /p2 }
+  p3: { description: Set traction notch P3, usage: /p3 }
+  p4: { description: Set traction notch P4, usage: /p4 }
+  n:  { description: Set the master controller to neutral, usage: /n }
+  b1: { description: Set brake notch B1, usage: /b1 }
+  b2: { description: Set brake notch B2, usage: /b2 }
+  b3: { description: Set brake notch B3, usage: /b3 }
+  b4: { description: Set brake notch B4, usage: /b4 }
+  b5: { description: Set brake notch B5, usage: /b5 }
+  b6: { description: Set brake notch B6, usage: /b6 }
+  b7: { description: Set brake notch B7, usage: /b7 }
+  eb: { description: Apply emergency braking, usage: /eb }
+permissions:
+  skytrain.admin:
+    description: Allows all SkyTrainFolia commands.
+    default: op
+  skytrain.use:
+    description: Allows basic train information commands.
+    default: true
+
+softdepend: [SkyworldTrainAPI]

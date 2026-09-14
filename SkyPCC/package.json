@@ -1,0 +1,13 @@
+{
+  "name": "skyrail-skypcc-tests",
+  "private": true,
+  "scripts": {
+    "test": "node tests/edge-line.cjs && node tests/i18n.cjs",
+    "test:browser": "node tests/i18n-browser.cjs",
+    "test:browser:legacy": "node tests/pcc-events-test.cjs && node tests/shadow-pcc.cjs && node tests/pcc-switch-ui.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}
+

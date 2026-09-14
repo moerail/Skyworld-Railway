@@ -1,0 +1,185 @@
+# MA audio is driver-only. Reload with /st reload after stopping all trains.
+# Sound IDs are namespace:path; omitted namespace defaults to minecraft.
+# Custom resource-pack IDs are allowed; the client must have the sound installed.
+# volume: 0..4; pitch: 0.5..2; count: 1..5; interval-ticks: 1..200 (20 ticks/s).
+# category: MASTER, MUSIC, RECORDS, WEATHER, BLOCKS, HOSTILE, NEUTRAL, PLAYERS, AMBIENT, VOICE.
+ma-sounds:
+  enabled: true
+  granted:
+    enabled: true
+    sound: minecraft:block.anvil.land
+    category: MASTER
+    volume: 1.0
+    pitch: 2.0
+    count: 2
+    interval-ticks: 5
+  changed:
+    enabled: true
+    sound: minecraft:block.anvil.land
+    category: MASTER
+    volume: 1.0
+    pitch: 2.0
+    count: 1
+    interval-ticks: 5
+  released:
+    enabled: true
+    sound: minecraft:block.iron_trapdoor.close
+    category: MASTER
+    volume: 0.6
+    pitch: 1.2
+    count: 1
+    interval-ticks: 5
+  shrinking:
+    enabled: true
+    sound: minecraft:entity.experience_orb.pickup
+    category: MASTER
+    volume: 1.0
+    pitch: 1.0
+    count: 1
+    interval-ticks: 5
+  low:
+    enabled: true
+    sound: minecraft:block.note_block.pling
+    category: MASTER
+    volume: 1.0
+    pitch: 1.0
+    count: 1
+    interval-ticks: 5
+settings:
+  config-version: 3
+  # vehicles/<id>.yml: crh380b, cr400bf, keikyu-n1000, minecraft-comfort
+  default-vehicle-profile: minecraft-comfort
+  # Independent server ceiling (km/h). Existing train-specific caps remain in effect.
+  server-speed-limit-kmh: 420.0
+  tick-interval: 1
+  autosave-interval-ticks: 6000
+  default-speed: 0.35
+  # Automatic signs use the selected vehicle's real P1-P4 / B1-B7 notches.
+  # STA 0.3 + STCS 0.8 provide advisory station distance, not MA/ATP protection.
+  station-look-ahead-blocks: 8192.0
+  # TC launch speed syntax uses blocks/tick when no unit is written.
+  station-launch-speed: 0.4
+  sign-spawn-max-carts: 64
+  max-speed-change-per-tick: 0.035
+  powered-rail-boost-speed: 0.60
+  unpowered-powered-rail-brake: true
+  empty-carts-slow-down: false
+  default-spacing: 1.10
+  force-tight-spacing: true
+  tight-spacing: 1.10
+  spacing-correction: 0.075
+  spacing-follow-correction: 0.35
+  minimum-follow-distance-ratio: 0.72
+  rail-bind-enabled: true
+  rail-bind-strength: 0.45
+  rail-bind-max-correction-per-tick: 0.035
+  rail-bind-teleport-distance: 0.55
+  track-coordinate-physics: true
+  train-physics-hard-lock: true
+  train-physics-position-correction: 0.75
+  train-physics-max-correction-per-tick: 0.20
+  train-physics-teleport-distance: 0.45
+  # Player-occupied carts always use smooth motion in hard-lock mode to keep the camera stable.
+  passenger-smoothing-enabled: true
+  passenger-position-correction: 0.30
+  passenger-max-correction-per-tick: 0.10
+  passenger-teleport-distance: 1.25
+  passenger-settle-distance: 0.04
+  passenger-vanilla-motion-factor: 0.75
+  # 1.4.0: value-only frames + per-connection bundles. Train/entity schedulers are unchanged.
+  # This adapter is validated for Shiroha/Folia 26.2. Changes require a full restart.
+  display-sync-enabled: true
+  display-sync-stale-ms: 500
+  display-sync-max-deviation: 8.0
+  # 1.4.1: ordinary movement within the already-owned region preserves the mount tree.
+  # Different regions/large relocations continue through the existing Folia fallback.
+  owned-region-movement-enabled: true
+  # Brief corner errors are corrected with velocity; sustained or large errors still recover.
+  passenger-recovery-guard-enabled: true
+  passenger-recovery-grace-ticks: 6
+  passenger-recovery-hard-distance: 4.0
+  # Broadcast the running sound from the active leader so nearby trackside players can hear the train.
+  trackside-running-sound-enabled: true
+  trackside-running-sound-interval-ticks: 16
+  trackside-running-sound-min-speed: 0.025
+  trackside-running-sound-volume: 0.85
+  # Absolute speed curve: silent below start, smoothly reaches the volume/pitch cap at full.
+  trackside-running-sound-start-kmh: 10.0
+  trackside-running-sound-full-kmh: 120.0
+  trackside-running-sound-min-pitch: 0.75
+  trackside-running-sound-max-pitch: 1.20
+  # Applies to manual and automatic handles. Partial brake release remains silent.
+  brake-sound-enabled: true
+  brake-sound-cooldown-ms: 300
+  brake-sound-apply-volume: 0.45
+  brake-sound-apply-pitch: 1.5
+  brake-sound-release-volume: 0.55
+  brake-sound-release-pitch: 0.7
+  # A stopped, unmanaged consist can be pushed as one unit when its pushable property is true.
+  player-push-impulse: 0.055
+  player-push-movement-bonus: 0.045
+  player-push-max-speed: 0.22
+  player-push-activation-speed: 0.035
+  player-push-deceleration-per-tick: 0.004
+  front-minecart-detection-enabled: true
+  front-minecart-detection-distance: 8.0
+  front-minecart-stop-distance: 1.65
+  front-minecart-lateral-distance: 1.15
+  coupled-hard-stop-ratio: 0.78
+  coupled-slow-ratio: 1.08
+  coupled-brake-speed-buffer: 0.015
+  reverse-settle-ticks: 16
+  reverse-max-brake-ticks: 60
+  reverse-release-speed: 0.025
+  scan-radius: 8.0
+  sign-cooldown-ms: 1000
+  reverse-sign-cooldown-ms: 3000
+  default-station-wait-ticks: 100
+  # Final station docking is distance-controlled. Long-range approach braking belongs to SkyATO.
+  station-docking-stop-offset: 0.0
+  station-docking-max-distance: 64.0
+  station-docking-min-speed: 0.020
+  station-departure-distance: 8.0
+  station-departure-min-speed: 0.012
+  # A station can trigger again only after every member of the previous train clears this radius.
+  station-release-distance: 4.0
+  station-marker-rail-search-radius: 3.0
+  auto-link-enabled: true
+  auto-link-radius: 2.75
+  auto-link-delay-ticks: 2
+  auto-link-create-single-cart-trains: false
+  auto-link-max-carts-per-pass: 16
+  auto-arrange-enabled: true
+  auto-arrange-spacing: 1.10
+  # Keep a moving corridor loaded so managed trains can cross player-free chunks.
+  chunk-loading-enabled: true
+  chunk-loading-radius: 1
+  consist-label-visible-ticks: 120
+  sign-activation-radius: 6.0
+  switch-approach-distance: 4.0
+  switch-approach-lateral-distance: 1.10
+  switch-occupied-distance: 1.35
+  switch-release-distance: 2.25
+  cab-refresh-interval-ticks: 5
+  # Driver-only MA BossBar: full bar at this distance; text always shows actual metres.
+  # Display scale only, unrelated to MA allocation or ATP supervision.
+  cab-ma-bar-range-meters: 300.0
+  auto-train-name-prefix: "auto"
+  # Report measured edge positions to STCS.
+  stcs-telemetry-enabled: true
+  # Publish accumulated position and current speed to STCS (5 ticks = 0.25 seconds).
+  stcs-telemetry-publish-interval-ticks: 5
+  # Re-query the authoritative STCS RailGraph (100 ticks = 5 seconds).
+  # STF also reconciles immediately near an edge end and on start/stop/reverser changes.
+  stcs-telemetry-reconcile-interval-ticks: 100
+messages:
+  prefix: "&6[SkyTrain]&r "
+infrastructure:
+  # Distance from a marker sign to the rail it belongs to.
+  marker-rail-search-radius: 2.5
+  # Player distance for /st balise, /st origin, and /st end inspection.
+  inspection-radius: 2.0
+  # Internal STF distance conversion. Keep 1 block = 1 metre for normal maps.
+  blocks-per-meter: 1.0
+  # After this distance without another Balise, the train is outside the signal area.
+  balise-search-distance: 500.0

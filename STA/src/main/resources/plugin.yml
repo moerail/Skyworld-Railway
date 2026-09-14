@@ -1,0 +1,11 @@
+name: SkyworldTrainAPI
+version: 0.8.0
+main: net.skyworld.sta.StaPlugin
+api-version: '1.13'
+folia-supported: true
+author: William
+description: Shared typed API contracts for the Skyworld railway suite.
+commands:
+  sta:
+    description: Suite help and installed versions
+    usage: /sta help [page] [zh|en|fr|ja]

@@ -1,0 +1,11 @@
+name: SkyPCC
+version: 0.8.1
+main: net.skyworld.skypcc.SkyPccPlugin
+api-version: '1.13'
+folia-supported: true
+depend: [STCS, SkyworldTrainAPI]
+description: Live railway control centre map for STF and STCS.
+commands:
+  skypcc:
+    description: Suite help and installed versions
+    usage: /skypcc help [page] [zh|en|fr|ja]

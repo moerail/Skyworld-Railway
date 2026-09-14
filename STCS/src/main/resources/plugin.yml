@@ -1,0 +1,22 @@
+name: STCS
+version: 2.2.0-alpha.1
+main: net.skyworld.stcs.StcsPlugin
+api-version: '1.13'
+folia-supported: true
+author: SkyWorld
+description: Folia-native railway infrastructure registry and directed RailGraph provider.
+softdepend: [SkyTrainFolia, SkyworldTrainAPI]
+commands:
+  stcs:
+    description: Inspect and rebuild the STCS RailGraph.
+    usage: /stcs help
+permissions:
+  stcs.ma:
+    description: Request or release a shadow MA for the explicitly controlled train.
+    default: true
+  stcs.admin:
+    description: Allows STCS graph rebuild and export commands.
+    default: op
+  stcs.use:
+    description: Allows STCS inspection commands.
+    default: true

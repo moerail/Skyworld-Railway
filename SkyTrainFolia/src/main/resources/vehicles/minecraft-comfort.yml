@@ -1,0 +1,42 @@
+# Entirely fictional. Responsive low-speed control, stronger braking, reduced slope penalty and a 420 km/h cap. High-speed Folia passenger movement needs in-game validation.
+# Source: Fictional game tuning; no real vehicle equivalence
+# All values describe ONE complete reference train, regardless of Minecraft cart count.
+schema-version: 1
+name: "SkySprint 420 (fictional Minecraft comfort)"
+physics-mode: force
+mass-tonnes: 400.0
+max-speed-kmh: 420.0
+traction:
+  # Gross acceleration at low speed before resistance (m/s^2).
+  acceleration-mps2:
+    p1: 0.2
+    p2: 0.5
+    p3: 0.9
+    p4: 1.35
+  base-speed-kmh: 180.0
+  field-weakening-speed-kmh: 360.0
+  minimum-ratio: 0.0
+brake:
+  # Gross brake contribution, before adding resistance (m/s^2).
+  deceleration-mps2:
+    b1: 0.18
+    b2: 0.35
+    b3: 0.55
+    b4: 0.8
+    b5: 1.05
+    b6: 1.35
+    b7: 1.65
+  emergency-mps2: 2.4
+resistance:
+  rolling-mps2: 0.02
+  # Air deceleration at 100 km/h; scales with the square of speed.
+  air-mps2-at-100-kmh: 0.006
+  # Grade acceleration = this value * vertical component of track direction.
+  grade-mps2: 0.8
+control:
+  direction-change-speed-kmh: 1.0
+# Existing automatic target-speed controller; station docking remains distance-controlled.
+automatic:
+  acceleration-mps2: 1
+  deceleration-mps2: 1.35
+  emergency-mps2: 2.4

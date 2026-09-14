@@ -1,0 +1,37 @@
+# Generated files and local dependencies
+target/
+artifacts/
+dist/
+node_modules/
+__pycache__/
+*.py[cod]
+*.class
+*.jar
+*.zip
+*.log
+*.args
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+*.local.*
+# Never commit server installations or live railway/credential data.
+server/
+Test_Server/
+plugins/
+world/
+world_nether/
+world_the_end/
+railgraph*.json
+occupancy-ledger*.json
+server.properties
+ops.json
+whitelist.json
+usercache.json
+*.pem
+*.key
+

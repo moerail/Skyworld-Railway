@@ -1,0 +1,42 @@
+# CRRC: 350 km/h operation, 10140 kW, 420 km/h maximum test speed. Operational cap is NOT the test speed. Mass, drag and notch curves are estimates.
+# Source: https://www.crrcgc.cc/ckgf/2016-06/13/article_61929E3A42714486807DFFE6348F5A77.html
+# All values describe ONE complete reference train, regardless of Minecraft cart count.
+schema-version: 1
+name: "CR400BF (8-car reference, game approximation)"
+physics-mode: force
+mass-tonnes: 470.0
+max-speed-kmh: 350.0
+traction:
+  # Gross acceleration at low speed before resistance (m/s^2).
+  acceleration-mps2:
+    p1: 0.18
+    p2: 0.35
+    p3: 0.53
+    p4: 0.7
+  base-speed-kmh: 111.0
+  field-weakening-speed-kmh: 400.0
+  minimum-ratio: 0.0
+brake:
+  # Gross brake contribution, before adding resistance (m/s^2).
+  deceleration-mps2:
+    b1: 0.12
+    b2: 0.24
+    b3: 0.38
+    b4: 0.52
+    b5: 0.66
+    b6: 0.8
+    b7: 0.95
+  emergency-mps2: 1.25
+resistance:
+  rolling-mps2: 0.014
+  # Air deceleration at 100 km/h; scales with the square of speed.
+  air-mps2-at-100-kmh: 0.0085
+  # Grade acceleration = this value * vertical component of track direction.
+  grade-mps2: 9.81
+control:
+  direction-change-speed-kmh: 1.0
+# Existing automatic target-speed controller; station docking remains distance-controlled.
+automatic:
+  acceleration-mps2: 0.6
+  deceleration-mps2: 0.95
+  emergency-mps2: 1.25

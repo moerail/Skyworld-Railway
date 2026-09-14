@@ -1,0 +1,43 @@
+scan:
+  max-distance-meters: 256.0
+  blocks-per-meter: 1.0
+  marker-rail-search-radius: 3.0
+  only-loaded-chunks: true
+
+graph:
+  file: railgraph.json
+  pretty-print: true
+
+telemetry:
+  # STF publishes display telemetry frequently, while RailGraph reconciliation remains low-frequency.
+  stale-after-seconds: 15
+  expire-after-seconds: 60
+
+occupancy:
+  # M1 diagnostic sampling only. Does not enable MA, ATP or automatic resource release.
+  # Bounds: 250..5000 ms. Existing occupancy is retained when telemetry becomes stale.
+  poll-interval-ms: 500
+  stale-after-ms: 3000
+
+ma:
+  # Replaceable, NON-EXECUTABLE shadow snapshots. No ATP or real point locking.
+  enabled: true
+  # Directed-route search horizon (10..10000 m). Preview does not reserve every edge found.
+  look-ahead-meters: 600.0
+  # Allow shadow MA to cross a point only within this route distance (0..10000 m).
+  # Outside the range, stop the shadow EoA one block before the point. NOT a physical lock.
+  lock-distance-meters: 150.0
+  # Exact forward MA credit cap (1..10000 m), also capped by look-ahead-meters.
+  # If the cap cannot fit the train beyond a throat, wait before entering it.
+  max-authority-distance-meters: 300.0
+  # Old ma.horizon-meters still supplies any missing new distance keys in existing files.
+  margin-meters: 2.0
+  sound:
+    enabled: true
+    jump-threshold-meters: 20.0
+    cooldown-ms: 1500
+    # Warning once below this distance; 0 disables. Rearms 5 m above the threshold.
+    low-remaining-meters: 50.0
+
+messages:
+  prefix: '&6[STCS]&r '

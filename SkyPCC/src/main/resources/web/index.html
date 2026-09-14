@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SkyPCC</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><img id="brandLogo" src="/assets/night_logo.png" alt="SkyPCC" width="180" height="60"><span data-i18n="Poste de commande centralisée">Poste de commande centralisée</span></div>
+    <div class="system-status">
+      <select id="languageSelect" aria-label="Language / 语言 / Langue / 言語" title="Language / 语言 / Langue / 言語">
+        <option value="zh">中文</option><option value="en">English</option><option value="fr">Français</option><option value="ja">日本語</option>
+      </select>
+      <button id="themeToggle" class="icon-button" type="button" title="Switch to light theme" data-i18n-title="Switch to light theme" aria-label="Switch to light theme" data-i18n-aria="Switch to light theme">☀</button>
+      <span id="connectionDot" class="status-dot"></span>
+      <span id="connectionText">Connecting</span>
+      <span class="divider"></span>
+      <span><span data-i18n="Graph">Graph</span> <b id="graphRevision">--</b></span>
+      <span><span data-i18n="Trains">Trains</span> <b id="trainCount">0</b></span>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="left-panel">
+      <div class="panel-heading">
+        <h1 data-i18n="Network">Network</h1>
+        <button id="fitButton" type="button" title="Fit the complete network in view" data-i18n-title="Fit the complete network in view" data-i18n="Fit">Fit</button>
+      </div>
+      <label class="field-label" for="lineFilter" data-i18n="Line">Line</label>
+      <select id="lineFilter"><option value="" data-i18n="All lines">All lines</option></select>
+      <div class="section-title"><span data-i18n="Rolling stock">Rolling stock</span><span id="activeCount">0 active</span></div>
+      <div id="trainList" class="train-list"></div>
+    </aside>
+
+    <section class="map-shell" aria-label="Live railway map" data-i18n-aria="Live railway map">
+      <svg id="railMap" role="img" aria-label="STCS RailGraph with live train positions" data-i18n-aria="STCS RailGraph with live train positions">
+        <g id="edgeLayer"></g>
+        <g id="switchLayer"></g>
+        <g id="nodeLayer"></g>
+        <g id="labelLayer"></g>
+        <g id="authorityLayer"></g>
+        <g id="trainLayer"></g>
+      </svg>
+      <div class="map-tools">
+        <div class="tool-group" aria-label="Map zoom" data-i18n-aria="Map zoom">
+          <button id="zoomIn" type="button" title="Zoom in" data-i18n-title="Zoom in" aria-label="Zoom in" data-i18n-aria="Zoom in">+</button>
+          <button id="zoomOut" type="button" title="Zoom out" data-i18n-title="Zoom out" aria-label="Zoom out" data-i18n-aria="Zoom out">-</button>
+        </div>
+        <div class="tool-group font-tools" aria-label="Map label size" data-i18n-aria="Map label size">
+          <button id="fontDecrease" type="button" title="Decrease label size" data-i18n-title="Decrease label size" aria-label="Decrease label size" data-i18n-aria="Decrease label size">A−</button>
+          <button id="fontSizeValue" type="button" title="Reset label size" data-i18n-title="Reset label size" aria-label="Reset label size" data-i18n-aria="Reset label size">150%</button>
+          <button id="fontIncrease" type="button" title="Increase label size" data-i18n-title="Increase label size" aria-label="Increase label size" data-i18n-aria="Increase label size">A+</button>
+        </div>
+      </div>
+      <div class="map-legend">
+        <span><i class="legend-line"></i><span data-i18n="Unallocated">Unallocated</span></span>
+        <span><i class="legend-line occupied"></i><span data-i18n="Observed occupancy">Observed occupancy</span></span>
+        <span><i class="legend-line uncertain"></i><span data-i18n="Frozen / uncertain">Frozen / uncertain</span></span>
+        <span><i class="legend-line reserved"></i><span data-i18n="Shadow reservation">Shadow reservation</span></span>
+        <span id="maStatus">MA unavailable</span>
+      </div>
+      <div id="emptyState" class="empty-state" hidden data-i18n="No RailGraph data">No RailGraph data</div>
+    </section>
+
+    <aside class="right-panel">
+      <div class="panel-heading">
+        <h2 data-i18n="Inspector">Inspector</h2>
+        <button id="inspectorBack" class="icon-button" type="button" title="Back to overview" data-i18n-title="Back to overview"
+          aria-label="Back to overview" data-i18n-aria="Back to overview" hidden>←</button>
+      </div>
+      <div id="inspectorEmpty" class="inspector-empty" data-i18n="Select a train on the map or in the list.">Select a train on the map or in the list.</div>
+      <div id="cameraControls" class="camera-controls" hidden>
+        <button id="followTrain" type="button" title="Follow this train" data-i18n-title="Follow this train" aria-label="Follow this train" data-i18n-aria="Follow this train">◎</button>
+        <button id="cancelFollow" type="button" title="Cancel camera follow" data-i18n-title="Cancel camera follow" aria-label="Cancel camera follow" data-i18n-aria="Cancel camera follow" hidden>×</button>
+        <span id="followStatus" role="status">Camera free</span>
+      </div>
+      <dl id="inspector" class="inspector" hidden>
+        <div class="inspector-title"><dt data-i18n="Train">Train</dt><dd id="detailName">--</dd></div>
+        <div><dt data-i18n="Status">Status</dt><dd id="detailStatus">--</dd></div>
+        <div><dt data-i18n="Mode">Mode</dt><dd id="detailMode">--</dd></div>
+        <div><dt data-i18n="ATP mode">ATP mode</dt><dd id="detailAtp">--</dd></div>
+        <div><dt data-i18n="Shadow MA">Shadow MA</dt><dd id="detailMa">--</dd></div>
+        <div><dt data-i18n="EoA">EoA</dt><dd id="detailEoa">--</dd></div>
+        <div><dt data-i18n="MA reason">MA reason</dt><dd id="detailMaReason">--</dd></div>
+        <div><dt data-i18n="Direction">Direction</dt><dd id="detailDirection">--</dd></div>
+        <div><dt data-i18n="Reverser">Reverser</dt><dd id="detailReverser">--</dd></div>
+        <div><dt data-i18n="Handle">Handle</dt><dd id="detailHandle">--</dd></div>
+        <div><dt data-i18n="Brake hold">Brake hold</dt><dd id="detailBrakeHold">--</dd></div>
+        <div><dt data-i18n="Driver">Driver</dt><dd id="detailDriver">--</dd></div>
+        <div><dt data-i18n="Line">Line</dt><dd id="detailLine">--</dd></div>
+        <div><dt data-i18n="Mileage">Mileage</dt><dd id="detailMileage">--</dd></div>
+        <div><dt data-i18n="Speed">Speed</dt><dd id="detailSpeed">--</dd></div>
+        <div><dt data-i18n="Edge">Edge</dt><dd id="detailEdge">--</dd></div>
+        <div><dt data-i18n="Measured">Measured</dt><dd id="detailAge">--</dd></div>
+      </dl>
+      <dl id="infrastructureInspector" class="inspector" hidden></dl>
+      <button id="infrastructureSwitch" type="button" hidden data-i18n="Change switch">Change switch</button>
+    </aside>
+  </main>
+
+  <details id="eventPanel" class="event-panel" open>
+    <summary><strong data-i18n="Operations log">Operations log</strong><span id="eventCount">0 events</span><span id="eventStatus">Connecting</span><button id="expandEvents" class="icon-button" type="button" aria-expanded="false" title="Expand log" aria-label="Expand log">↑</button></summary>
+    <div class="event-toolbar">
+      <label for="eventFilter" data-i18n="Severity">Severity</label>
+      <select id="eventFilter"><option value="all" data-i18n="All events">All events</option><option value="warning" data-i18n="Warnings">Warnings</option></select>
+      <span id="eventRetention"></span>
+    </div>
+    <div id="eventList" class="event-list" role="log" aria-label="Railway operational events" data-i18n-aria="Railway operational events" aria-live="polite"></div>
+  </details>
+
+  <dialog id="switchDialog" aria-labelledby="switchTitle">
+    <div class="panel-heading"><h2 id="switchTitle">Switch</h2><button id="switchClose" type="button" title="Close" data-i18n-title="Close" aria-label="Close" data-i18n-aria="Close">×</button></div>
+    <p id="switchTransition"></p>
+    <label class="field-label" for="switchToken" data-i18n="Operator token">Operator token</label>
+    <input id="switchToken" type="password" autocomplete="off" spellcheck="false">
+    <p id="switchResult" role="status"></p>
+    <button id="switchConfirm" type="button" data-i18n="Change switch">Change switch</button>
+  </dialog>
+  <script src="/assets/i18n.js"></script>
+  <script src="/assets/app.js"></script>
+</body>
+</html>
