@@ -126,6 +126,11 @@ Our goal is simple: a place where everyone can enjoy playing.
 *Somehow, this fucking thing is still here.*  
 *Since 2013.*
 
+## 联系作者 / Contact 
+- **邮箱 / Email：me@saionjirin.com; saionjirin@outlook.com**
+- **QQ群 / QQ Group: 204749370**
+- **Telegram: [@saionjirin](https://t.me/saionjirin)**
+
 ## 目录结构
 
 ```text
