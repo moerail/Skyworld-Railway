@@ -65,6 +65,67 @@ Logo's en personageafbeeldingen vallen niet onder de MIT-codelicentie. Verspreid
 
 > 当前 MA/EoA 仍是影子功能，ATP 不根据它施加制动。司机失能 EB 和 RECOVERING 制动保持是另外的实际控制功能。
 
+## 在真实服务器上体验 / See It in Action
+
+SkyRail Suite 正在 **Skyworld Minecraft Server** 中运行和持续测试。欢迎加入服务器，或打开 SkyPCC 实时大屏，看看玩家建设的铁路和运行中的列车。
+
+SkyRail Suite is running and being tested on **Skyworld Minecraft Server**. Join us in-game or explore the live SkyPCC dashboard to see our player-built railway network in operation.
+
+> 这是实际部署与持续测试的展示，不代表所有功能已完成或不存在缺陷。目前 MA/EoA 仍处于影子阶段，不执行 ATP 制动监督。
+>
+> This is a live deployment, not a guarantee of completeness or reliability. MA/EoA currently operate in shadow mode without ATP braking supervision.
+
+### 加入服务器 / Join the Server
+
+**Minecraft Java Edition 26.2** · 无需安装铁路客户端模组 / No railway client mod required
+
+| 服务 / Service | 地址 / Address |
+| --- | --- |
+| 生存服 / Survival server | `mc.skywor1d.cn` |
+| 铁路测试服 / Railway test server | `irvine-filth.tun.ply.gg` |
+| **SkyPCC 实时大屏 / Live railway dashboard** | **[打开大屏 / Open Dashboard](http://mc.skywor1d.cn:8765/)** |
+| 皮肤站 / Skin & authentication service | [skin.deviy.cn](https://skin.deviy.cn) |
+
+**测试服会删档，请勿存放需要长期保留的建筑或物品。**  
+**The test server may be wiped. Do not use it for builds or items you want to preserve.**
+
+登录请按服务器要求配置正版验证或外置登录；需要帮助可通过下方社区联系管理员。  
+Configure official or external authentication as required by the server. Contact our community for help joining.
+
+### 社区 / Community
+
+- **QQ 群：204749370**
+- **Telegram:** [Skyworld MC](https://t.me/skyworld_mc)
+- **Discord:** [Join our Discord](https://discord.gg/bzM3tfm)
+- **OOPZ:** [加入频道 / Join channel](https://oopz.cn/i/LExN5k) · `381998378`
+
+### 关于 Skyworld / About Skyworld
+
+**自 2013 年起，一直都在。**
+
+目前开放生存服；博物馆服正在筹备中，计划保存并展示自 2014 年以来能够找回的世界存档，包括 LL 小镇。
+
+**Still here, since 2013.**
+
+Our survival server is open. A museum server is being prepared to preserve and showcase recoverable worlds dating back to 2014, including LL Town.
+
+服务器不提供锁箱或圈地保护，请自行保管物品、尊重他人的建筑与劳动。经查实的恶意破坏将被封禁。
+
+There is no chest-locking or land-claim protection. Look after your belongings and respect other players' work. Confirmed malicious griefing results in a ban.
+
+### 支持服务器 / Support the Server
+
+欢迎自愿支持日常网络与电力开支：  
+Optional contributions towards our network and electricity costs:
+
+**[爱发电 / Support Skyworld](https://afdian.com/a/skyworld)**
+
+我们的宗旨是让每个玩家在这里玩得开心。  
+Our goal is simple: a place where everyone can enjoy playing.
+
+*Somehow, this fucking thing is still here.*  
+*Since 2013.*
+
 ## 目录结构
 
 ```text
@@ -178,3 +239,4 @@ git push -u origin main
 - [发布与授权检查](doc/PUBLISHING.md)
 - [迁移记录](doc/MIGRATION.md)
 - [本次验证结果与已知旧测试缺口](doc/VALIDATION.md)
+
