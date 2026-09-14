@@ -7,7 +7,7 @@
 
 **完整手册 / Full Manuals / Volledige handleidingen:** [中文](README.zh.md) | [English](README.en.md) | [Nederlands](README.nl.md)
 
-面向 Minecraft / Folia 的列车运行、铁路基础设施、影子列控与调度显示套件。 
+面向 Minecraft / Folia 异步服务器架构的列车运行、铁路基础设施、列控与调度显示套件。 
 
 **TRAIN** **R**uns **A**synchronously **I**n **N**etwork
 
