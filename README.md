@@ -3,12 +3,10 @@
 <p align="center">
   <img src="logo.png" alt="SkyRail Suite" width="64" height="64">
 </p>
-<<<<<<< HEAD
 
+**完整手册 / Full Manuals / Volledige handleidingen:** [中文](README.zh.md) | [English](README.en.md) | [Nederlands](README.nl.md) | [Français](README.fr.md) | [日本語](README.ja.md)
 
-**完整手册 / Full Manuals / Volledige handleidingen:** [中文](README.zh.md) | [English](README.en.md) | [Nederlands](README.nl.md)
-
-面向 Minecraft / Folia 异步服务器架构的列车运行、铁路基础设施、列控与调度显示套件。 
+面向 Minecraft / Folia 异步服务器架构的列车运行、铁路基础设施、列控与调度显示套件。
 
 **TRAIN** **R**uns **A**synchronously **I**n **N**etwork
 
@@ -22,14 +20,14 @@ SkyRail Suite 延续 SkyTrain Suite 开发线；现有插件名、指令和数�
 
 | Plugin | Version | Responsibility |
 | --- | --- | --- |
-| SkyTrainFolia (STF) | 2.1.0-alpha.7 | Trains, driving, physics, signs and cab HMI |
-| STCS | 2.2.0-alpha.1 | RailGraph, localisation, occupancy and shadow MA/EoA |
+| SkyTrainFolia (STF) | 2.1.0-alpha.8 | Trains, driving, physics, signs and cab HMI |
+| STCS | 2.2.0-alpha.2 | RailGraph, localisation, occupancy and shadow MA/EoA |
 | SkyworldTrainAPI (STA) | 0.8.0 | Versioned inter-plugin contracts, telemetry and events |
 | SkyPCC | 0.8.1 | Web track diagram, inspectors, event log and turnout control |
 
 ## 开始使用 / Getting Started / Aan de slag
 
-从 [Releases](https://github.com/moerail/Skyworld-Railway/releases) 下载同一发布中的四个 JAR。当前适配基线：**Java 25，Shiroha / Folia 26.2**。安装前备份并先在测试服验证；完整安装、权限、指令、配置、教程与构建方法见上方三语手册，每份均可独立阅读。
+从 [Releases](https://github.com/moerail/Skyworld-Railway/releases) 下载同一发布中的四个 JAR。当前适配基线：**Java 25，Shiroha / Folia 26.2**。安装前备份并先在测试服验证；完整安装、权限、指令、配置、教程与构建方法见上方五语手册，每份均可独立阅读。
 
 Download the four matching JARs from Releases. Current baseline: **Java 25, Shiroha / Folia 26.2**. Back up and test before deployment. Each manual above includes installation, permissions, commands, configuration, tutorials and build instructions.
 
@@ -59,21 +57,8 @@ Logo 与角色图片不适用代码 MIT 授权。SkyPCC 内置吉祥物已获准
 
 Logos and character artwork are outside the code's MIT license. Distribution of the bundled SkyPCC mascot is permitted; this does not MIT-license the artwork.
 
-Logo's en personageafbeeldingen vallen niet onder de MIT-codelicentie. Verspreiding van de meegeleverde SkyPCC-mascotte is toegestaan; hierdoor valt de afbeelding niet onder MIT.# SkyRail Suite
+Logo's en personageafbeeldingen vallen niet onder de MIT-codelicentie. Verspreiding van de meegeleverde SkyPCC-mascotte is toegestaan; hierdoor valt de afbeelding niet onder MIT.
 
-面向 Minecraft / Folia 的列车、轨道基础设施、影子列控与调度显示套件。
-
-[English](README.en.md) / [Nederlands](README.nl.md)
-
-本目录是从当前 SkyTrain Suite 开发线整理出的独立源码工作区。**项目总名使用 SkyRail Suite，现有插件名、Java 包名、指令、数据目录和版本暂不改变**，避免仅为了整理目录而破坏兼容性。原开发目录与服务器数据不受影响。
-=======
-
-**完整手册 / Full Manuals / Volledige handleidingen:** [中文](README.zh.md) | [English](README.en.md) | [Nederlands](README.nl.md)
->>>>>>> 261e00f (Refactor STF train management and fix STCS line boundaries)
-
-面向 Minecraft / Folia 的列车运行、铁路基础设施、影子列控与调度显示套件。
-
-<<<<<<< HEAD
 ## 在真实服务器上体验 / See It in Action
 
 SkyRail Suite 正在 **Skyworld Minecraft Server** 中运行和持续测试。欢迎加入服务器，或打开 SkyPCC 实时大屏，看看玩家建设的铁路和运行中的列车。
@@ -141,89 +126,3 @@ Our goal is simple: a place where everyone can enjoy playing.
 - **邮箱 / Email：me@saionjirin.com; saionjirin@outlook.com**
 - **QQ群 / QQ Group: 204749370**
 - **Telegram: [@saionjirin](https://t.me/saionjirin)**
-
-## 目录结构
-=======
-A train-operation, railway-infrastructure, shadow train-control and dispatching-display suite for Minecraft / Folia.
->>>>>>> 261e00f (Refactor STF train management and fix STCS line boundaries)
-
-Een suite voor treinbediening, spoorweginfrastructuur, schaduwtreinbeveiliging en verkeersleidingsweergave in Minecraft / Folia.
-
-SkyRail Suite 延续 SkyTrain Suite 开发线；现有插件名、指令和数据目录不变。
-
-## 组件 / Components / Onderdelen
-
-| Plugin | Version | Responsibility |
-| --- | --- | --- |
-| SkyTrainFolia (STF) | 2.1.0-alpha.8 | Trains, driving, physics, signs and cab HMI |
-| STCS | 2.2.0-alpha.1 | RailGraph, localisation, occupancy and shadow MA/EoA |
-| SkyworldTrainAPI (STA) | 0.8.0 | Versioned inter-plugin contracts, telemetry and events |
-| SkyPCC | 0.8.1 | Web track diagram, inspectors, event log and turnout control |
-
-## 开始使用 / Getting Started / Aan de slag
-
-从 [Releases](https://github.com/moerail/Skyworld-Railway/releases) 下载同一发布中的四个 JAR。当前适配基线：**Java 25，Shiroha / Folia 26.2**。安装前备份并先在测试服验证；完整安装、权限、指令、配置、教程与构建方法见上方三语手册，每份均可独立阅读。
-
-Download the four matching JARs from Releases. Current baseline: **Java 25, Shiroha / Folia 26.2**. Back up and test before deployment. Each manual above includes installation, permissions, commands, configuration, tutorials and build instructions.
-
-Download de vier bij elkaar horende JAR's via Releases. Huidige basis: **Java 25, Shiroha / Folia 26.2**. Maak een back-up en test vóór installatie. Elke handleiding hierboven bevat installatie, rechten, commando's, configuratie, voorbeelden en bouwinstructies.
-
-## 开发版边界 / Alpha Limitations / Alfabeperkingen
-
-- **中文：** MA/EoA 目前仅为影子计算与显示，ATP 不据此施加制动。司机失能 EB、手动 EB 与 RECOVERING 制动保持是独立的实际控制功能。本项目不是认证铁路安全系统。
-- **English:** MA/EoA are currently calculated and displayed in shadow mode; ATP does not brake in response. Driver-loss EB, manual EB and RECOVERING brake hold are separate active functions. This is not a certified railway safety system.
-- **Nederlands:** MA/EoA worden momenteel alleen in schaduwmodus berekend en weergegeven; ATP grijpt hierbij niet remmend in. Noodremming bij verlies van de machinist, handmatige noodremming en de remvasthouding in RECOVERING zijn afzonderlijke actieve functies. Dit is geen gecertificeerd spoorwegveiligheidssysteem.
-
-## 致谢 / Acknowledgements / Dankwoord
-
-**中文：** 感谢 [bergerkiller / Berger Healer](https://github.com/bergerhealer) 及 [BKCommonLib](https://github.com/bergerhealer/BKCommonLib)、[TrainCarts](https://github.com/bergerhealer/TrainCarts) 的贡献者，为 Minecraft 插件生态与矿车铁路玩法所做的长期工作。TrainCarts 的牌子接口和运行流程为本项目提供了重要参考。SkyRail Suite 是独立项目，不要求安装 BKCommonLib 或 TrainCarts，也不代表二者的官方版本、认可或完整兼容实现；相关 TrainCarts 版权与许可声明继续保留。
-
-**English:** Thank you to [bergerkiller / Berger Healer](https://github.com/bergerhealer) and the contributors to [BKCommonLib](https://github.com/bergerhealer/BKCommonLib) and [TrainCarts](https://github.com/bergerhealer/TrainCarts) for their long-standing work on Minecraft plugins and minecart railways. TrainCarts' sign interfaces and operating workflows have been important references for this project. SkyRail Suite is an independent project: it does not require either plugin, is not an official or endorsed version of either, and does not claim complete compatibility. The applicable TrainCarts copyright and license notice is retained.
-
-**Nederlands:** Met dank aan [bergerkiller / Berger Healer](https://github.com/bergerhealer) en de bijdragers aan [BKCommonLib](https://github.com/bergerhealer/BKCommonLib) en [TrainCarts](https://github.com/bergerhealer/TrainCarts) voor hun jarenlange werk aan Minecraft-plugins en spoorwegen met mijnkarretjes. De bordinterfaces en bedieningsprocedures van TrainCarts waren belangrijke referenties voor dit project. SkyRail Suite is een onafhankelijk project: geen van beide plugins is vereist, het is geen officiële of door hen onderschreven versie en volledige compatibiliteit wordt niet geclaimd. De toepasselijke copyright- en licentievermelding van TrainCarts blijft behouden.
-
-## 授权 / License / Licentie
-
-Code and documentation: [MIT](LICENSE), `Copyright (c) 2026 Skyworld Minecraft Server contributors`.
-
-维护联系 / Maintainer / Beheerder: [moerail](https://github.com/moerail).
-
-Logo 与角色图片不适用代码 MIT 授权。SkyPCC 内置吉祥物已获准随包分发，这不等于将图片按 MIT 开放。
-
-Logos and character artwork are outside the code's MIT license. Distribution of the bundled SkyPCC mascot is permitted; this does not MIT-license the artwork.
-
-<<<<<<< HEAD
-```powershell
-git init -b main
-git status --short
-git add .
-git diff --cached --stat
-git diff --cached
-# 确认许可证、图片授权、待提交文件和敏感信息后再提交
-git commit -m "Prepare SkyRail Suite source tree"
-# 在 GitHub 建立空仓库，然后使用自己的实际远程地址
-git remote add origin https://github.com/YOUR_ACCOUNT/SkyRail-Suite.git
-git push -u origin main
-```
-
-以上是待执行工作流，不表示已创建远程仓库或已推送。不要直接上传整个旧 Minecraft Plugin 工作区；新目录仅保留源码、默认配置、必要资源与测试。
-
-若仅向其他开发者分享源码：
-
-```powershell
-./package-source.ps1
-```
-
-生成 `dist/SkyRail-Suite-source-<timestamp>.zip`。压缩包不包含 `.git`、JAR、服务器数据、依赖库、缓存或构建输出。
-
-## 说明文档
-
-- [完整英文手册](README.en.md) / [完整荷兰语手册](README.nl.md)：可单独发送，不依赖其他文档。
-- [架构与维护边界](doc/ARCHITECTURE.md)
-- [发布与授权检查](doc/PUBLISHING.md)
-- [迁移记录](doc/MIGRATION.md)
-- [本次验证结果与已知旧测试缺口](doc/VALIDATION.md)
-
-=======
-Logo's en personageafbeeldingen vallen niet onder de MIT-codelicentie. Verspreiding van de meegeleverde SkyPCC-mascotte is toegestaan; hierdoor valt de afbeelding niet onder MIT.
->>>>>>> 261e00f (Refactor STF train management and fix STCS line boundaries)
