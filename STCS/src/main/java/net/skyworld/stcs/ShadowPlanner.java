@@ -96,7 +96,8 @@ final class ShadowPlanner {
             if(total+item.distanceMeters()>=eoa) break;
             total+=item.distanceMeters();
         }
-        if(eoa<offset) reason="EOA_OVERRUN";
+        // A newly calculated obstacle behind the safety margin is not proof of passing an issued EoA.
+        // Preserve the actual blocker; signed remaining still describes the candidate endpoint.
         for(var part:parts)reserved.addAll(g.intervalResources(g.edges.get(part.edgeId()),part.fromMeters(),part.toMeters()));
         return new Result(List.copyOf(parts),Set.copyOf(reserved),last,lastOffset,eoa-offset,reason);
     }

@@ -42,9 +42,9 @@ Le projet introduit la prise de conduite explicite, l’occupation des ressource
 
 | Composant | Version | Fonction principale |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.0-alpha.7` | Rames, mouvement et inscription en courbe, prise de conduite, traction/freinage, profils de véhicule, panneaux, manœuvre physique des appareils de voie, IHM et sons |
-| STCS | `2.2.0-alpha.1` | Infrastructure, RailGraph orienté, point kilométrique, localisation, registre d’occupation conservé, MA/EoA fantômes et contrôles locaux des appareils de voie |
-| SkyworldTrainAPI / STA | `0.8.0` | Contrats inter-greffons versionnés, télémétrie, observations des véhicules, état du pupitre, autorisations et événements |
+| SkyTrainFolia / STF | `2.1.3` | Rames, mouvement et inscription en courbe, prise de conduite, traction/freinage, profils de véhicule, panneaux, manœuvre physique des appareils de voie, IHM et sons |
+| STCS | `2.2.1` | Infrastructure, RailGraph orienté, point kilométrique, localisation, registre d’occupation conservé, MA/EoA fantômes et contrôles locaux des appareils de voie |
+| SkyworldTrainAPI / STA | `0.8.1` | Contrats inter-greffons versionnés, télémétrie, observations des véhicules, état du pupitre, autorisations et événements |
 | SkyPCC | `0.8.1` | Tableau de contrôle optique Web, inspecteur des trains/infrastructures, occupations/réservations, journal d’événements et commande authentifiée des appareils de voie |
 
 ```text
@@ -96,9 +96,9 @@ Ce schéma illustre les responsabilités, et non une chaîne d’appels série o
 Fichiers d’installation actuels :
 
 ```text
-SkyTrainFolia-2.1.0-alpha.7.jar
-STCS-2.2.0-alpha.1.jar
-SkyworldTrainAPI-0.8.0.jar
+SkyTrainFolia-2.1.3.jar
+STCS-2.2.1.jar
+SkyworldTrainAPI-0.8.1.jar
 SkyPCC-0.8.1.jar
 ```
 
@@ -455,11 +455,24 @@ continue 40kmh
 | 3 | Temps de stationnement ; un nombre seul est en secondes, des formes comme `5s`, `100t`, `00:05` sont aussi admises |
 | 4 | Direction/vitesse, p. ex. `continue 40kmh` ou `reverse 0.4` ; sans unité, la vitesse est en blocs/tick |
 
-Un train libéré, automatique et poussable peut être poussé dans une gare puis expédié. L’annonce d’approche lointaine exige des requêtes de ligne/gare STA/STCS utilisables. Un arrêt sur le panneau ne prouve pas que la détection anticipée a fonctionné.
+Les trains automatiques peuvent désormais détecter les panneaux Station en suivant les rails réels, sans nom de ligne, balise ni étalonnage STCS. La recherche suit la branche sélectionnée des aiguillages, sans charger de chunks ni détecter les trains précédents. Ce n’est ni un ATP ni une protection anticollision.
 
-Le MVP utilise les crans du véhicule : forte traction au départ, ajustements N/P1 près de la vitesse cible, freinage progressivement réduit à l’approche et B7 à l’arrêt. Il ne s’agit ni d’une affectation instantanée de vitesse, ni d’une garantie de précision d’arrêt pour tous les profils et espacements de gare.
+Le repère d’arrêt est le centre du wagonnet de tête dans le sens de marche, augmenté du décalage du panneau ; aucune demi-longueur de rame n’est ajoutée. Depuis 2.1.3, le conducteur virtuel adapte le freinage à la distance restante et laisse rouler sous la courbe. Une reprise lente avec hystérésis intervient uniquement après un arrêt trop court. Le stationnement et HOLD conservent B7 ; la conduite manuelle est inchangée.
 
-`settings.station-look-ahead-blocks` de STF vaut 8192 par défaut ; `station-launch-speed`, 0,4 bloc/tick. L’accostage final possède des paramètres distincts. Ces réglages sont indépendants de l’anticipation MA de STCS. Commencez les essais à basse vitesse avec des gares généreusement espacées.
+Dans la section STF `settings` existante, ajoutez `station-local-look-ahead-blocks: 256.0`. Plage : 0–1024 blocs ; 0 désactive la recherche locale. Une recherche est effectuée au maximum toutes les 200 ms, uniquement sur les rails chargés relevant du thread Folia courant. Il s’agit d’une portée maximale, pas d’une distance de freinage garantie. L’avis facultatif du graphe STA/STCS conserve `station-look-ahead-blocks` (8192 par défaut). Commencez à basse vitesse avec suffisamment de voie chargée.
+
+### Panneau de propriété V_target (Depuis 2.1.2)
+
+Ce panneau modifie la vitesse cible des trains automatiques, pas leur vitesse maximale ni leur mode de conduite. Les trains manuels l’ignorent. Seul `V_target` est autorisé sur ces panneaux ; les autres propriétés passent par les commandes administrateur.
+
+```text
+[+stf]
+property
+V_target
+60km/h
+```
+
+Sans unité, la valeur est en blocs/tick : `0.4`, `8m/s` et `28.8km/h` sont équivalents à 20 ticks/s et un bloc par mètre. La propriété est enregistrée, respecte les plafonds du train/profil et ne démarre pas seule un train arrêté. Une vitesse de départ explicite du panneau Station est prioritaire ; sinon V_target s’applique, puis `settings.station-launch-speed` (0.4 par défaut). `[+stf]` est toujours actif ; `[stf]` dépend du redstone. Commandes administrateur : `/st property demo V_target 60km/h` pour régler et `/st property demo get V_target` pour lire.
 
 ### Apparition et destruction
 

@@ -42,9 +42,9 @@ Het project introduceert expliciete besturingsrechten, spoorbezetting, strijdige
 
 | Component | Versie | Verantwoordelijkheid |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.0-alpha.8` | Treinsamenstelling, beweging en bochten, besturingsrechten, tractie/remming, profielen, borden, fysieke wisselbediening, HMI en geluid |
-| STCS | `2.2.0-alpha.1` | Infrastructuur, gerichte RailGraph, lijnkilometrering, plaatsbepaling, bewaard bezettingsregister, schaduw-MA/EoA en lokale wisselcontroles |
-| SkyworldTrainAPI / STA | `0.8.0` | Versiegebonden plugincontracten, telemetrie, voertuigwaarnemingen, cabinestatus, rijtoestemmingen en gebeurtenissen |
+| SkyTrainFolia / STF | `2.1.3` | Treinsamenstelling, beweging en bochten, besturingsrechten, tractie/remming, profielen, borden, fysieke wisselbediening, HMI en geluid |
+| STCS | `2.2.1` | Infrastructuur, gerichte RailGraph, lijnkilometrering, plaatsbepaling, bewaard bezettingsregister, schaduw-MA/EoA en lokale wisselcontroles |
+| SkyworldTrainAPI / STA | `0.8.1` | Versiegebonden plugincontracten, telemetrie, voertuigwaarnemingen, cabinestatus, rijtoestemmingen en gebeurtenissen |
 | SkyPCC | `0.8.1` | Webspoorschema, inspectiepaneel voor treinen/infrastructuur, bezetting/reserveringen, gebeurtenissenlog en geauthenticeerde wisselbediening |
 
 ```text
@@ -96,9 +96,9 @@ Dit schema toont verantwoordelijkheden, geen verplichte opeenvolging van alle aa
 Huidige installatiebestanden:
 
 ```text
-SkyTrainFolia-2.1.0-alpha.8.jar
-STCS-2.2.0-alpha.1.jar
-SkyworldTrainAPI-0.8.0.jar
+SkyTrainFolia-2.1.3.jar
+STCS-2.2.1.jar
+SkyworldTrainAPI-0.8.1.jar
 SkyPCC-0.8.1.jar
 ```
 
@@ -455,11 +455,24 @@ continue 40kmh
 | 3 | Halteertijd; kaal getal in seconden, ook `5s`, `100t`, `00:05` |
 | 4 | Richting/snelheid, bijvoorbeeld `continue 40kmh` of `reverse 0.4`; zonder eenheid blokken/tick |
 
-Een vrijgegeven, automatische en duwbare trein kan op het station worden geduwd en daarna vertrekken. Vooruitmelding vereist bruikbare STA/STCS-lijn-/stationqueries. Op het bord stoppen bewijst niet dat vooruitdetectie is gelukt.
+Automatische treinen kunnen Station-borden vooruit ontdekken door de werkelijke rails te volgen, zonder lijnnaam, balises of STCS-kalibratie. De zoekactie volgt de ingestelde wisseltak, laadt geen chunks en detecteert geen voorliggende treinen. Dit is geen ATP of botsbeveiliging.
 
-De MVP gebruikt voertuigstanden: hogere tractie bij vertrek, N/P1 nabij de doelsnelheid, geleidelijk minder remming bij nadering en B7 in stilstand. Geen onmiddellijke snelheidstoewijzing en geen garantie van nauwkeurig stoppen voor ieder profiel en iedere halteafstand.
+Het stoppunt is het midden van de voorste mijnkar in de rijrichting, plus de stationoffset; er wordt geen halve treinlengte meer toegevoegd. Vanaf 2.1.3 kiest de virtuele machinist de remstand op basis van de resterende afstand. Onder de remcurve wordt uitgerold; alleen bij werkelijk te vroeg stoppen volgt langzaam bijrijden met hysterese. Bij stilstand en HOLD blijft B7 actief; handmatige bediening verandert niet.
 
-STF `settings.station-look-ahead-blocks` is standaard 8192; `station-launch-speed` 0.4 blokken/tick. Het laatste deel van het stoppen heeft aparte dockingparameters. Dit staat los van STCS MA-vooruitkijken. Test eerst langzaam met ruime halteafstanden.
+Voeg onder de bestaande STF-sectie `settings` de instelling `station-local-look-ahead-blocks: 256.0` toe. Bereik: 0–1024 blokken; 0 schakelt lokaal zoeken uit. Er wordt hoogstens iedere 200 ms gezocht, uitsluitend op geladen rails binnen de huidige Folia-thread. Dit is een maximale zoekafstand, geen gegarandeerde remweg. Optioneel STA/STCS-graafadvies gebruikt afzonderlijk `station-look-ahead-blocks` (standaard 8192). Test eerst langzaam met voldoende geladen spoor.
+
+### V_target-eigenschapsbord (Vanaf 2.1.2)
+
+Dit bord wijzigt de doelsnelheid van automatische treinen, niet hun maximumsnelheid of besturingsmodus. Handmatige treinen negeren het. Alleen `V_target` is toegestaan op eigenschapsborden; andere eigenschappen worden via beheerderscommando's ingesteld.
+
+```text
+[+stf]
+property
+V_target
+60km/h
+```
+
+Zonder eenheid geldt blokken/tick: `0.4`, `8m/s` en `28.8km/h` zijn gelijk bij 20 ticks/s en één blok per meter. De eigenschap wordt opgeslagen, respecteert trein- en profielmaxima en start een stilstaande trein niet zelfstandig. Een expliciete stationvertreksnelheid heeft voorrang; anders geldt V_target, met `settings.station-launch-speed` (standaard 0.4) als terugval. `[+stf]` is altijd actief; `[stf]` gebruikt redstone. Beheerders gebruiken `/st property demo V_target 60km/h` om in te stellen en `/st property demo get V_target` om uit te lezen.
 
 ### Spawn en Destroy
 

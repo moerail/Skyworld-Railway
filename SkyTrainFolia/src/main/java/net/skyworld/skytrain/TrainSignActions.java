@@ -162,10 +162,7 @@ final class TrainSignActions {
     }
 
     boolean signPropertyAllowed(String property) {
-        return switch (manager.normalizeProperty(property)) {
-            case "name", "destination", "dest", "route", "tags", "owners" -> false;
-            default -> true;
-        };
+        return manager.normalizeProperty(property).equals("vtarget");
     }
 
     boolean handleSignActions(Train train, Block railBlock, Location leaderLocation,

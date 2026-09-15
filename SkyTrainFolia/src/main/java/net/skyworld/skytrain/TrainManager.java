@@ -511,6 +511,8 @@ final class TrainManager implements TrainMotionController.Host {
     }
 
     private void retireTrain(Train train) {
+        var sink = plugin.telemetrySink();
+        java.util.function.Consumer<UUID> confirmed = sink == null ? id -> {} : sink.beginRemoval(train);
         UUID driver = drivers.driverId(train.id());
         if (driver != null) drivers.revokeDriver(driver, null, "VEHICLE_REMOVED");
         automaticSigns.forget(train.id());
@@ -530,7 +532,7 @@ final class TrainManager implements TrainMotionController.Host {
             Minecart cart = managedCarts.remove(member);
             actuator.forgetPending(member);
             if (cart != null) {
-                scheduleCartRemoval(cart);
+                scheduleCartRemoval(cart, confirmed);
             }
         }
         persistence.save();
@@ -917,6 +919,11 @@ final class TrainManager implements TrainMotionController.Host {
         String cleanValue = value == null ? "" : value.trim();
 
         switch (key) {
+            case "vtarget" -> {
+                properties.setAutomaticTargetSpeed(cleanValue);
+                if (train.automaticRun!=null && train.automaticRun.phase==AutomaticRun.Phase.CRUISE)
+                    train.automaticRun.inheritTargetSpeed=true;
+            }
             case "name" -> renameTrain(train, cleanValue);
             case "displayname" -> properties.displayName = cleanValue;
             case "trainnumber" -> properties.setTrainNumber(cleanValue);
@@ -961,6 +968,7 @@ final class TrainManager implements TrainMotionController.Host {
         Train train = requireTrain(trainName);
         TrainProperties properties = train.properties();
         return switch (normalizeProperty(property)) {
+            case "vtarget" -> properties.automaticTargetSpeed == null ? "default" : Double.toString(properties.automaticTargetSpeed);
             case "name" -> train.name();
             case "displayname" -> properties.displayName;
             case "trainnumber" -> properties.trainNumber;
@@ -1396,7 +1404,7 @@ final class TrainManager implements TrainMotionController.Host {
         }
     }
 
-    private void scheduleCartRemoval(Minecart cart) {
+    private void scheduleCartRemoval(Minecart cart, java.util.function.Consumer<UUID> confirmed) {
         UUID entityId = cart.getUniqueId();
         retiringCarts.add(entityId);
         try {
@@ -1407,6 +1415,7 @@ final class TrainManager implements TrainMotionController.Host {
                             if (cart.isValid() && !cart.isDead()) {
                                 cart.eject();
                                 cart.remove();
+                                if (!cart.isValid()) confirmed.accept(entityId);
                             }
                         } finally {
                             retiringCarts.remove(entityId);

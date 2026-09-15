@@ -177,6 +177,25 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
         switch (sub) {
             case "ma" -> {
+                if (args.length >= 2 && args[1].equalsIgnoreCase("clear")) {
+                    if (!(sender instanceof org.bukkit.command.ConsoleCommandSender)) {
+                        send(sender, "&cConsole only: stcs ma clear <train-uuid> confirm. Verify all carts are gone first.");
+                        return true;
+                    }
+                    if (args.length != 4 || !args[3].equals("confirm")) {
+                        send(sender, "&cstcs ma clear <train-uuid> confirm: operator confirms physical track clearance; historical M1 ledger is retained.");
+                        return true;
+                    }
+                    java.util.UUID id;
+                    try { id = java.util.UUID.fromString(args[2]); }
+                    catch (IllegalArgumentException ex) { send(sender, "&cInvalid train UUID."); return true; }
+                    if (!id.toString().equalsIgnoreCase(args[2])) { send(sender, "&cUse the complete train UUID."); return true; }
+                    getServer().getAsyncScheduler().runNow(this, task -> {
+                        String result = shadow == null ? "UNAVAILABLE" : shadow.clearArchived(id, sender.getName());
+                        getLogger().info("Shadow clearance " + id + ": " + result);
+                    });
+                    return true;
+                }
                 if (args.length == 2 && args[1].equalsIgnoreCase("status")) {
                     if (!hasAdminPermission(sender)) { send(sender, "&c" + protectionText(sender, "protection.permission")); return true; }
                     sendMaDiagnostics(sender, shadow == null ? null : shadow.diagnostics());

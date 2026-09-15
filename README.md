@@ -20,10 +20,16 @@ SkyRail Suite 延续 SkyTrain Suite 开发线；现有插件名、指令和数�
 
 | Plugin | Version | Responsibility |
 | --- | --- | --- |
-| SkyTrainFolia (STF) | 2.1.0-alpha.8 | Trains, driving, physics, signs and cab HMI |
-| STCS | 2.2.0-alpha.2 | RailGraph, localisation, occupancy and shadow MA/EoA |
-| SkyworldTrainAPI (STA) | 0.8.0 | Versioned inter-plugin contracts, telemetry and events |
+| SkyTrainFolia (STF) | 2.1.3 | Trains, driving, physics, signs and cab HMI |
+| STCS | 2.2.1 | RailGraph, localisation, occupancy and shadow MA/EoA |
+| SkyworldTrainAPI (STA) | 0.8.1 | Versioned inter-plugin contracts, telemetry and events |
 | SkyPCC | 0.8.1 | Web track diagram, inspectors, event log and turnout control |
+
+## 2.1.3 更新 / Update / Bijgewerkt
+
+- **中文：** V_target 自动属性牌、无标定 Station 前视、领车停车对位，以及按剩余距离调整的进站制动。MA/EoA 仍为影子模式。
+- **English:** V_target property signs, unmarked-track station detection, lead-cart stop alignment and distance-feedback station braking. MA/EoA remain shadow-only.
+- **Nederlands:** V_target-borden, stationdetectie zonder lijnkalibratie, stoppen op de voorste mijnkar en remregeling op resterende afstand. MA/EoA blijven in schaduwmodus.
 
 ## 开始使用 / Getting Started / Aan de slag
 

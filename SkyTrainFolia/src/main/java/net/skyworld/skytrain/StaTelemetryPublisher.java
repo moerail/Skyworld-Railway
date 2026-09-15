@@ -22,8 +22,23 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
     private volatile boolean warned;
     private volatile List<ConsistObservation> consists = List.of();
     private long nextConsistSample;
+    private final ConcurrentMap<UUID, ConsistObservation> destructions = new ConcurrentHashMap<>();
+    private final java.nio.file.Path destructionFile;
+    private String savedDestructions = "";
     StaTelemetryPublisher(SkyTrainPlugin plugin) {
         this.plugin = plugin;
+        destructionFile = plugin.getDataFolder().toPath().resolve("confirmed-destructions.json");
+        try {
+            if (java.nio.file.Files.exists(destructionFile)) {
+                var saved = new com.google.gson.Gson().fromJson(java.nio.file.Files.readString(destructionFile), ConsistObservation[].class);
+                for (var receipt : saved) {
+                    if (!receipt.confirmedDestruction()) throw new IllegalArgumentException("Incomplete destruction receipt");
+                    destructions.put(receipt.train(), receipt);
+                }
+            }
+        } catch (java.io.IOException | RuntimeException ex) {
+            throw new IllegalStateException("Invalid destruction receipts; original file retained", ex);
+        }
         scale = plugin.getConfig().getDouble("infrastructure.blocks-per-meter", 1.0);
         if (!Double.isFinite(scale) || scale <= 0) throw new IllegalArgumentException("Invalid distance scale");
         store = new LatestMessageStore(session, 16384, ex -> plugin.getLogger().warning("STA consumer failed: " + ex));
@@ -48,6 +63,21 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
         } catch (RuntimeException | LinkageError ex) { warn("Driver event delivery failed: " + ex); }
     }
     public Collection<ConsistObservation> consistObservations() { return consists; }
+    public Consumer<UUID> beginRemoval(Train train) {
+        var expected = List.copyOf(train.members());
+        var evidence = train.memberEvidence();
+        List<ConsistObservation.Member> members = new ArrayList<>();
+        for (UUID id : expected) {
+            var e = evidence.get(id);
+            if (e == null) return ignored -> {};
+            var p = e.position();
+            members.add(new ConsistObservation.Member(id, p.worldName, p.x, p.y, p.z,
+                    p.timeMillis, System.currentTimeMillis(), ConsistObservation.State.REMOVED));
+        }
+        return new RemovalConfirmation(expected, () -> destructions.put(train.id(),
+                new ConsistObservation(session, sequence.incrementAndGet(), train.id(), train.name(),
+                        System.currentTimeMillis(), expected, members, true)));
+    }
     public void protectionEvent(Train train, UUID actor, String actorName, String previous, String next) {
         try {
             var service = plugin.getServer().getServicesManager().load(RailwayEventService.class);
@@ -81,7 +111,26 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
             result.add(new ConsistObservation(session, sequence.incrementAndGet(), train.id(), train.name(),
                     now, train.members(), members, false));
         }
-        // Absent trains remain the consumer's responsibility; absence never means track clear.
+        // Persist before publication; receipts survive missed sampling and server restarts.
+        var receipts = destructions.values().stream().sorted(Comparator.comparing(r -> r.train().toString())).toList();
+        String json = new com.google.gson.Gson().toJson(receipts);
+        if (!json.equals(savedDestructions)) {
+            try {
+                var tmp = destructionFile.resolveSibling(destructionFile.getFileName() + ".tmp");
+                java.nio.file.Files.writeString(tmp, json);
+                try { java.nio.file.Files.move(tmp, destructionFile, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING); }
+                catch (java.nio.file.AtomicMoveNotSupportedException ex) {
+                    java.nio.file.Files.move(tmp, destructionFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+                savedDestructions = json;
+            } catch (java.io.IOException ex) { throw new IllegalStateException("Cannot persist destruction receipts", ex); }
+        }
+        var live = result.stream().map(ConsistObservation::train).collect(java.util.stream.Collectors.toSet());
+        for (var receipt : receipts) if (!live.contains(receipt.train())) result.add(new ConsistObservation(
+                session, sequence.incrementAndGet(), receipt.train(), receipt.name(), now,
+                receipt.expectedMembers(), receipt.members(), true));
+        // Absence alone never means track clear.
         consists = List.copyOf(result);
     }
     public Collection<StaMessage> snapshots() { return store.snapshots(); }

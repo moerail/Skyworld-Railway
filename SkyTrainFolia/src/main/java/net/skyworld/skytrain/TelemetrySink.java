@@ -4,6 +4,7 @@ import java.util.UUID;
 
 /** Optional STA implementation is isolated so STF can still run without the API jar. */
 interface TelemetrySink {
+    default java.util.function.Consumer<UUID> beginRemoval(Train train) { return id -> {}; }
     default void protectionEvent(Train train, UUID actor, String actorName, String previous, String next) { }
     default void switchEvent(UUID trainId, String trainName, SkyTrainSwitch railwaySwitch,
             String type, String reason, String previous, String next, String entry) { }

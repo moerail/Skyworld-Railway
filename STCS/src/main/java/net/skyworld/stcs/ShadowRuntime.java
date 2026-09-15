@@ -200,6 +200,15 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
             uncertain.addAll(occupied.keySet());
             unbounded=!available;
             if(available) for(var train:input.roster()) {
+                if (train.session().equals(input.rosterSession()) && train.session().equals(input.driverSession())
+                        && fresh(train.sampledAtMillis(), now) && train.confirmedDestruction()
+                        && retained.getOrDefault(train.train(), ShadowOccupancyStore.TrainRecord.legacy(Set.of()))
+                                .positions().stream().allMatch(p -> train.expectedMembers().contains(p.id()))
+                        && input.roster().stream().noneMatch(other -> other.train().equals(train.train()) && !other.removed())
+                        && !drivers.containsKey(train.train()) && !reports.containsKey(train.train())) {
+                    clearRetained(train.train());
+                    continue;
+                }
                 Set<String> cells=new HashSet<>();
                 boolean trusted=train.session().equals(input.rosterSession()) && train.session().equals(input.driverSession())
                         && !train.removed() && fresh(train.sampledAtMillis(),now);
@@ -346,8 +355,11 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
                             settings,switchStates,obstacles);
                     reserved.put(id,result.reserved());reason=result.reason();
                     maPoints.put(id,pointsInPath(model,result.path()));
+                    boolean granted = result.remaining()!=null && result.remaining()>0 && !result.path().isEmpty();
                     authorities.add(new Authority(id,desk.leaseId(),m.tracking().telemetrySessionId(),m.physical().state().sequence(),
-                            result.remaining()==null?"WAITING":"ALLOCATED_SHADOW",reason,result.path(),result.edge(),result.offset(),result.remaining()));
+                            granted ? "ALLOCATED_SHADOW" : "WAITING", reason,
+                            granted ? result.path() : List.of(), granted ? result.edge() : null,
+                            granted ? result.offset() : null, granted ? result.remaining() : null));
                 } else authorities.add(new Authority(id,desk==null?null:desk.leaseId(),m==null?null:m.tracking().telemetrySessionId(),
                         m==null?0:m.physical().state().sequence(),intents.containsKey(id)?"WAITING":"INACTIVE",reason,List.of(),null,null,null));
                 reasons.put(id,reason);
@@ -440,6 +452,41 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
         if(json.equals(persisted))return;
         ShadowOccupancyStore.save(file,json);
         persisted=json;lastPersistedAt=now;persistedResources=Map.copyOf(occupied);persistedOutside=Set.copyOf(outside);
+    }
+
+    private void clearRetained(UUID id) {
+        occupied.remove(id); retained.remove(id); reserved.remove(id); intents.remove(id);
+        maPoints.remove(id); occupiedPoints.remove(id); uncertain.remove(id);
+        reversed.remove(id); reasons.remove(id); soundTracker.reset(id);
+    }
+
+    synchronized String clearArchived(UUID id, String actor) {
+        tick();
+        var input = inputSource.get();
+        if (closed || failed || !input.available() || input.rosterSession()==null
+                || !input.rosterSession().equals(input.driverSession())) return "SOURCE_UNAVAILABLE";
+        if (input.roster().stream().anyMatch(t -> t.train().equals(id) && !t.removed())
+                || input.desks().stream().anyMatch(d -> d.trainId().equals(id))
+                || input.reports().stream().anyMatch(m -> m.header().trainId().equals(id)
+                        && m.header().kind()==StaMessage.Kind.TRACK_REPORT)) return "TRAIN_STILL_REPORTED";
+        if (!occupied.containsKey(id)) return "NOT_FOUND";
+        try {
+            persist(true);
+            // Backup and append-only operator audit must succeed before discarding evidence.
+            var backup = file.resolveSibling(file.getFileName()+".clear-"+UUID.randomUUID()+".bak");
+            Files.copy(file, backup);
+            Files.writeString(file.resolveSibling("shadow-clearance-audit.log"),
+                    java.time.Instant.now()+" actor="+actor+" train="+id+" backup="+backup.getFileName()+"\n",
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            clearRetained(id);
+            persist(true);
+            tick();
+            return "CLEARED_SHADOW_ONLY";
+        } catch (java.io.IOException ex) {
+            failed=true;
+            if (plugin!=null) plugin.getLogger().log(java.util.logging.Level.SEVERE,"Shadow clearance failed; MA disabled",ex);
+            return "FAILED_MA_DISABLED";
+        }
     }
     public synchronized CompletionStage<Reply> change(Request request) {
         if(switchResults.containsKey(request.requestId())) return request.equals(switchRequests.get(request.requestId()))

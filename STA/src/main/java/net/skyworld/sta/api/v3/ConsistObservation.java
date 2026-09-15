@@ -16,6 +16,11 @@ public record ConsistObservation(UUID session, long sequence, UUID train, String
             throw new IllegalArgumentException("Duplicate member");
     }
     public enum State { OBSERVED, UNLOADED, PLAYER_QUIT, REMOVED }
+    /** Explicit complete destruction receipt, not a roster-removal or unload message. */
+    public boolean confirmedDestruction() {
+        return removed && !expectedMembers.isEmpty() && members.size() == expectedMembers.size()
+                && members.stream().allMatch(m -> m.state() == State.REMOVED && expectedMembers.contains(m.id()));
+    }
     public record Member(UUID id, String world, double x, double y, double z,
             long observedAtMillis, long stateAtMillis, State state) {
         public Member {

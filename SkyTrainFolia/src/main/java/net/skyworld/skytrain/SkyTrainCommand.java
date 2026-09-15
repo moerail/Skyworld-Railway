@@ -33,7 +33,7 @@ final class SkyTrainCommand implements TabExecutor {
             "name", "displayname", "trainnumber", "destination", "collision", "playersenter", "playersexit",
             "pushable", "pickupitems", "invincible", "allowplayertake", "requirepoweredcart", "sound",
             "keepchunksloaded", "conductionmode", "gravity", "friction", "waitticks", "speed", "maxspeed",
-            "spacing");
+            "spacing", "V_target");
 
     private final SkyTrainPlugin plugin;
     private final TrainManager manager;

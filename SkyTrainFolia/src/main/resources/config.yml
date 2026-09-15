@@ -55,8 +55,12 @@ settings:
   autosave-interval-ticks: 6000
   default-speed: 0.35
   # Automatic signs use the selected vehicle's real P1-P4 / B1-B7 notches.
-  # STA 0.3 + STCS 0.8 provide advisory station distance, not MA/ATP protection.
+  # Optional STA/STCS graph advice; not MA/ATP protection.
   station-look-ahead-blocks: 8192.0
+  # Unmarked-track station search, checked every 200 ms, in blocks (0 disables, max 1024).
+  # Follows current rail geometry; stops at unloaded or foreign-region rails.
+  # Does not load chunks. This range is a maximum, not a guaranteed braking distance.
+  station-local-look-ahead-blocks: 256.0
   # TC launch speed syntax uses blocks/tick when no unit is written.
   station-launch-speed: 0.4
   sign-spawn-max-carts: 64

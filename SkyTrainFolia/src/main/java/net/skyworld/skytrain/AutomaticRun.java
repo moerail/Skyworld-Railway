@@ -14,11 +14,13 @@ final class AutomaticRun {
     volatile String reason = "Station approach";
     double desiredSpeed;
     boolean graphApproach;
+    boolean inheritTargetSpeed;
     double initialSpeed;
     boolean coasting;
     private boolean brakingAnnounced;
-    private long lastNotchChange;
     private double brakingEntrySpeed;
+    private boolean docking;
+    private boolean dockingPower;
     private boolean speedHolding;
     private double lastCruiseTarget;
     AutomaticRun(String key, AutomaticSignSpec spec, double distance, boolean reverse, boolean reversed) {
@@ -35,6 +37,8 @@ final class AutomaticRun {
         speedHolding=false;
         lastCruiseTarget=0;
         brakingEntrySpeed=0;
+        docking=false;
+        dockingPower=false;
         initialSpeed=0;
         until=spec.direction().isEmpty() && !spec.route() ? Long.MAX_VALUE : now+spec.waitMillis();
         reason="Station wait";
@@ -59,27 +63,45 @@ final class AutomaticRun {
         return distance;
     }
 
-    /** Full-power departure, P1/coast cruising and speed-banded station braking. */
+    // Integrate a deceleration that tapers from B4 towards B1 over the last eight blocks.
+    static double approachSpeed(double distance, double[] brakes, double resistance) {
+        double d=Math.max(0,distance);
+        double low=Math.max(.000001,brakes[1]+resistance);
+        double high=Math.max(low,brakes[4]+resistance);
+        return Math.sqrt(2*(low*d+(high-low)*(d-8*Math.log1p(d/8))));
+    }
+
+    /** Full-power departure, P1/coast cruising and distance-feedback station braking. */
     int notch(double speed, double target, double[] powers, double[] brakes, double resistance, long now, int previous) {
         if (phase == Phase.WAIT || phase == Phase.HOLD || remaining <= .02 && phase == Phase.APPROACH) return -7;
         if (phase == Phase.APPROACH) {
             if (brakingEntrySpeed == 0 && speed > .003
-                    && remaining <= taperedStopDistance(speed, brakes, resistance) + speed * 2 + .15) {
+                    && speed >= approachSpeed(remaining-speed*2,brakes,resistance)) {
                 brakingEntrySpeed = speed;
-                lastNotchChange = now;
-                return -7;
             }
             if (brakingEntrySpeed > 0) {
-                // Recover a small undershoot without jumping back to full traction.
-                if (speed < .006 && remaining > .02) return 1;
-                int brake = Math.max(1, Math.min(7, (int)Math.ceil(7 * speed / brakingEntrySpeed)));
-                double required = speed * speed / (2 * Math.max(.02, remaining - .02));
-                while (brake < 7 && brakes[brake] + resistance < required) brake++;
-                int old = Math.max(0, -previous);
-                if (old > brake && speed > .03) {
-                    brake = now - lastNotchChange < 200 ? old : Math.max(brake, old - 1);
+                if(speed<.001 && remaining>.02) docking=true;
+                double horizon=4;
+                double desired=approachSpeed(remaining-speed*horizon,brakes,resistance);
+                if(docking) {
+                    double creep=Math.min(.04,approachSpeed(remaining,brakes,resistance));
+                    if(speed<creep*.55) dockingPower=true;
+                    if(speed>=creep*.9) dockingPower=false;
+                    if(dockingPower && (speed<.001 || speed+Math.max(0,powers[1]-resistance)<desired)) return 1;
                 }
-                if (brake != old) lastNotchChange = now;
+                // Coast below the curve, rather than braking to a standstill and reapplying P1.
+                double required=Math.max(0,(speed-desired)/horizon-resistance);
+                int brake=0;
+                double error=required;
+                for(int b=1;b<=7;b++) {
+                    double candidate=Math.abs(brakes[b]-required);
+                    if(candidate<error) { error=candidate; brake=b; }
+                }
+                int old=Math.max(0,Math.min(7,-previous));
+                if(Math.abs(brakes[old]-required)<=error+.00005) brake=old;
+                // Late detection/overspeed must not be hidden by notch hysteresis.
+                double stopping=speed*speed/(2*Math.max(.001,remaining-.02));
+                if(stopping>brakes[7]+resistance) brake=7;
                 return -brake;
             }
         }

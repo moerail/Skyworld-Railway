@@ -82,11 +82,8 @@ public final class AutomaticSignTest {
         run.phase=AutomaticRun.Phase.APPROACH;
         run.remaining=AutomaticRun.taperedStopDistance(.4,brakes,.0001);
         check(run.notch(.4,.4,powers,brakes,.0001,1500,0)==-7,"Station braking starts at B7");
-        int previous=-7;
-        for(int b=6;b>=1;b--) {
-            previous=run.notch(.4*b/7-.00001,.4,powers,brakes,.0001,1500+(7-b)*250,previous);
-            check(previous==-b,"Progressive brake release B"+b);
-        }
+        check(run.notch(.05,.4,powers,brakes,.0001,1750,-7)==0,
+                "Coast when below distance curve; do not keep braking based on entry speed");
         run.remaining=.05;
         check(run.notch(.3,.4,powers,brakes,.0001,4000,-1)==-7,"Insufficient distance overrides taper");
         run.arrived(5000);
@@ -180,7 +177,8 @@ public final class AutomaticSignTest {
         var run=new AutomaticRun("test",spec,distance,false,false);
         Train train=new Train(UUID.randomUUID(),"test",.4,v.maxSpeed(),1.1);
         train.seedCurrentSpeed(initial);
-        int previous=0, tick=0;
+        int previous=0, tick=0, repowers=0, finalTicks=0;
+        boolean braking=false;
         double speedAtArrival=0;
         for(;tick<30000 && run.remaining>.02;tick++) {
             double speed=train.currentSpeed();
@@ -192,6 +190,9 @@ public final class AutomaticSignTest {
             double resistance=v.rolling()+v.air()*speed*speed;
             double target=initial;
             int notch=run.notch(speed,target,powers,brakes,resistance,(tick+1)*50L,previous);
+            if(notch<0) braking=true;
+            if(braking && notch>0 && previous<=0) repowers++;
+            if(run.remaining<1) finalTicks++;
             previous=notch;
             int p=Math.max(0,notch),b=Math.max(0,-notch);
             speedAtArrival=train.updateDrivenForceSpeed((tick+1)*50L,v.maxSpeed(),v.tractionForce(p),v.brakeForce(b),
@@ -199,11 +200,14 @@ public final class AutomaticSignTest {
                     v.autoDeceleration(),v.emergencyForce(),false,p>0&&b==0);
             run.moved(speedAtArrival);
         }
-        check(tick<30000,v.id()+" must reach stop marker without stalling");
+        check(tick<30000,v.id()+" must reach stop marker without stalling: remaining="+run.remaining+", speed="+speedAtArrival);
         check(speedAtArrival<.03,v.id()+" excessive speed at stop marker: "+speedAtArrival);
+        check(repowers<=2,v.id()+" repeated brake/traction cycles: "+repowers);
+        check(finalTicks<300,v.id()+" final metre took too long: "+finalTicks);
         run.arrived(1000);
         check(run.until==6000 && run.phase==AutomaticRun.Phase.WAIT,"Dwell starts on arrival");
-        System.out.printf("%s: %.1f km/h station approach, arrival %.4f blocks/tick%n",v.id(),initial*72,speedAtArrival);
+        System.out.printf("%s: %.1f km/h, arrival %.4f, repowers %d, last metre %.2fs%n",
+                v.id(),initial*72,speedAtArrival,repowers,finalTicks*.05);
     }
     static void check(boolean v,String message) { if(!v) throw new AssertionError(message); }
     static void near(double a,double b) { check(Math.abs(a-b)<1e-8,a+" != "+b); }

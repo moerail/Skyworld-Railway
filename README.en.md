@@ -42,9 +42,9 @@ The project introduces explicit driving control, resource occupancy, conflicting
 
 | Component | Version | Responsibility |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.0-alpha.8` | Consists, movement and cornering, driving control, traction/braking, vehicle profiles, signs, physical turnout actuation, HMI and sounds |
-| STCS | `2.2.0-alpha.1` | Infrastructure, directed RailGraph, line mileage, localisation, retained occupancy ledger, shadow MA/EoA and local turnout checks |
-| SkyworldTrainAPI / STA | `0.8.0` | Versioned inter-plugin contracts, telemetry, member observations, cab state, authorities and events |
+| SkyTrainFolia / STF | `2.1.3` | Consists, movement and cornering, driving control, traction/braking, vehicle profiles, signs, physical turnout actuation, HMI and sounds |
+| STCS | `2.2.1` | Infrastructure, directed RailGraph, line mileage, localisation, retained occupancy ledger, shadow MA/EoA and local turnout checks |
+| SkyworldTrainAPI / STA | `0.8.1` | Versioned inter-plugin contracts, telemetry, member observations, cab state, authorities and events |
 | SkyPCC | `0.8.1` | Web track diagram, train/infrastructure inspector, occupancy/reservations, event log and authenticated turnout control |
 
 ```text
@@ -96,9 +96,9 @@ This illustrates responsibilities, not a mandatory serial call chain. Browser in
 Current installation files:
 
 ```text
-SkyTrainFolia-2.1.0-alpha.8.jar
-STCS-2.2.0-alpha.1.jar
-SkyworldTrainAPI-0.8.0.jar
+SkyTrainFolia-2.1.3.jar
+STCS-2.2.1.jar
+SkyworldTrainAPI-0.8.1.jar
 SkyPCC-0.8.1.jar
 ```
 
@@ -455,11 +455,24 @@ continue 40kmh
 | 3 | Dwell; a plain number is seconds, with forms such as `5s`, `100t`, `00:05` also supported |
 | 4 | Direction/speed, e.g. `continue 40kmh` or `reverse 0.4`; no speed unit means blocks/tick |
 
-A released, automatic, pushable train can be pushed into a station and subsequently dispatched. Long-range approach notification requires usable STA/STCS line/station queries. Stopping on the sign does not prove that advance detection worked.
+Automatic trains can now discover Station signs ahead by following actual rails, without line names, balises or STCS calibration. Search follows the selected turnout branch; it neither loads chunks nor detects trains ahead. This is not ATP or collision protection.
 
-The MVP uses vehicle notches: higher traction on departure, N/P1 adjustments near target speed, progressively reduced braking on approach and B7 when stopped. It is not an instantaneous speed assignment, nor a guarantee of accurate stopping for every profile/station spacing.
+The stopping reference is the centre of the leading cart in the direction of travel, plus the station offset; no half-consist length is added. Since 2.1.3, the virtual driver selects braking from remaining distance, coasts below the curve, and uses low-speed recovery with hysteresis only after a genuine undershoot. Dwell and HOLD still apply B7; manual driving is unchanged.
 
-STF `settings.station-look-ahead-blocks` defaults to 8192; `station-launch-speed` to 0.4 blocks/tick. Final docking has separate parameters. These are independent of STCS MA look-ahead. Test at low speed with generous station spacing first.
+Under the existing STF `settings` section, set `station-local-look-ahead-blocks: 256.0`. The range is 0–1024 blocks, with 0 disabling local search. Queries run at most every 200 ms and read only loaded rails owned by the current Folia thread. This is a search ceiling, not guaranteed braking distance. Optional STA/STCS graph advice retains the separate `station-look-ahead-blocks` setting (default 8192). Test at low speed with enough loaded track first.
+
+### V_target Property Sign (Since 2.1.2)
+
+This sign changes the automatic train's target speed, not its speed cap or control mode. Manual trains ignore it. Only `V_target` is currently permitted on property signs; other properties use administrator commands.
+
+```text
+[+stf]
+property
+V_target
+60km/h
+```
+
+Unitless values are blocks/tick: `0.4`, `8m/s` and `28.8km/h` are equivalent at 20 ticks/s and one block per metre. The property is persisted, respects train/profile speed caps, and does not start a stopped train by itself. An explicit station departure speed takes precedence; otherwise the station inherits V_target, then falls back to `settings.station-launch-speed` (default 0.4). `[+stf]` is always enabled; `[stf]` uses redstone activation. Administrators set it with `/st property demo V_target 60km/h` and read it with `/st property demo get V_target`.
 
 ### Spawn and Destroy
 

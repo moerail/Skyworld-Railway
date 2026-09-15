@@ -22,6 +22,13 @@ record AutomaticSignSpec(String action, Launch launch, double offset, long waitM
         String text = clean(second);
         String action = text.split("\\s+", 2)[0];
         String options = text.substring(action.length()).trim();
+        if (action.equals("property")) {
+            if (!options.isEmpty() || !clean(third).equals("v_target"))
+                throw new IllegalArgumentException("Property signs currently accept V_target only");
+            var properties = TrainProperties.defaults();
+            properties.setAutomaticTargetSpeed(fourth);
+            return new AutomaticSignSpec(action, Launch.automatic(), 0, 0, "", properties.automaticTargetSpeed, false, 0, "");
+        }
         if (action.equals("destroy")) {
             if (!options.isEmpty()) throw new IllegalArgumentException("destroy takes no second-line options");
             return new AutomaticSignSpec(action, Launch.automatic(), 0, 0, "", null, false, 0, "");
@@ -85,6 +92,13 @@ record AutomaticSignSpec(String action, Launch launch, double offset, long waitM
             return new Launch(-1, Math.round(n * (unit=='t' ? 50 : unit=='m' ? 60000 : 1000)), -1, linear);
         }
         return new Launch(nonnegative(number(value)), -1, -1, linear);
+    }
+
+    static boolean explicitStationSpeed(String fourth) {
+        String text = clean(fourth);
+        for (String token : text.isEmpty() ? new String[0] : text.split("\\s+"))
+            if (!isDirection(token) && !token.equals("route")) return true;
+        return false;
     }
 
     static long time(String value) {

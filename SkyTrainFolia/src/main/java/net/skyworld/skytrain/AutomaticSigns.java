@@ -16,7 +16,7 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 final class AutomaticSigns {
     record Observation(String key, SwitchBlockPosition sign, Side side, SwitchBlockPosition rail,
             TrainSignHeader header, AutomaticSignSpec spec, double faceX, double faceZ,
-            boolean powered, boolean previousPower, long edge, long observedAt, Set<BlockFace> poweredSides) {
+            boolean powered, boolean previousPower, long edge, long observedAt, Set<BlockFace> poweredSides, boolean explicitSpeed) {
         Vector facing() { return new Vector(faceX,0,faceZ); }
         boolean active(boolean redstone) { return header.activate(powered,previousPower,redstone); }
     }
@@ -43,7 +43,7 @@ final class AutomaticSigns {
     }
     static boolean action(String line) {
         String value=plain(line).toLowerCase(Locale.ROOT).split("\\s+",2)[0];
-        return value.equals("station") || value.equals("spawn") || value.equals("destroy");
+        return value.equals("station") || value.equals("spawn") || value.equals("destroy") || value.equals("property");
     }
     void validate(Block sign, String headerText, String second, String third, String fourth) {
         var header=TrainSignHeader.parse(headerText);
@@ -153,7 +153,8 @@ final class AutomaticSigns {
                         || !old.spec().equals(spec) || !old.header().equals(header));
                 var observation=new Observation(key,pos,side,SwitchBlockPosition.of(rail),header,spec,
                         facing.getX(),facing.getZ(),power,revised?old.powered():old==null?power:old.previousPower(),
-                        revised?edges.incrementAndGet():old==null?0:old.edge(),System.currentTimeMillis(),Set.copyOf(sides));
+                        revised?edges.incrementAndGet():old==null?0:old.edge(),System.currentTimeMillis(),Set.copyOf(sides),
+                        AutomaticSignSpec.explicitStationSpeed(text.getLine(3)));
                 observations.put(key,observation);
                 if(spawn && spec.action().equals("spawn")) {
                     boolean pulse=changed && header.activate(power,old.powered(),true);
@@ -208,6 +209,7 @@ final class AutomaticSigns {
             var cruiseSpec=AutomaticSignSpec.parse("station","0","continue "+train.targetSpeed,defaultSpeed());
             var cruise=new AutomaticRun("",cruiseSpec,0,false,train.reversed);
             cruise.phase=AutomaticRun.Phase.CRUISE;
+            cruise.inheritTargetSpeed=train.properties().automaticTargetSpeed!=null;
             cruise.reason="Automatic cruise";
             train.automaticRun=cruise;
         }
@@ -254,6 +256,12 @@ final class AutomaticSigns {
                 train.automaticRun.reason="Station released by inverted pulse";
             }
             if(!sign.active(edge)) continue;
+            if(sign.spec().action().equals("property") && (!previous.contains(key) || edge)) {
+                train.properties().setAutomaticTargetSpeed(Double.toString(sign.spec().speed()));
+                if (train.automaticRun!=null && train.automaticRun.phase==AutomaticRun.Phase.CRUISE)
+                    train.automaticRun.inheritTargetSpeed=true;
+                manager.save();
+            }
             if(sign.spec().action().equals("destroy") && (!previous.contains(key) || edge)) {
                 return manager.destroyAutomatic(train);
             }
@@ -267,30 +275,26 @@ final class AutomaticSigns {
         }
         AutomaticRun run=train.automaticRun;
         if(run!=null && run.graphApproach && run.phase==AutomaticRun.Phase.APPROACH
-                && run.remaining>train.spacing*Math.max(0,train.memberCount()-1)*.5+2
-                && now-queryAt.getOrDefault(train.id(),0L)>=200 && plugin.telemetrySink()!=null) {
+                && run.remaining>2
+                && now-queryAt.getOrDefault(train.id(),0L)>=200) {
             queryAt.put(train.id(),now);
-            var path=train.trackPath();
-            var p=path==null?null:path.activeLeaderTrackPosition(train.reversed);
-            var forecast=p==null?null:plugin.telemetrySink().stationAhead(p,lookAhead());
+            var forecast=stationAhead(train,now);
             if(forecast==null || !run.signKey.startsWith(forecast.signKey().toLowerCase(Locale.ROOT)+":")) {
                 run.hold("Station route changed or unavailable");
             } else {
-                run.remaining=Math.max(0,forecast.distanceBlocks()+train.spacing*Math.max(0,train.memberCount()-1)*.5+run.spec.offset());
+                run.remaining=stoppingDistance(forecast.distanceBlocks(),run.spec.offset());
             }
         }
         if((run==null || run.phase==AutomaticRun.Phase.CRUISE || run.phase==AutomaticRun.Phase.DEPART)
-                && now-queryAt.getOrDefault(train.id(),0L)>=200 && plugin.telemetrySink()!=null) {
+                && now-queryAt.getOrDefault(train.id(),0L)>=200) {
             queryAt.put(train.id(),now);
-            var path=train.trackPath();
-            var position=path==null?null:path.activeLeaderTrackPosition(train.reversed);
-            var forecast=position==null?null:plugin.telemetrySink().stationAhead(position,lookAhead());
+            var forecast=stationAhead(train,now);
             if(forecast!=null) for(Side side:Side.values()) {
                 var sign=observations.get(forecast.signKey().toLowerCase(Locale.ROOT)+":"+side);
                 if(sign!=null && (run==null || !run.signKey.equals(sign.key))
                         && now-sign.observedAt()<1000 && sign.active(false)
-                        && RailSignAccess.entered(sign.header(),sign.facing(),direction)) {
-                    begin(train,sign,forecast.distanceBlocks(),direction,now);
+                        && RailSignAccess.entered(sign.header(),sign.facing(),forecast.approachDirection())) {
+                    begin(train,sign,forecast.distanceBlocks(),forecast.approachDirection(),now);
                     if(train.automaticRun!=null) train.automaticRun.graphApproach=true;
                     break;
                 }
@@ -306,8 +310,9 @@ final class AutomaticSigns {
         if(!departure.equals(spec.direction())) spec=new AutomaticSignSpec(spec.action(),spec.launch(),spec.offset(),
                 spec.waitMillis(),departure,spec.speed(),spec.route(),spec.intervalMillis(),spec.pattern());
         boolean reverse=RailSignAccess.direction(departure,sign.facing(),direction).dot(direction)<-.1;
-        double distance=Math.max(0,railDistance+train.spacing*Math.max(0,train.memberCount()-1)*.5+spec.offset());
+        double distance=stoppingDistance(railDistance,spec.offset());
         AutomaticRun next=new AutomaticRun(sign.key(),spec,distance,reverse,train.reversed);
+        next.inheritTargetSpeed=!sign.explicitSpeed();
         next.initialSpeed=train.currentSpeed();
         if(spec.waitMillis()==0 && !departure.isEmpty() && !reverse) {
             // TC's zero-delay through station launches without first docking.
@@ -336,7 +341,7 @@ final class AutomaticSigns {
                 run.coasting=true;
             } else if(run.phase==AutomaticRun.Phase.WAIT
                     && !departure(observation,direction).equals(run.spec.direction())) {
-                begin(train,observation,-train.spacing*Math.max(0,train.memberCount()-1)*.5,direction,now);
+                begin(train,observation,0,direction,now);
                 run=train.automaticRun; run.arrived(now);
             }
         }
@@ -344,7 +349,9 @@ final class AutomaticSigns {
         if(run.coasting) { train.powerNotch=0; train.brakeNotch=0; return; }
         double speed=train.currentSpeed();
         double cap=Math.min(train.maxSpeed,v.maxSpeed());
-        double cruise=Math.min(cap,run.spec.speed()==null?cap:Math.abs(run.spec.speed()));
+        double cruise=Math.min(cap,run.inheritTargetSpeed
+                ? train.properties().automaticTargetSpeed==null?defaultSpeed():train.properties().automaticTargetSpeed
+                : run.spec.speed()==null?cap:Math.abs(run.spec.speed()));
         if(run.phase==AutomaticRun.Phase.WAIT && now>=run.until) {
             if(run.reverse && train.reversed==run.initialReversed) {
                 train.reversePending=true;
@@ -374,6 +381,38 @@ final class AutomaticSigns {
         train.reverser=train.reversed?Reverser.BACKWARD:Reverser.FORWARD;
     }
     private double defaultSpeed() { return plugin.getConfig().getDouble("settings.station-launch-speed",.4); }
+    static double stoppingDistance(double railDistance,double offset) { return Math.max(0,railDistance+offset); }
+    private record StationAhead(String signKey,double distanceBlocks,Vector approachDirection) { }
+    private StationAhead stationAhead(Train train,long now) {
+        var path=train.trackPath();
+        if(path==null) return null;
+        double range=localLookAhead(plugin.getConfig().getDouble("settings.station-local-look-ahead-blocks",256));
+        if(range>0) for(var probe:path.probeAhead(range,train.reversed)) {
+            var p=probe.trackPosition();
+            World world=Bukkit.getWorld(p.worldName);
+            if(world==null) break;
+            Block rail=world.getBlockAt(p.railX,p.railY,p.railZ);
+            if(!RailSignAccess.readable(rail)) break;
+            for(Block sign:RailSignAccess.signsFor(rail)) {
+                refresh(sign,false);
+                var pos=SwitchBlockPosition.of(sign);
+                for(Side side:Side.values()) {
+                    var o=observations.get(pos.key()+":"+side);
+                    if(o==null || !o.spec().action().equals("station") || now-o.observedAt()>1000
+                            || !o.active(false) || !RailSignAccess.entered(o.header(),o.facing(),p.motion())) continue;
+                    double distance=probe.distance()+new Vector(p.railX+.5-p.x,p.railY+.0625-p.y,p.railZ+.5-p.z).dot(p.motion());
+                    if(distance < -.02) continue;
+                    if(positions.putIfAbsent(pos.key(),pos)==null) persist();
+                    return new StationAhead(pos.key(),Math.max(0,distance),p.motion());
+                }
+            }
+        }
+        var p=path.activeLeaderTrackPosition(train.reversed);
+        if(p==null || plugin.telemetrySink()==null) return null;
+        var forecast=plugin.telemetrySink().stationAhead(p,lookAhead());
+        return forecast==null ? null : new StationAhead(forecast.signKey(),forecast.distanceBlocks(),p.motion());
+    }
+    static double localLookAhead(double value) { return Double.isFinite(value)?Math.max(0,Math.min(1024,value)):256; }
     private double lookAhead() { return Math.max(16,Math.min(10000,plugin.getConfig().getDouble("settings.station-look-ahead-blocks",8192))); }
     private static String plain(String value) { return ChatColor.stripColor(value==null?"":value).trim(); }
 }

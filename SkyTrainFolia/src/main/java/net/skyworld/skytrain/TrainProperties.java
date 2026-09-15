@@ -13,6 +13,14 @@ final class TrainProperties {
     volatile String displayName = "";
     volatile String trainNumber = "";
     volatile String destination = "";
+    volatile Double automaticTargetSpeed;
+
+    void setAutomaticTargetSpeed(String value) {
+        double speed = AutomaticSignSpec.velocity(value);
+        if (!Double.isFinite(speed) || speed < 0 || speed > 100)
+            throw new IllegalArgumentException("V_target must be between 0 and 100 blocks/tick.");
+        automaticTargetSpeed = speed;
+    }
     volatile String collisionMode = "default";
     volatile boolean playersEnter = true;
     volatile boolean playersExit = true;
@@ -50,6 +58,7 @@ final class TrainProperties {
         properties.displayName = section.getString("display-name", "");
         properties.trainNumber = section.getString("train-number", "");
         properties.destination = section.getString("destination", "");
+        if (section.contains("v-target")) properties.setAutomaticTargetSpeed(section.getString("v-target"));
         properties.collisionMode = section.getString("collision-mode", "default");
         properties.playersEnter = section.getBoolean("players-enter", true);
         properties.playersExit = section.getBoolean("players-exit", true);
@@ -77,6 +86,7 @@ final class TrainProperties {
     }
 
     void copyFrom(TrainProperties other) {
+        this.automaticTargetSpeed = other.automaticTargetSpeed;
         this.displayName = other.displayName;
         this.trainNumber = other.trainNumber;
         this.destination = other.destination;
@@ -103,6 +113,7 @@ final class TrainProperties {
     }
 
     void save(YamlConfiguration config, String path) {
+        config.set(path + ".v-target", automaticTargetSpeed);
         config.set(path + ".display-name", displayName);
         config.set(path + ".train-number", trainNumber);
         config.set(path + ".destination", destination);

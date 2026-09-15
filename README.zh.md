@@ -59,9 +59,9 @@ SkyTrain Suite 把 Minecraft 作为可交互的铁路运行环境：玩家建设
 
 | 组件 | 当前版本 | 主要职责 |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.0-alpha.8` | 矿车编组、运动与过弯、驾驶权、牵引制动、车型、牌子、实体道岔执行、HMI 和声音 |
-| STCS | `2.2.0-alpha.2` | 基础设施、有向 RailGraph、线路里程、定位、保留占用账本、影子 MA/EoA 和局部道岔检查 |
-| SkyworldTrainAPI / STA | `0.8.0` | 插件间带版本的服务契约、遥测、成员观测、驾驶台状态、许可和事件交换 |
+| SkyTrainFolia / STF | `2.1.3` | 矿车编组、运动与过弯、驾驶权、牵引制动、车型、牌子、实体道岔执行、HMI 和声音 |
+| STCS | `2.2.1` | 基础设施、有向 RailGraph、线路里程、定位、保留占用账本、影子 MA/EoA 和局部道岔检查 |
+| SkyworldTrainAPI / STA | `0.8.1` | 插件间带版本的服务契约、遥测、成员观测、驾驶台状态、许可和事件交换 |
 | SkyPCC | `0.8.1` | 网页线路图、车辆/设施 Inspector、占用与预约显示、事件栏、经鉴权的道岔控制 |
 
 ```text
@@ -113,9 +113,9 @@ Minecraft 玩家 / 矿车 / 轨道 / 红石
 从仓库 Releases 获取匹配的一组 JAR；本地构建输出位于 `artifacts/`。当前文件名：
 
 ```text
-SkyTrainFolia-2.1.0-alpha.8.jar
-STCS-2.2.0-alpha.2.jar
-SkyworldTrainAPI-0.8.0.jar
+SkyTrainFolia-2.1.3.jar
+STCS-2.2.1.jar
+SkyworldTrainAPI-0.8.1.jar
 SkyPCC-0.8.1.jar
 ```
 
@@ -478,11 +478,24 @@ continue 40kmh
 | 3 | 等待时间，纯数字为秒，也支持 `5s`、`100t`、`00:05` |
 | 4 | 方向和速度，例如 `continue 40kmh`、`reverse 0.4`；无单位速度为 blocks/tick |
 
-满足 auto、已释放、可推动等条件后，可将车推入 station 扣停并发车。长距离预告依赖 STA/STCS 的线路与车站查询；在牌上停住不等于提前预告成功。
+自动列车现在可以沿实际轨道提前寻找 Station，无需线路名、balise 或 STCS 标定。搜索跟随当前道岔分支，不强制加载区块，也不检测前车占用；这不是 ATP 或防撞系统。
 
-伪自动驾驶使用车型 P/B 级位：起步较高牵引，目标速度附近 N/P1 调整，进站制动逐步减轻，停稳后 B7 停放。不是直接瞬移速度，也不保证任意车型/站距下均可精确停车。
+停车参考点是运行方向的领车中心，加上 Station 的停车偏移，不再额外加半列车长度。2.1.3 的虚拟司机按剩余距离调整制动，低于曲线时优先惰行；确实停短后才进入带切换滞回的低速补位。停站及 HOLD 仍保持 B7，手动驾驶不变。
 
-STF `settings.station-look-ahead-blocks` 默认 8192；`station-launch-speed` 默认 0.4 blocks/tick，最后对标还受 docking 参数影响。这些与 STCS MA 前视不同。先用低速、长站距试验线验收。
+在 STF 配置的已有 `settings` 下设置 `station-local-look-ahead-blocks: 256.0`。范围 0–1024 格，0 关闭；最多每 200 ms 查询一次，仅访问已加载且属于当前 Folia 线程的轨道。配置值是搜索上限，不保证可用制动距离。可选 STA/STCS 图查询仍使用独立的 `station-look-ahead-blocks`（默认 8192）。先用低速、足够长的已加载线路验收。
+
+### V_target 属性牌（2.1.2 起）
+
+此牌仅修改自动列车的目标速度，不修改速度上限或驾驶模式。手动列车忽略它。当前属性牌只允许 `V_target`，其他属性使用管理员指令。
+
+```text
+[+stf]
+property
+V_target
+60km/h
+```
+
+无单位按格/tick 解析；`0.4`、`8m/s`、`28.8km/h` 等价（20 tick/s，1 格按 1 m）。属性随列车保存，受列车及车型最高速度约束，单独设置不会启动车辆。Station 显式发车速度优先；未填写时继承 V_target，再回退到 `settings.station-launch-speed`（默认 0.4）。`[+stf]` 常开，`[stf]` 按红石使能。管理员可用 `/st property demo V_target 60km/h` 设置，用 `/st property demo get V_target` 查询。
 
 ### Spawn 与 Destroy
 
