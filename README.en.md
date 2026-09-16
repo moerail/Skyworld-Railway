@@ -42,7 +42,7 @@ The project introduces explicit driving control, resource occupancy, conflicting
 
 | Component | Version | Responsibility |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.3` | Consists, movement and cornering, driving control, traction/braking, vehicle profiles, signs, physical turnout actuation, HMI and sounds |
+| SkyTrainFolia / STF | `2.1.4` | Consists, movement and cornering, driving control, traction/braking, vehicle profiles, signs, physical turnout actuation, HMI and sounds |
 | STCS | `2.2.1` | Infrastructure, directed RailGraph, line mileage, localisation, retained occupancy ledger, shadow MA/EoA and local turnout checks |
 | SkyworldTrainAPI / STA | `0.8.1` | Versioned inter-plugin contracts, telemetry, member observations, cab state, authorities and events |
 | SkyPCC | `0.8.1` | Web track diagram, train/infrastructure inspector, occupancy/reservations, event log and authenticated turnout control |
@@ -96,7 +96,7 @@ This illustrates responsibilities, not a mandatory serial call chain. Browser in
 Current installation files:
 
 ```text
-SkyTrainFolia-2.1.3.jar
+SkyTrainFolia-2.1.4.jar
 STCS-2.2.1.jar
 SkyworldTrainAPI-0.8.1.jar
 SkyPCC-0.8.1.jar

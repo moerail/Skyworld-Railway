@@ -42,7 +42,7 @@ Le projet introduit la prise de conduite explicite, l’occupation des ressource
 
 | Composant | Version | Fonction principale |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.3` | Rames, mouvement et inscription en courbe, prise de conduite, traction/freinage, profils de véhicule, panneaux, manœuvre physique des appareils de voie, IHM et sons |
+| SkyTrainFolia / STF | `2.1.4` | Rames, mouvement et inscription en courbe, prise de conduite, traction/freinage, profils de véhicule, panneaux, manœuvre physique des appareils de voie, IHM et sons |
 | STCS | `2.2.1` | Infrastructure, RailGraph orienté, point kilométrique, localisation, registre d’occupation conservé, MA/EoA fantômes et contrôles locaux des appareils de voie |
 | SkyworldTrainAPI / STA | `0.8.1` | Contrats inter-greffons versionnés, télémétrie, observations des véhicules, état du pupitre, autorisations et événements |
 | SkyPCC | `0.8.1` | Tableau de contrôle optique Web, inspecteur des trains/infrastructures, occupations/réservations, journal d’événements et commande authentifiée des appareils de voie |
@@ -96,7 +96,7 @@ Ce schéma illustre les responsabilités, et non une chaîne d’appels série o
 Fichiers d’installation actuels :
 
 ```text
-SkyTrainFolia-2.1.3.jar
+SkyTrainFolia-2.1.4.jar
 STCS-2.2.1.jar
 SkyworldTrainAPI-0.8.1.jar
 SkyPCC-0.8.1.jar

@@ -42,7 +42,7 @@ Het project introduceert expliciete besturingsrechten, spoorbezetting, strijdige
 
 | Component | Versie | Verantwoordelijkheid |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.3` | Treinsamenstelling, beweging en bochten, besturingsrechten, tractie/remming, profielen, borden, fysieke wisselbediening, HMI en geluid |
+| SkyTrainFolia / STF | `2.1.4` | Treinsamenstelling, beweging en bochten, besturingsrechten, tractie/remming, profielen, borden, fysieke wisselbediening, HMI en geluid |
 | STCS | `2.2.1` | Infrastructuur, gerichte RailGraph, lijnkilometrering, plaatsbepaling, bewaard bezettingsregister, schaduw-MA/EoA en lokale wisselcontroles |
 | SkyworldTrainAPI / STA | `0.8.1` | Versiegebonden plugincontracten, telemetrie, voertuigwaarnemingen, cabinestatus, rijtoestemmingen en gebeurtenissen |
 | SkyPCC | `0.8.1` | Webspoorschema, inspectiepaneel voor treinen/infrastructuur, bezetting/reserveringen, gebeurtenissenlog en geauthenticeerde wisselbediening |
@@ -96,7 +96,7 @@ Dit schema toont verantwoordelijkheden, geen verplichte opeenvolging van alle aa
 Huidige installatiebestanden:
 
 ```text
-SkyTrainFolia-2.1.3.jar
+SkyTrainFolia-2.1.4.jar
 STCS-2.2.1.jar
 SkyworldTrainAPI-0.8.1.jar
 SkyPCC-0.8.1.jar

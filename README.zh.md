@@ -59,7 +59,7 @@ SkyTrain Suite 把 Minecraft 作为可交互的铁路运行环境：玩家建设
 
 | 组件 | 当前版本 | 主要职责 |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.3` | 矿车编组、运动与过弯、驾驶权、牵引制动、车型、牌子、实体道岔执行、HMI 和声音 |
+| SkyTrainFolia / STF | `2.1.4` | 矿车编组、运动与过弯、驾驶权、牵引制动、车型、牌子、实体道岔执行、HMI 和声音 |
 | STCS | `2.2.1` | 基础设施、有向 RailGraph、线路里程、定位、保留占用账本、影子 MA/EoA 和局部道岔检查 |
 | SkyworldTrainAPI / STA | `0.8.1` | 插件间带版本的服务契约、遥测、成员观测、驾驶台状态、许可和事件交换 |
 | SkyPCC | `0.8.1` | 网页线路图、车辆/设施 Inspector、占用与预约显示、事件栏、经鉴权的道岔控制 |
@@ -113,7 +113,7 @@ Minecraft 玩家 / 矿车 / 轨道 / 红石
 从仓库 Releases 获取匹配的一组 JAR；本地构建输出位于 `artifacts/`。当前文件名：
 
 ```text
-SkyTrainFolia-2.1.3.jar
+SkyTrainFolia-2.1.4.jar
 STCS-2.2.1.jar
 SkyworldTrainAPI-0.8.1.jar
 SkyPCC-0.8.1.jar
