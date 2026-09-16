@@ -31,7 +31,7 @@ Minecraft is both the live operating environment and an interactive railway-syst
 | 插件 / Plugin | 版本 / Version | 职责 / Responsibility |
 | --- | --- | --- |
 | [SkyTrainFolia (STF)](SkyTrainFolia/) | 2.1.3 | 列车运动、编组、驾驶控制、车型、牌子、实体道岔执行与驾驶室 HMI。<br>Train motion, consists, driving control, vehicle profiles, signs, physical point actuation and cab HMI. |
-| [STCS](STCS/) | 2.2.1 | RailGraph、线路归属、定位、保留占用与实验性影子 MA/EoA 分配。<br>RailGraph, line attribution, localisation, retained occupancy and experimental shadow MA/EoA allocation. |
+| [STCS - Skyworld Train Control System](STCS/) | 2.2.1 | RailGraph、线路归属、定位、保留占用与实验性影子 MA/EoA 分配。<br>RailGraph, line attribution, localisation, retained occupancy and experimental shadow MA/EoA allocation. |
 | [SkyworldTrainAPI (STA)](STA/) | 0.8.1 | 插件之间的版本化进程内服务契约、遥测与行车事件。<br>Versioned in-process service contracts, telemetry and railway events between plugins. |
 | [SkyPCC](SkyPCC/) | 0.8.1 | HTTP/SSE 调度显示、基础设施详情、事件日志与经过身份验证的道岔操作请求。<br>HTTP/SSE dispatch display, infrastructure inspectors, event log and authenticated turnout requests. |
 
