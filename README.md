@@ -12,6 +12,12 @@
 
 **Full manuals / 完整手册:** [中文](README.zh.md) | [English](README.en.md) | [Nederlands](README.nl.md) | [Français](README.fr.md) | [日本語](README.ja.md)
 
+**趣味别册 / Just for fun:** [鐵道運轉試驗規程 · 舊式技術訓令體](README.ja.classical.md)
+
+日语旧式技术训令体节编，非历史文献，不替代完整手册；技术限制与安全边界照旧。*文體ハ舊式ナレドモ、運轉ハ非同期ナリ。*
+
+An abridged Japanese companion in an old-fashioned technical-regulations style, not a historical document or a replacement for the full manual. Technical and safety limitations remain unchanged. *Old-fashioned prose, asynchronous trains.*
+
 **已用于 Skyworld，持续开发中。** 行车许可（MA）与行车许可终点（EoA）目前仅进行实验性的影子计算，不提供 ATP 制动监督。本项目不是认证铁路安全系统。
 
 **In use on Skyworld; under active development.** Movement Authority (MA) and End of Authority (EoA) are currently experimental, shadow-only calculations. They do not provide ATP braking supervision. This is not a certified railway safety system.
