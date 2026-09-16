@@ -4,7 +4,28 @@ import java.util.UUID;
 import net.skyworld.sta.api.v4.ShadowAuthorityService;
 
 /** Read-only display selection. A live service is not the same as a valid train authority. */
-final class ShadowMaDisplay {
+final class StaCabIntegration {
+    static CabAuthorityView query(org.bukkit.plugin.ServicesManager services, UUID train, UUID lease, long now) {
+        try {
+            var service=services.load(ShadowAuthorityService.class);
+            var snapshot=service==null?null:service.snapshot();
+            var network=services.load(net.skyworld.sta.api.v2.RailNetworkService.class);
+            var view=select(snapshot,train,lease,network==null?-1:network.graphRevision(),now);
+            var authority=view.authority();
+            String location=null;
+            if(authority!=null) try {
+                var position=network==null?null:network.edgePosition(snapshot.graphRevision(),
+                        authority.eoaEdgeId(),authority.eoaOffsetMeters());
+                if(position!=null && position.graphCurrent() && !position.stale()
+                        && position.graphRevision()==snapshot.graphRevision()
+                        && network.graphRevision()==snapshot.graphRevision()
+                        && authority.eoaEdgeId().equals(position.edgeId())) location=eoaLocation(position);
+            } catch(RuntimeException | LinkageError ignored) { /* Older providers may lack edge references. */ }
+            return new CabAuthorityView(view.live(),view.reason(),
+                    authority==null?null:authority.signedRemainingMeters(),
+                    authority==null?0:authority.creditMeters(),location);
+        } catch(RuntimeException | LinkageError ignored) { return CabAuthorityView.unavailable(); }
+    }
     record View(boolean live, ShadowAuthorityService.Authority authority, String reason) {}
 
     static String eoaLocation(net.skyworld.sta.api.v1.TrackPositionSnapshot position) {

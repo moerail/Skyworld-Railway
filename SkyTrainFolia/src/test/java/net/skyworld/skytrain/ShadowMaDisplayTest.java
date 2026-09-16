@@ -12,23 +12,23 @@ public final class ShadowMaDisplayTest {
     public static void main(String[] args) {
         var waiting=new Authority(train,lease,session,1,"WAITING","FLEET_UNCERTAIN",List.of(),null,null,null);
         var live=snapshot(waiting,now,revision,"SHADOW");
-        var view=ShadowMaDisplay.select(live,train,lease,revision,now);
+        var view=StaCabIntegration.select(live,train,lease,revision,now);
         assert view.live() && view.authority()==null && view.reason().equals("FLEET_UNCERTAIN");
-        assert ShadowMaDisplay.select(live,train,null,revision,now).reason().equals("NO_DRIVER");
-        assert ShadowMaDisplay.select(live,train,UUID.randomUUID(),revision,now).reason().equals("LEASE_CHANGED");
-        assert ShadowMaDisplay.select(live,UUID.randomUUID(),lease,revision,now).reason().equals("IDLE");
-        assert !ShadowMaDisplay.select(live,train,lease,revision+1,now).live();
-        assert !ShadowMaDisplay.select(live,train,lease,revision,now+1501).live();
-        assert ShadowMaDisplay.select(live,train,lease,revision,now+1500).live();
-        assert !ShadowMaDisplay.select(live,train,lease,revision,now-1).live();
-        assert !ShadowMaDisplay.select(null,train,lease,revision,now).live();
-        assert !ShadowMaDisplay.select(snapshot(waiting,now,revision,"FAILED"),train,lease,revision,now).live();
+        assert StaCabIntegration.select(live,train,null,revision,now).reason().equals("NO_DRIVER");
+        assert StaCabIntegration.select(live,train,UUID.randomUUID(),revision,now).reason().equals("LEASE_CHANGED");
+        assert StaCabIntegration.select(live,UUID.randomUUID(),lease,revision,now).reason().equals("IDLE");
+        assert !StaCabIntegration.select(live,train,lease,revision+1,now).live();
+        assert !StaCabIntegration.select(live,train,lease,revision,now+1501).live();
+        assert StaCabIntegration.select(live,train,lease,revision,now+1500).live();
+        assert !StaCabIntegration.select(live,train,lease,revision,now-1).live();
+        assert !StaCabIntegration.select(null,train,lease,revision,now).live();
+        assert !StaCabIntegration.select(snapshot(waiting,now,revision,"FAILED"),train,lease,revision,now).live();
         var allocated=new Authority(train,lease,session,2,"ALLOCATED_SHADOW","MA_DISTANCE_LIMIT",
                 List.of(new PathPart("edge",20,70)),"edge",70.,50.);
-        view=ShadowMaDisplay.select(snapshot(allocated,now,revision,"SHADOW"),train,lease,revision,now);
+        view=StaCabIntegration.select(snapshot(allocated,now,revision,"SHADOW"),train,lease,revision,now);
         assert view.authority()==allocated && view.authority().creditMeters()==50;
         var overrun=new Authority(train,lease,session,2,"ALLOCATED_SHADOW","EOA_OVERRUN",List.of(),"edge",19.,-1.);
-        view=ShadowMaDisplay.select(snapshot(overrun,now,revision,"SHADOW"),train,lease,revision,now);
+        view=StaCabIntegration.select(snapshot(overrun,now,revision,"SHADOW"),train,lease,revision,now);
         assert view.authority().signedRemainingMeters()==-1 && view.authority().creditMeters()==0;
         var ui=new UiMessages(null);
         for(var language:UiLanguage.values()) {

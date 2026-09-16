@@ -719,7 +719,7 @@ final class TrainManager implements TrainMotionController.Host {
         return drivers.isDriver(player, train);
     }
 
-    List<net.skyworld.sta.api.v4.DriverDeskService.Desk> driverDesks() {
+    List<DriverDeskSnapshot> driverDesks() {
         return drivers.driverDesks();
     }
 

@@ -46,11 +46,11 @@ public final class MaBossBarTest {
         assert MaBossBar.progress(150., 0) == .5f;
         var position = new net.skyworld.sta.api.v1.TrackPositionSnapshot(1, "e", "a", "b", 20, 100,
                 "Branch", 1234.5, 1000, true, false);
-        assert ShadowMaDisplay.eoaLocation(position).equals("Branch / K1+234.50");
-        assert ShadowMaDisplay.eoaLocation(null) == null;
+        assert StaCabIntegration.eoaLocation(position).equals("Branch / K1+234.50");
+        assert StaCabIntegration.eoaLocation(null) == null;
         position = new net.skyworld.sta.api.v1.TrackPositionSnapshot(1, "e", "a", "b", 20, 100,
                 "Branch", null, 1000, true, false);
-        assert ShadowMaDisplay.eoaLocation(position) == null;
+        assert StaCabIntegration.eoaLocation(position) == null;
         var ui = new UiMessages(null);
         for (var language : UiLanguage.values()) {
             for (String key : new String[]{"protection.speedLimit", "ma.remaining", "ma.overrun", "ma.locationUnknown"}) {

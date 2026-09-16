@@ -148,13 +148,13 @@ final class DriverControlService {
                 player.isOnline() && !player.isDead());
     }
 
-    List<net.skyworld.sta.api.v4.DriverDeskService.Desk> driverDesks() {
+    List<DriverDeskSnapshot> driverDesks() {
         synchronized (driverLock) {
-            List<net.skyworld.sta.api.v4.DriverDeskService.Desk> result = new ArrayList<>();
+            List<DriverDeskSnapshot> result = new ArrayList<>();
             trainDrivers.forEach((trainId, driverId) -> {
                 Train train = trainLookup.apply(trainId);
                 UUID lease = driverLeaseIds.get(driverId);
-                if (train != null && lease != null) result.add(new net.skyworld.sta.api.v4.DriverDeskService.Desk(
+                if (train != null && lease != null) result.add(new DriverDeskSnapshot(
                         trainId, driverId, lease, train.protectionMode.name()));
             });
             return List.copyOf(result);

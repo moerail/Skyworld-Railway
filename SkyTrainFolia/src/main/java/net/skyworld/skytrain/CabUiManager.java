@@ -655,34 +655,19 @@ final class CabUiManager implements Listener {
         lines[13] = line(ui.text(language, "protection.rbc"), ui.text(language,
                 train.protectionMode == ProtectionMode.ISOLATED ? "protection.isolated"
                         : !stcsEnabled ? "protection.noStcs" : "ma.stale"));
-        if (train.protectionMode != ProtectionMode.ISOLATED) try {
-            var service = Bukkit.getServicesManager().load(net.skyworld.sta.api.v4.ShadowAuthorityService.class);
-            var snapshot = service == null ? null : service.snapshot();
-            var network = Bukkit.getServicesManager().load(net.skyworld.sta.api.v2.RailNetworkService.class);
+        if (train.protectionMode != ProtectionMode.ISOLATED && plugin.telemetrySink() != null) {
             var desk = plugin.driverDesks().stream().filter(d -> d.trainId().equals(train.id())).findFirst().orElse(null);
-            var display = ShadowMaDisplay.select(snapshot, train.id(), desk == null ? null : desk.leaseId(),
-                    network == null ? -1 : network.graphRevision(), System.currentTimeMillis());
+            var display = plugin.telemetrySink().cabAuthority(train.id(), desk == null ? null : desk.leaseId(),
+                    System.currentTimeMillis());
             if (display.live()) {
                 lines[13] = line(ui.text(language, "protection.rbc"), ui.text(language, "ma.link"));
-                var authority = display.authority();
-                if (authority != null) {
-                    maRemaining = authority.signedRemainingMeters();
+                if (display.remainingMeters() != null) {
+                    maRemaining = display.remainingMeters();
                     maTitle = ui.text(language, "ma.shadow") + " MA | " + ui.text(language, "ma.remaining")
-                            + " " + format(authority.creditMeters()) + " m";
+                            + " " + format(display.creditMeters()) + " m";
                     if (maRemaining < 0) maTitle += " | " + ui.text(language, "ma.overrun");
-                    lines[11] = line("EoA", ui.text(language, "ma.locationUnknown"));
-                    // Optional older providers may not support edge references. Keep the MA visible.
-                    try {
-                        var position = network == null ? null : network.edgePosition(snapshot.graphRevision(),
-                                authority.eoaEdgeId(), authority.eoaOffsetMeters());
-                        if (position != null && position.graphCurrent() && !position.stale()
-                                && position.graphRevision() == snapshot.graphRevision()
-                                && network.graphRevision() == snapshot.graphRevision()
-                                && authority.eoaEdgeId().equals(position.edgeId())) {
-                            String location = ShadowMaDisplay.eoaLocation(position);
-                            if (location != null) lines[11] = line("EoA", location);
-                        }
-                    } catch (RuntimeException | LinkageError ignored) { /* No guessed mileage. */ }
+                    lines[11] = line("EoA", display.eoaLocation() == null
+                            ? ui.text(language, "ma.locationUnknown") : display.eoaLocation());
                 } else {
                     String key = "ma.reason." + display.reason();
                     String reason = ui.text(language, key);
@@ -691,7 +676,7 @@ final class CabUiManager implements Listener {
                             + (reason.equals(key) ? ui.text(language, "ma.reason.WAITING") : reason);
                 }
             }
-        } catch (RuntimeException | LinkageError ignored) { /* Optional display service; never changes physics. */ }
+        }
         session.maBar.update(player, manager.isDriver(player, train), maTitle, maRemaining,
                 plugin.getConfig().getDouble("settings.cab-ma-bar-range-meters", 300.0));
         session.sidebar.show(player,

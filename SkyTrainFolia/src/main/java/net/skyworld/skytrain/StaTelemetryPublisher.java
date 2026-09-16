@@ -53,7 +53,14 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
         plugin.getLogger().info("STA v2 telemetry provider active; legacy position reporting disabled.");
     }
     public UUID sessionId() { return session; }
-    public Collection<net.skyworld.sta.api.v4.DriverDeskService.Desk> driverDesks() { return plugin.driverDesks(); }
+    public Collection<net.skyworld.sta.api.v4.DriverDeskService.Desk> driverDesks() { return toDesks(plugin.driverDesks()); }
+    static List<net.skyworld.sta.api.v4.DriverDeskService.Desk> toDesks(Collection<DriverDeskSnapshot> desks) {
+        return desks.stream().map(d -> new net.skyworld.sta.api.v4.DriverDeskService.Desk(
+                d.trainId(), d.driverId(), d.leaseId(), d.atpMode())).toList();
+    }
+    @Override public CabAuthorityView cabAuthority(UUID train, UUID lease, long now) {
+        return StaCabIntegration.query(plugin.getServer().getServicesManager(), train, lease, now);
+    }
     public void driverEvent(Train train, UUID driver, String driverName, String type, String reason) {
         try {
             var service = plugin.getServer().getServicesManager().load(RailwayEventService.class);

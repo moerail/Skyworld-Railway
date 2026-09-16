@@ -143,7 +143,7 @@ public final class SkyTrainPlugin extends JavaPlugin {
 
     java.util.Collection<Train> observedTrains() { return manager == null ? List.of() : manager.trains(); }
 
-    java.util.Collection<net.skyworld.sta.api.v4.DriverDeskService.Desk> driverDesks() {
+    java.util.Collection<DriverDeskSnapshot> driverDesks() {
         return manager == null ? List.of() : manager.driverDesks();
     }
 
