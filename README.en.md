@@ -1,12 +1,20 @@
 # SkyRail Suite
 
+## 2.1.5 Update (2026-09-23)
+
+Read-only shadow curves do not change handles or brakes. Defaults: stop 1 m before EoA; at most 5 km/h within the final 5 m, continuously decreasing to zero. This level-track estimate uses B7 parameters and measured speed, not the theoretical speed ceiling for telemetry-age compensation.
+
+Configure the model under `shadow-atp`; `enforcement-enabled: true` is explicitly rejected. `shadow-atp.warning` defaults to warning 2 km/h below the limit, re-arming 5 km/h below it, silence below 0.5 km/h and a 5000 ms cooldown. `ma-sounds.near-limit` controls sound ID, volume, pitch, count and interval; default `minecraft:block.note_block.bell`. Stop trains before `/st reload`.
+
+The testbench ledger inspector reads matching railgraph and shadow-occupancy.json files without modifying them or proving clearance. Only after verifying the entire original train and all members are gone may the console operator use `stcs ma clear <full-UUID> confirm`. It clears all shadow evidence for that identity, backs up and audits the operation, and preserves historical M1 evidence. Unloaded trains must not be cleared merely because they are invisible.
+
 [Home](README.md) | [中文](README.zh.md) | **English** | [Nederlands](README.nl.md)
 
 **English edition. Self-contained: no companion documentation is required to read this manual.**
 
 A train-operation, railway-infrastructure, shadow train-control and dispatching-display suite for Minecraft / Folia. SkyRail Suite is the new repository name for the SkyTrain Suite development line; existing runtime plugin names, commands and data directories remain unchanged.
 
-This manual describes the local source baseline documented on **13 September 2026**. English edition prepared on **14 September 2026**. It is intended for server administrators, drivers, railway builders and plugin developers. Ideas discussed for future development are not necessarily implemented.
+This manual describes the local source baseline documented on **23 September 2026**. English edition prepared on **14 September 2026**. It is intended for server administrators, drivers, railway builders and plugin developers. Ideas discussed for future development are not necessarily implemented.
 
 > **Development-build limitation:** the suite calculates, allocates and displays shadow MA/EoA information, but ATP does not apply brakes in response to it. An accepted request, an apparently clear track on PCC, or an online RBC indicator is not permission to assume safe movement. Driver-loss emergency braking, manual emergency braking and the RECOVERING brake hold are separate, active control functions.
 
@@ -42,7 +50,7 @@ The project introduces explicit driving control, resource occupancy, conflicting
 
 | Component | Version | Responsibility |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.4` | Consists, movement and cornering, driving control, traction/braking, vehicle profiles, signs, physical turnout actuation, HMI and sounds |
+| SkyTrainFolia / STF | `2.1.5` | Consists, movement and cornering, driving control, traction/braking, vehicle profiles, signs, physical turnout actuation, HMI and sounds |
 | STCS | `2.2.1` | Infrastructure, directed RailGraph, line mileage, localisation, retained occupancy ledger, shadow MA/EoA and local turnout checks |
 | SkyworldTrainAPI / STA | `0.8.1` | Versioned inter-plugin contracts, telemetry, member observations, cab state, authorities and events |
 | SkyPCC | `0.8.1` | Web track diagram, train/infrastructure inspector, occupancy/reservations, event log and authenticated turnout control |
@@ -71,7 +79,7 @@ This illustrates responsibilities, not a mandatory serial call chain. Browser in
 | Graph, line attribution, mileage, retained occupancy | Implemented; timeout/unloading does not establish clearance |
 | Online MA/EoA and spatial reservations | Shadow implementation; no ATP braking |
 | Web turnout control | Authentication, local checks and asynchronous PENDING implemented |
-| Onboard speed curves and ATP overspeed/EoA intervention | Not implemented |
+| Onboard speed curves and ATP overspeed/EoA intervention | Read-only shadow speed curves implemented; automatic overspeed/EoA braking not implemented. |
 | Complete destination routing and timetable ATO | Not implemented as a complete system; route metadata is not an established route |
 | ETCS FS/SR/SH/SB/TR/PT modes | Not implemented; current modes are not full substitutes |
 | Separate SIR, SkyCBI or Python RBC service | Architectural ideas, not current installable components |
@@ -96,7 +104,7 @@ This illustrates responsibilities, not a mandatory serial call chain. Browser in
 Current installation files:
 
 ```text
-SkyTrainFolia-2.1.4.jar
+SkyTrainFolia-2.1.5.jar
 STCS-2.2.1.jar
 SkyworldTrainAPI-0.8.1.jar
 SkyPCC-0.8.1.jar
@@ -627,7 +635,7 @@ STA retains the latest 500 events in the current session by default, not a perma
 
 ## 11. Sounds and HMI
 
-The MA BossBar is driver-only. `settings.cab-ma-bar-range-meters` in STF defaults to 300 m and affects only the bar scale; text shows actual distance. The sidebar ATP speed limit remains a not-implemented placeholder, not an existing speed curve.
+The driver-only BossBar shows `Shadow MA | information | ATP limit: xx km/h`; the same shadow limit is on sidebar line two. Invalid curves show `--`. `settings.cab-ma-bar-range-meters` defaults to 300 m and changes only the bar scale.
 
 ### MA Audio Configuration
 
@@ -774,7 +782,7 @@ The offline Python testbench exercises topology, direction, occupancy, reservati
 
 M0 contracts/modes and M1 observations/retention have implementations and player testing. M2 now includes online shadow MA and spatial-resource refinements. Previous acceptance does not replace regression tests or establish ATP readiness.
 
-The next step can be **onboard shadow speed curves**: use MA/EoA and vehicle brake parameters to display/log a curve without applying brakes. Intervention comes only after validation.
+Next: validate the shadow curve, localisation freshness and braking model before implementing brake execution. The current configuration cannot activate FS.
 
 Before real ATP, remaining work includes full train envelopes/consistency, authority identity/acknowledgement/revocation, loss-of-contact/freeze/bypass policies, speed restrictions/braking models, justified resource release and fault-injection testing.
 

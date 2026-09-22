@@ -16,6 +16,7 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
     private final AtomicLong sequence = new AtomicLong();
     private final LatestMessageStore store;
     private final ConcurrentMap<UUID, TrainTelemetrySnapshot> previous = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, List<TrainTelemetrySnapshot>> curveHistory = new ConcurrentHashMap<>();
     private final double scale;
     private final ScheduledTask task;
     private volatile boolean closed;
@@ -60,6 +61,20 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
     }
     @Override public CabAuthorityView cabAuthority(UUID train, UUID lease, long now) {
         return StaCabIntegration.query(plugin.getServer().getServicesManager(), train, lease, now);
+    }
+    @Override public ShadowCurve.Input shadowCurveInput(UUID train, UUID lease, long now,
+            boolean reversed, String reverser) {
+        try {
+            var services = plugin.getServer().getServicesManager();
+            var authority = services.load(net.skyworld.sta.api.v4.ShadowAuthorityService.class);
+            var network = services.load(RailNetworkService.class);
+            if (network == null || Double.compare(network.blocksPerMeter(), scale) != 0
+                    || Double.compare(plugin.getConfig().getDouble("infrastructure.blocks-per-meter", 1), scale) != 0)
+                return ShadowCurve.Input.unavailable("SCALE_UNAVAILABLE");
+            return StaCabIntegration.curveInput(authority == null ? null : authority.snapshot(),
+                    train, lease, network.graphRevision(), now, session,
+                    curveHistory.getOrDefault(train, List.of()), reversed, reverser);
+        } catch (RuntimeException | LinkageError ex) { return ShadowCurve.Input.unavailable("UNAVAILABLE"); }
     }
     public void driverEvent(Train train, UUID driver, String driverName, String type, String reason) {
         try {
@@ -169,6 +184,13 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
             var m = new StaMessage(new StaMessage.Header(2, StaMessage.Kind.TELEMETRY_REPORT,
                     StaMessage.Source.STF, session, seq, now, train.id()), new StaMessage.Physical(state, scale), null);
             if (store.offer(m)) {
+                curveHistory.compute(train.id(), (id, history) -> {
+                    var next = new ArrayList<TrainTelemetrySnapshot>();
+                    if (history != null) history.stream().filter(s -> now - s.observedAtMillis() <= 1500)
+                            .skip(Math.max(0, history.size() - 63)).forEach(next::add);
+                    next.add(state);
+                    return List.copyOf(next);
+                });
                 previous.put(train.id(), state);
                 if (old != null && old.cab() != null && !old.cab().emergencyBrake() && cab.emergencyBrake()) {
                     driverEvent(train, null, driver, "EMERGENCY_BRAKE_APPLIED",
@@ -183,6 +205,7 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
     public void remove(UUID id) {
         if (id == null || closed) return;
         previous.remove(id);
+        curveHistory.remove(id);
         store.offer(new StaMessage(new StaMessage.Header(2, StaMessage.Kind.TRAIN_REMOVED,
                 StaMessage.Source.STF, session, sequence.incrementAndGet(), System.currentTimeMillis(), id), null, null));
     }
@@ -207,6 +230,7 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
         plugin.getServer().getServicesManager().unregister(net.skyworld.sta.api.v4.DriverDeskService.class, this);
         consists = List.of();
         store.close(); previous.clear();
+        curveHistory.clear();
     }
     public StationForecast stationAhead(TrainTrackPosition p,double maxBlocks) {
         try {

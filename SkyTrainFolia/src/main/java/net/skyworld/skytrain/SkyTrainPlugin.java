@@ -113,6 +113,10 @@ public final class SkyTrainPlugin extends JavaPlugin {
     }
 
     VehicleProfile vehicleProfile() { return vehicleProfile; }
+    private volatile ShadowCurve.Settings shadowCurveSettings;
+    private volatile ShadowSpeedNotice.Settings shadowSpeedNoticeSettings;
+    ShadowSpeedNotice.Settings shadowSpeedNoticeSettings() { return shadowSpeedNoticeSettings; }
+    ShadowCurve.Settings shadowCurveSettings() { return shadowCurveSettings; }
     double serverSpeedLimit() { return serverSpeedLimit; }
     double trainSpeedLimit(Train train) {
         return vehicleProfile.speedLimit(serverSpeedLimit, train.maxSpeed);
@@ -124,10 +128,14 @@ public final class SkyTrainPlugin extends JavaPlugin {
             var candidate = VehicleProfiles.load(new java.io.File(getDataFolder(), "vehicles"),
                     config.getString("settings.default-vehicle-profile"));
             double limit = VehicleProfile.number(config, "settings.server-speed-limit-kmh", 3.6, 576) / 72;
+            var curveSettings = ShadowCurveSettings.load(config);
+            var noticeSettings = ShadowSpeedNotice.Settings.load(config);
             reloadConfig();
             maSounds = MaSoundSettings.load(getConfig(), message -> getLogger().warning(message));
             maSoundTokens.clear();
             vehicleProfile = candidate;
+            shadowCurveSettings = curveSettings;
+            shadowSpeedNoticeSettings = noticeSettings;
             serverSpeedLimit = limit;
             getLogger().info("Vehicle profile: " + candidate.id() + ", fixed mass " + candidate.mass()
                     + " t, effective cap " + Math.min(candidate.maxSpeed(), limit) * 72

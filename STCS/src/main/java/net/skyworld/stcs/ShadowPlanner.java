@@ -56,7 +56,13 @@ final class ShadowPlanner {
         for(int i=0;i<bundles.size();i++) {
             if(acceptedDistance>=limit) {reason=limitReason;break;}
             var bundle=bundles.get(i); Double cap=capacities.get(i);
-            if(cap!=null&&cap<length+margin) {reason="NO_EXIT_CAPACITY";break;}
+            if(cap!=null&&cap<length+margin) {
+                // A truncated search cannot prove that the physical exit is too short.
+                // Preserve the actual boundary so unknown points/graph gaps can be resolved.
+                reason=end.equals("TRACK_END")?"NO_EXIT_CAPACITY":
+                        end.equals("LOOKAHEAD_LIMIT")?"SWITCH_LOOKAHEAD_DISTANCE":end;
+                break;
+            }
             double bundleLength=bundle.stream().mapToDouble(RailGraph.Edge::distanceMeters).sum();
             // A clipped MA must still let the entire train clear the last point in an atomic throat bundle.
             if(cap!=null && Math.min(cap,limit-(acceptedDistance+bundleLength-cap))<length+margin) {

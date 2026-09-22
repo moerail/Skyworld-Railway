@@ -14,6 +14,7 @@ final class MaSoundSettings {
         add(tones, config, warning, "RELEASED", "released", "block.iron_trapdoor.close", .6f, 1.2f, 1);
         add(tones, config, warning, "SHRINKING", "shrinking", "entity.experience_orb.pickup", 1, 1, 1);
         add(tones, config, warning, "LOW", "low", "block.note_block.pling", 1, 1, 1);
+        add(tones, config, warning, "NEAR_LIMIT", "near-limit", "block.note_block.bell", 1, 1.5f, 1);
         return Map.copyOf(tones);
     }
     private static void add(Map<String, Tone> result, ConfigurationSection c, Consumer<String> warning,

@@ -32,11 +32,19 @@ Minecraft 既是实际运行环境，也是可交互的铁路系统实验环境�
 
 Minecraft is both the live operating environment and an interactive railway-system test environment: users can build track, run trains and observe how points, occupancy, resource reservations and control information interact. The project also aims to make these relationships accessible to railway students and enthusiasts. That educational use is an exploration, not an established teaching platform or a validated railway simulator.
 
+## 2.1.5 更新 / Update
+
+STF 现已提供只读影子速度曲线、司机接近限速提示音及中英法日 HMI。限速显示在计分板第二行和 BossBar；低速遥测补偿不再使用理论最高速度。Python 测试台新增只读账本诊断。**仍无 ATP 自动制动，不能直接启用 FS。**
+
+STF now provides read-only shadow speed curves, driver near-limit audio and four-language HMI. The limit appears on sidebar line two and the BossBar; low-speed telemetry extrapolation no longer uses the theoretical speed ceiling. The Python testbench adds read-only ledger inspection. **No automatic ATP braking or FS activation.**
+
+[更新说明 / Release notes](CHANGELOG.md)
+
 ## 主要模块 / Main Modules
 
 | 插件 / Plugin | 版本 / Version | 职责 / Responsibility |
 | --- | --- | --- |
-| [SkyTrainFolia (STF)](SkyTrainFolia/) | 2.1.4 | 列车运动、编组、驾驶控制、车型、牌子、实体道岔执行与驾驶室 HMI。<br>Train motion, consists, driving control, vehicle profiles, signs, physical point actuation and cab HMI. |
+| [SkyTrainFolia (STF)](SkyTrainFolia/) | 2.1.5 | 列车运动、编组、驾驶控制、车型、牌子、实体道岔执行与驾驶室 HMI。<br>Train motion, consists, driving control, vehicle profiles, signs, physical point actuation and cab HMI. |
 | [Skyworld Train Control System (STCS)](STCS/) | 2.2.1 | RailGraph、线路归属、定位、保留占用与实验性影子 MA/EoA 分配。<br>RailGraph, line attribution, localisation, retained occupancy and experimental shadow MA/EoA allocation. |
 | [SkyworldTrainAPI (STA)](STA/) | 0.8.1 | 插件之间的版本化进程内服务契约、遥测与行车事件。<br>Versioned in-process service contracts, telemetry and railway events between plugins. |
 | [SkyPCC](SkyPCC/) | 0.8.1 | HTTP/SSE 调度显示、基础设施详情、事件日志与经过身份验证的道岔操作请求。<br>HTTP/SSE dispatch display, infrastructure inspectors, event log and authenticated turnout requests. |

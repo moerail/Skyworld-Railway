@@ -4,6 +4,9 @@ import java.util.UUID;
 
 /** Optional STA implementation is isolated so STF can still run without the API jar. */
 interface TelemetrySink {
+    default ShadowCurve.Input shadowCurveInput(UUID train, UUID lease, long now, boolean reversed, String reverser) {
+        return ShadowCurve.Input.unavailable("UNAVAILABLE");
+    }
     default CabAuthorityView cabAuthority(UUID train, UUID lease, long now) { return CabAuthorityView.unavailable(); }
     default java.util.function.Consumer<UUID> beginRemoval(Train train) { return id -> {}; }
     default void protectionEvent(Train train, UUID actor, String actorName, String previous, String next) { }

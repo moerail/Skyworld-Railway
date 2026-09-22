@@ -1,3 +1,22 @@
+# Experimental onboard display only; no automatic traction or brake action.
+# Reload with /st reload after stopping all trains.
+shadow-atp:
+  enabled: true
+  # Reserved activation gate. TRUE IS REJECTED until the FS execution chain exists.
+  enforcement-enabled: false
+  stop-margin-meters: 1.0
+  approach-distance-meters: 5.0
+  approach-speed-kmh: 5.0
+  reaction-seconds: 1.0
+  # Fraction of the selected vehicle profile's B7 deceleration; level-track model.
+  service-brake-factor: 0.8
+  warning:
+    # Warn when speed >= limit - enter-gap; re-arm below limit - clear-gap.
+    enter-gap-kmh: 2.0
+    clear-gap-kmh: 5.0
+    minimum-speed-kmh: 0.5
+    cooldown-millis: 5000
+
 # MA audio is driver-only. Reload with /st reload after stopping all trains.
 # Sound IDs are namespace:path; omitted namespace defaults to minecraft.
 # Custom resource-pack IDs are allowed; the client must have the sound installed.
@@ -5,6 +24,14 @@
 # category: MASTER, MUSIC, RECORDS, WEATHER, BLOCKS, HOSTILE, NEUTRAL, PLAYERS, AMBIENT, VOICE.
 ma-sounds:
   enabled: true
+  near-limit:
+    enabled: true
+    sound: minecraft:block.note_block.bell
+    category: MASTER
+    volume: 1.0
+    pitch: 1.5
+    count: 1
+    interval-ticks: 5
   granted:
     enabled: true
     sound: minecraft:block.anvil.land

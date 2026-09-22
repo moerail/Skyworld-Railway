@@ -28,6 +28,27 @@ public final class StaCabIntegrationTest {
         assert !adapter.cabAuthority(train,lease,1000).live();
         var authority=new Authority(train,lease,session,1,"ALLOCATED_SHADOW","TRACK_END",
                 List.of(new PathPart("e",0,50)),"e",50.,30.);
+        var curveSnapshot = new Snapshot(4,true,false,session,1,1000,2,"SHADOW",List.of(authority),List.of());
+        var source = new net.skyworld.sta.api.v1.TrainTelemetrySnapshot(train,"test",1,1000,"world",
+                0,0,0,0,0,0,1,0,0,0,10,3,false,false,net.skyworld.sta.api.v1.TrainMode.MANUAL,"driver",
+                new net.skyworld.sta.api.v1.TrainTelemetrySnapshot.CabState("SHADOW","FORWARD",0,0,false,false));
+        var history = List.of(source);
+        assert StaCabIntegration.curveInput(curveSnapshot,train,lease,2,1100,session,history,false,"FORWARD")
+                .remainingMeters() == 30;
+        assert StaCabIntegration.curveInput(curveSnapshot,train,lease,2,1100,session,history,false,"FORWARD")
+                .ageSeconds() == 0.1;
+        assert StaCabIntegration.curveInput(curveSnapshot,train,lease,2,2501,session,history,false,"FORWARD")
+                .remainingMeters() == null;
+        assert StaCabIntegration.curveInput(curveSnapshot,train,lease,3,1100,session,history,false,"FORWARD")
+                .remainingMeters() == null;
+        assert StaCabIntegration.curveInput(curveSnapshot,train,UUID.randomUUID(),2,1100,session,history,false,"FORWARD")
+                .remainingMeters() == null;
+        assert StaCabIntegration.curveInput(curveSnapshot,train,lease,2,1100,UUID.randomUUID(),history,false,"FORWARD")
+                .reason().equals("SESSION_CHANGED");
+        assert StaCabIntegration.curveInput(curveSnapshot,train,lease,2,1100,session,List.of(),false,"FORWARD")
+                .reason().equals("SOURCE_UNAVAILABLE");
+        assert StaCabIntegration.curveInput(curveSnapshot,train,lease,2,1100,session,history,true,"BACKWARD")
+                .reason().equals("DIRECTION_CHANGED");
         providers.put(ShadowAuthorityService.class,(ShadowAuthorityService)()->
                 new Snapshot(4,true,false,session,1,1000,2,"SHADOW",List.of(authority),List.of()));
         var position=new TrackPositionSnapshot(2,"e","a","b",50,100,"Main",50.,1000,true,false);

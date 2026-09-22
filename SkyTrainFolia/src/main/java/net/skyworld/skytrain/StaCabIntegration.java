@@ -5,6 +5,24 @@ import net.skyworld.sta.api.v4.ShadowAuthorityService;
 
 /** Read-only display selection. A live service is not the same as a valid train authority. */
 final class StaCabIntegration {
+    static ShadowCurve.Input curveInput(ShadowAuthorityService.Snapshot snapshot, UUID train, UUID lease,
+            long graphRevision, long now, UUID session,
+            java.util.List<net.skyworld.sta.api.v1.TrainTelemetrySnapshot> history, boolean reversed, String reverser) {
+        var view = select(snapshot, train, lease, graphRevision, now);
+        var authority = view.authority();
+        if (authority == null) return ShadowCurve.Input.unavailable(view.reason());
+        if (!session.equals(authority.telemetrySession())) return ShadowCurve.Input.unavailable("SESSION_CHANGED");
+        var source = history.stream().filter(s -> s.sequence() == authority.telemetrySequence()).findFirst().orElse(null);
+        if (source == null || !source.trainId().equals(train)) return ShadowCurve.Input.unavailable("SOURCE_UNAVAILABLE");
+        long age = now - source.observedAtMillis();
+        if (age < 0 || age > 1500) return ShadowCurve.Input.unavailable("STALE");
+        if (source.reversed() != reversed || source.cab() == null || !source.cab().reverser().equals(reverser)
+                || history.stream().anyMatch(s -> s.sequence() > source.sequence()
+                    && (s.reversed() != source.reversed() || !s.world().equals(source.world())
+                        || s.cab() == null || !s.cab().reverser().equals(reverser))))
+            return ShadowCurve.Input.unavailable("DIRECTION_CHANGED");
+        return new ShadowCurve.Input(authority.signedRemainingMeters(), age / 1000.0, "SHADOW", source.speedMetersPerSecond());
+    }
     static CabAuthorityView query(org.bukkit.plugin.ServicesManager services, UUID train, UUID lease, long now) {
         try {
             var service=services.load(ShadowAuthorityService.class);

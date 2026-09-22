@@ -1,5 +1,11 @@
 # SkyRail Suite 鐵道運轉試驗規程
 
+## 二・一・五版　追補
+
+影方式速度曲線ヲ運轉臺側欄ノ第二行及ビ BossBar ニ揭示ス。EoA 前一米ニテ零速、終端五米內ハ每時五粁以下トシ、連續的ニ減速スル模型ナリ。遙測遲延ノ補償ニ理論最高速度ヲ用ヒズ、實測速度ヲ用フ。
+
+`shadow-atp.warning` ニ警報ノ遲滯幅、`ma-sounds.near-limit` ニ音響ヲ定ム。臺帳診斷ハ讀取專用トス。原編成ノ全車消滅ヲ確認シタル場合ノミ、管理コンソールニテ `stcs ma clear <UUID> confirm` ヲ用フベシ。**本曲線ハ制動ヲ執行セズ。`enforcement-enabled: true` ハ受理セズ、FS ヲ稱スベカラズ。**
+
 **TRAIN** **R**uns **A**synchronously **I**n **N**etwork
 
 [總目](README.md) | [通常日本語版](README.ja.md)
@@ -24,7 +30,7 @@
 
 | 部名 | 現行版 | 分掌 |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.4` | 編成、軌道運動、力行制動、運轉權、車輛諸元、標識、實體分岐器及ビ運轉臺 |
+| SkyTrainFolia / STF | `2.1.5` | 編成、軌道運動、力行制動、運轉權、車輛諸元、標識、實體分岐器及ビ運轉臺 |
 | STCS | `2.2.1` | 有向 RailGraph、線區歸屬、里程、位置標定、占有保持及ビ影方式 MA/EoA |
 | SkyworldTrainAPI / STA | `0.8.1` | 同一 JVM 內ノ版付きサービス契約、遙測、車輛觀測及ビ行車事象 |
 | SkyPCC | `0.8.1` | 閱覽器上ノ配線略圖、列車及ビ施設ノ照會、事象記錄並ニ認證付き分岐器操作 |
@@ -45,7 +51,7 @@ STA ハ自動的ニ公開サルル Python 用通信線ニ非ズ。同一サー�
 4. 設定變更ハ停止中ニ行ヒ、再ビ完全起動スベシ。動的差替ニ依存スベカラズ。
 
 ```text
-SkyTrainFolia-2.1.4.jar
+SkyTrainFolia-2.1.5.jar
 STCS-2.2.1.jar
 SkyworldTrainAPI-0.8.1.jar
 SkyPCC-0.8.1.jar

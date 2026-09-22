@@ -8,9 +8,10 @@ import math
 import sys
 from pathlib import Path
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from railgraph_simulation import Graph, Simulation
+from occupancy_audit import audit
 
 BG, PANEL, TEXT, MUTED = "#14181b", "#202629", "#eef3f3", "#a8b4b9"
 FREE, RESERVED, OCCUPIED, FROZEN = "#77868c", "#39aee8", "#ff6576", "#f4b951"
@@ -110,6 +111,7 @@ class Testbench:
         self.button(bar, "保存场景", self.save_scene)
         self.button(bar, "载入场景", self.open_scene)
         self.button(bar, "适配视图", self.fit)
+        self.button(bar, "账本诊断", self.inspect_ledger)
         ttk.Label(bar, text="离线 · 影子许可", foreground="#5bd3af").pack(side="right", padx=10)
         controls = ttk.Frame(self.root, padding=(8, 2))
         controls.pack(fill="x")
@@ -238,6 +240,28 @@ class Testbench:
                     raise ValueError("不能把场景覆盖到 railgraph.json，请使用其他文件名")
             p.write_text(json.dumps(self.sim.export(), ensure_ascii=False, indent=2), encoding="utf-8")
             self.sim.event("场景已保存: " + p.name)
+
+    def inspect_ledger(self):
+        path = filedialog.askopenfilename(title="打开 shadow-occupancy.json（只读）", filetypes=[("JSON", "*.json")])
+        if not path:
+            return
+        pair = simpledialog.askstring("查询区段", "两端设备名称或 UUID，以逗号分隔，例如 101,103；留空检查全部。", parent=self.root)
+        if pair is None:
+            return
+        endpoints = [value.strip() for value in pair.split(",")] if pair.strip() else None
+        if endpoints and (len(endpoints) != 2 or not all(endpoints)):
+            raise ValueError("请输入两个设备名称，例如 101,103")
+        report = audit(self.sim.graph, json.loads(Path(path).read_text(encoding="utf-8-sig")), endpoints)
+        window = tk.Toplevel(self.root)
+        window.title("离线账本诊断 / 仅供核对，不证明区段空闲")
+        window.geometry("1000x600")
+        text = tk.Text(window, wrap="word")
+        scroll = ttk.Scrollbar(window, command=text.yview)
+        scroll.pack(side="right", fill="y")
+        text.configure(yscrollcommand=scroll.set)
+        text.pack(fill="both", expand=True)
+        text.insert("1.0", report)
+        text.configure(state="disabled")
 
     def open_scene(self):
         path = filedialog.askopenfilename(title="载入离线场景", filetypes=[("JSON", "*.json")])

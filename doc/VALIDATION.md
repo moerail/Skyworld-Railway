@@ -2,6 +2,17 @@
 
 ## Passed
 
+### 2026-09-23 Follow-up (STF 2.1.5)
+
+Four plugins rebuilt; 62 Java test entry points passed, including shadow-curve continuity,
+stationary/constant-speed report refresh, HMI row ordering, four-language BossBar formatting,
+near-limit audio hysteresis, input validity and no-STA classloading.
+Python: 60 cases discovered, 57 passed, 3 optional cases skipped.
+The server owner reported a successful test. No new live-server or PCC browser run was
+performed by the coding agent; this does not establish FS safety or resolve every retained-occupancy cause.
+
+### Historical Directory-Migration Run
+
 - Four JARs rebuilt from source using JDK 25 and the prepared local Shiroha/Folia 26.2 dependency tree.
 - 52 Java test entry points passed with assertions enabled, including the formerly separate MaSoundSettingsTest.
 - PCC edge-line.cjs and i18n.cjs passed (265 language keys).

@@ -1,12 +1,20 @@
 # SkyRail Suite
 
+## Mise à jour 2.1.5 (2026-09-23)
+
+Les courbes en mode ombre ne commandent ni traction ni freinage. Par défaut : arrêt 1 m avant EoA, au plus 5 km/h dans les derniers 5 m, puis diminution continue à zéro. Le modèle en palier utilise les paramètres B7 et les vitesses mesurées, sans compenser l’âge des données par la vitesse maximale théorique.
+
+Configuration dans `shadow-atp` ; `enforcement-enabled: true` est refusé. `shadow-atp.warning` : alerte à 2 km/h sous la limite, réarmement à 5 km/h sous celle-ci, silence sous 0.5 km/h, intervalle minimal de 5000 ms. `ma-sounds.near-limit` règle son, volume, hauteur, nombre et intervalle ; son par défaut `minecraft:block.note_block.bell`. Arrêter les trains avant `/st reload`.
+
+L’inspecteur du banc lit railgraph et shadow-occupancy.json correspondants sans les modifier ni prouver la libération. Après vérification de la disparition de toute la rame d’origine seulement : `stcs ma clear <UUID-complet> confirm` dans la console. Toutes les preuves en mode ombre de cette identité sont effacées, avec sauvegarde et journal d’audit ; le registre historique M1 reste intact. Un train déchargé n’est pas nécessairement supprimé.
+
 [Accueil](README.md) | [中文](README.zh.md) | [English](README.en.md) | [Nederlands](README.nl.md) | **Français** | [日本語](README.ja.md)
 
 **Édition française complète et autonome : aucun document complémentaire n’est nécessaire pour lire ce manuel.**
 
 Suite d’exploitation ferroviaire, d’infrastructure, de contrôle-commande ferroviaire fantôme et d’affichage de régulation pour Minecraft / Folia. SkyRail Suite est le nouveau nom du dépôt de la branche de développement SkyTrain Suite ; les noms des greffons exécutables, les commandes et les répertoires de données restent inchangés.
 
-Ce manuel décrit l’état du code source local au **13 septembre 2026**. Édition française préparée le **14 septembre 2026**. Il s’adresse aux administrateurs de serveur, conducteurs, constructeurs de lignes et développeurs de greffons. Les idées évoquées pour des développements futurs ne sont pas nécessairement mises en œuvre.
+Ce manuel décrit l’état du code source local au **23 septembre 2026**. Édition française préparée le **14 septembre 2026**. Il s’adresse aux administrateurs de serveur, conducteurs, constructeurs de lignes et développeurs de greffons. Les idées évoquées pour des développements futurs ne sont pas nécessairement mises en œuvre.
 
 > **Limite de la version de développement :** la suite calcule, attribue et affiche des informations MA/EoA fantômes, mais l’ATP ne commande pas le freinage à partir de celles-ci. Une demande acceptée, une voie apparemment libre sur le PCC ou un indicateur RBC en ligne ne constituent pas une autorisation de circuler en sécurité. Le freinage d’urgence sur perte du conducteur, le freinage d’urgence manuel et le maintien du frein en mode RECOVERING sont des fonctions de commande distinctes et actives.
 
@@ -42,7 +50,7 @@ Le projet introduit la prise de conduite explicite, l’occupation des ressource
 
 | Composant | Version | Fonction principale |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.4` | Rames, mouvement et inscription en courbe, prise de conduite, traction/freinage, profils de véhicule, panneaux, manœuvre physique des appareils de voie, IHM et sons |
+| SkyTrainFolia / STF | `2.1.5` | Rames, mouvement et inscription en courbe, prise de conduite, traction/freinage, profils de véhicule, panneaux, manœuvre physique des appareils de voie, IHM et sons |
 | STCS | `2.2.1` | Infrastructure, RailGraph orienté, point kilométrique, localisation, registre d’occupation conservé, MA/EoA fantômes et contrôles locaux des appareils de voie |
 | SkyworldTrainAPI / STA | `0.8.1` | Contrats inter-greffons versionnés, télémétrie, observations des véhicules, état du pupitre, autorisations et événements |
 | SkyPCC | `0.8.1` | Tableau de contrôle optique Web, inspecteur des trains/infrastructures, occupations/réservations, journal d’événements et commande authentifiée des appareils de voie |
@@ -71,7 +79,7 @@ Ce schéma illustre les responsabilités, et non une chaîne d’appels série o
 | Graphe, affectation de ligne, point kilométrique, occupation conservée | Réalisé ; expiration ou déchargement ne prouvent pas que la voie est libre |
 | MA/EoA en ligne et réservations spatiales | Implémentation fantôme ; aucun freinage ATP |
 | Commande Web des appareils de voie | Authentification, contrôles locaux et état asynchrone PENDING réalisés |
-| Courbes de vitesse embarquées et intervention ATP pour survitesse/EoA | Non réalisé |
+| Courbes de vitesse embarquées et intervention ATP pour survitesse/EoA | Courbes de vitesse en mode ombre disponibles en lecture seule ; freinage automatique pour survitesse/EoA non réalisé. |
 | Tracé automatique complet des itinéraires et ATO à l’horaire | Système complet non réalisé ; les métadonnées d’itinéraire ne constituent pas un itinéraire établi |
 | Modes ETCS FS/SR/SH/SB/TR/PT | Non réalisés ; les modes actuels ne sont pas des équivalents complets |
 | SIR, SkyCBI ou service RBC Python séparé | Pistes d’architecture, non composants installables actuels |
@@ -96,7 +104,7 @@ Ce schéma illustre les responsabilités, et non une chaîne d’appels série o
 Fichiers d’installation actuels :
 
 ```text
-SkyTrainFolia-2.1.4.jar
+SkyTrainFolia-2.1.5.jar
 STCS-2.2.1.jar
 SkyworldTrainAPI-0.8.1.jar
 SkyPCC-0.8.1.jar
@@ -627,7 +635,7 @@ Par défaut, STA conserve les 500 derniers événements de la session actuelle, 
 
 ## 11. Sons et IHM
 
-La BossBar de MA est réservée au conducteur. `settings.cab-ma-bar-range-meters` de STF vaut 300 m par défaut et n’affecte que l’échelle de la barre ; le texte indique la distance réelle. La limite de vitesse ATP de la barre latérale reste un substitut non implémenté, pas une courbe de vitesse existante.
+La BossBar réservée au conducteur affiche les informations MA puis `Limite ATP: xx km/h`. La même limite en mode ombre figure sur la deuxième ligne latérale ; une courbe invalide affiche `--`. `settings.cab-ma-bar-range-meters` vaut 300 m par défaut et ne modifie que l’échelle.
 
 ### Configuration sonore MA
 
@@ -774,7 +782,7 @@ Le banc d’essai Python hors ligne couvre topologie, direction, occupation, ré
 
 Les contrats/modes M0 et les observations/conservations M1 sont implémentés et testés par des joueurs. M2 comprend désormais la MA fantôme en ligne et des perfectionnements des ressources spatiales. Une réception antérieure ne remplace pas les essais de non-régression et n’établit pas l’aptitude ATP.
 
-La prochaine étape peut être les **courbes de vitesse fantômes embarquées** : employer MA/EoA et les paramètres de freinage du véhicule pour afficher/journaliser une courbe sans commander les freins. L’intervention ne viendra qu’après validation.
+Prochaine étape : valider la courbe en mode ombre, la fraîcheur de localisation et le modèle de freinage avant de réaliser la commande des freins. La configuration actuelle ne permet pas d’activer FS.
 
 Avant un ATP réel restent notamment à réaliser : enveloppes/cohérence du train complet, identité/acquittement/révocation des autorisations, règles de perte de contact/gel/contournement, limitations de vitesse/modèles de freinage, libération justifiée des ressources et essais d’injection de pannes.
 

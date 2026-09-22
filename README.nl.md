@@ -1,12 +1,20 @@
 # SkyRail Suite
 
+## Update 2.1.5 (2026-09-23)
+
+Schaduwcurves wijzigen geen rijstanden of remmen. Standaard: stilstand 1 m voor EoA en maximaal 5 km/h in de laatste 5 m, aflopend tot nul. Het model voor vlak spoor gebruikt B7-parameters en gemeten snelheid; vertraging wordt niet meer met de theoretische maximumsnelheid gecompenseerd.
+
+`shadow-atp` bevat de curve-instellingen; `enforcement-enabled: true` wordt geweigerd. `shadow-atp.warning`: waarschuwing 2 km/h onder de limiet, opnieuw gereed 5 km/h eronder, stil onder 0.5 km/h, minimaal 5000 ms tussen signalen. `ma-sounds.near-limit` configureert geluid, volume, toonhoogte, aantal en interval; standaard `minecraft:block.note_block.bell`. Stop treinen voor `/st reload`.
+
+De testbank leest bij elkaar horende railgraph- en shadow-occupancy.json-bestanden zonder ze te wijzigen. Alleen na controle dat de volledige oorspronkelijke trein verdwenen is: consolecommando `stcs ma clear <volledige-UUID> confirm`. Dit verwijdert alle schaduwbewijzen voor die identiteit, met back-up en audit; historische M1-gegevens blijven behouden. Een niet-geladen trein is niet automatisch verdwenen.
+
 [Home](README.md) | [中文](README.zh.md) | [English](README.en.md) | **Nederlands**
 
 **Nederlandse uitgave. Zelfstandig leesbaar: aanvullende documentatie is niet nodig om deze handleiding te gebruiken.**
 
 Een suite voor treinbesturing, spoorweginfrastructuur, treinbeveiliging in schaduwbedrijf en verkeersleidingsweergave in Minecraft / Folia. SkyRail Suite is de nieuwe repositorynaam voor de SkyTrain Suite-ontwikkellijn; bestaande pluginnamen, commando's en gegevensmappen blijven gelijk.
 
-Deze handleiding beschrijft de lokale broncodebasis die op **13 september 2026** is gedocumenteerd. De Nederlandse versie is opgesteld op **14 september 2026**, voor serverbeheerders, machinisten, spoorbouwers en pluginontwikkelaars. Besproken toekomstplannen zijn niet automatisch gerealiseerde functies.
+Deze handleiding beschrijft de lokale broncodebasis die op **23 september 2026** is gedocumenteerd. De Nederlandse versie is opgesteld op **14 september 2026**, voor serverbeheerders, machinisten, spoorbouwers en pluginontwikkelaars. Besproken toekomstplannen zijn niet automatisch gerealiseerde functies.
 
 > **Beperking van deze ontwikkelversie:** de suite berekent, verdeelt en toont MA/EoA in schaduwbedrijf, maar ATP grijpt op basis daarvan niet in op de remmen. Een geaccepteerde aanvraag, een ogenschijnlijk vrij spoor op PCC of een online RBC-indicator biedt geen garantie dat doorrijden veilig is. Noodremming bij verlies van de machinist, handmatige noodremming en het vasthouden van de rem in RECOVERING zijn afzonderlijke, wel actieve besturingsfuncties.
 
@@ -42,7 +50,7 @@ Het project introduceert expliciete besturingsrechten, spoorbezetting, strijdige
 
 | Component | Versie | Verantwoordelijkheid |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.4` | Treinsamenstelling, beweging en bochten, besturingsrechten, tractie/remming, profielen, borden, fysieke wisselbediening, HMI en geluid |
+| SkyTrainFolia / STF | `2.1.5` | Treinsamenstelling, beweging en bochten, besturingsrechten, tractie/remming, profielen, borden, fysieke wisselbediening, HMI en geluid |
 | STCS | `2.2.1` | Infrastructuur, gerichte RailGraph, lijnkilometrering, plaatsbepaling, bewaard bezettingsregister, schaduw-MA/EoA en lokale wisselcontroles |
 | SkyworldTrainAPI / STA | `0.8.1` | Versiegebonden plugincontracten, telemetrie, voertuigwaarnemingen, cabinestatus, rijtoestemmingen en gebeurtenissen |
 | SkyPCC | `0.8.1` | Webspoorschema, inspectiepaneel voor treinen/infrastructuur, bezetting/reserveringen, gebeurtenissenlog en geauthenticeerde wisselbediening |
@@ -71,7 +79,7 @@ Dit schema toont verantwoordelijkheden, geen verplichte opeenvolging van alle aa
 | Graaf, lijntoewijzing, kilometrering en bewaarde bezetting | Gerealiseerd; timeout of chunk-unload bewijst geen vrijgave |
 | Online MA/EoA en ruimtelijke reserveringen | Schaduwimplementatie, zonder ATP-remingreep |
 | Wisselbediening via het web | Authenticatie, lokale controles en asynchrone PENDING gerealiseerd |
-| Snelheidscurves aan boord en ATP-ingreep bij te hoge snelheid/EoA | Niet gerealiseerd |
+| Snelheidscurves aan boord en ATP-ingreep bij te hoge snelheid/EoA | Alleen-lezen schaduwsnelheidscurves beschikbaar; automatische ATP-remingrepen nog niet gerealiseerd. |
 | Volledige bestemmingsroutering en dienstregeling-ATO | Niet als compleet systeem gerealiseerd; routegegevens zijn geen ingestelde rijweg |
 | ETCS-modi FS/SR/SH/SB/TR/PT | Niet gerealiseerd; huidige modi zijn geen volledige vervangers |
 | Aparte SIR-, SkyCBI- of Python-RBC-service | Architectuurideeën, geen huidige installeerbare onderdelen |
@@ -96,7 +104,7 @@ Dit schema toont verantwoordelijkheden, geen verplichte opeenvolging van alle aa
 Huidige installatiebestanden:
 
 ```text
-SkyTrainFolia-2.1.4.jar
+SkyTrainFolia-2.1.5.jar
 STCS-2.2.1.jar
 SkyworldTrainAPI-0.8.1.jar
 SkyPCC-0.8.1.jar
@@ -627,7 +635,7 @@ STA bewaart standaard de laatste 500 gebeurtenissen van de huidige sessie, geen 
 
 ## 11. Geluiden en HMI
 
-Alleen de machinist krijgt de MA-BossBar. STF `settings.cab-ma-bar-range-meters` is standaard 300 m en wijzigt alleen de schaal; de tekst toont de echte afstand. De ATP-snelheidslimiet in de zijbalk blijft een aanduiding van een nog niet gerealiseerde functie, geen bestaande snelheidscurve.
+De BossBar voor de machinist toont MA-informatie en de schaduwsnelheidslimiet, die ook op de tweede zijbalkregel staat. Ongeldige curves tonen `--`. De interface ondersteunt Chinees, Engels, Frans en Japans. `settings.cab-ma-bar-range-meters` is standaard 300 m en bepaalt alleen de schaal.
 
 ### MA-geluiden configureren
 
@@ -774,7 +782,7 @@ De offline Python-testbank test topologie, richting, bezetting, reserveringen en
 
 M0-contracten/modi en M1-waarneming/behoud zijn geïmplementeerd en met spelers getest. M2 bevat nu online schaduw-MA en ruimtelijke verfijningen. Eerdere acceptatie vervangt geen regressietest en bewijst geen ATP-gereedheid.
 
-Een volgende stap is **snelheidscurves in schaduwbedrijf aan boord**: MA/EoA en profielremparameters gebruiken voor weergave/logging, zonder remingreep. Ingrijpen volgt pas na validatie.
+Volgende stap: de schaduwcurve, de actualiteit van lokalisatie en het remmodel valideren voordat remingrepen worden gebouwd. FS kan nog niet via de configuratie worden geactiveerd.
 
 Voor echte ATP blijven nodig: volledige treinbegrenzing/consistentie, MA-identiteit/bevestiging/intrekking, beleid bij contactverlies/bevriezen/bypass, snelheidsbeperkingen/remmodellen, onderbouwde resourcevrijgave en foutinjectietests.
 

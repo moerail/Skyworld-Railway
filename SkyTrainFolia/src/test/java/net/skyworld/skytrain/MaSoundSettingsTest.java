@@ -6,7 +6,8 @@ public final class MaSoundSettingsTest {
         var c = new YamlConfiguration();
         var errors = new ArrayList<String>();
         var defaults = MaSoundSettings.load(c, errors::add);
-        assert defaults.size() == 5 && errors.isEmpty();
+        assert defaults.size() == 6 && errors.isEmpty();
+        assert defaults.get("NEAR_LIMIT").sound().equals("minecraft:block.note_block.bell");
         assert defaults.get("GRANTED").pitch() == 2 && defaults.get("GRANTED").count() == 2;
         c.set("ma-sounds.low.sound", "skyworld:atp/warning");
         c.set("ma-sounds.low.count", 3);

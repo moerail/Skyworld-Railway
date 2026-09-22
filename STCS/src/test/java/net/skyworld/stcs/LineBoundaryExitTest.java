@@ -46,7 +46,7 @@ public final class LineBoundaryExitTest {
         assert ((Number)position.get("currentMileageMeters")).doubleValue()==84;
         var states = Map.of("151","diverging");
         var oldResult = ShadowPlanner.plan(new ShadowGraph(old),a.id(),84,10,600,2,states,Set.of());
-        assert oldResult.reason().equals("NO_EXIT_CAPACITY") && oldResult.remaining()==9 : oldResult;
+        assert oldResult.reason().equals("GRAPH_GAP") && oldResult.remaining()==9 : oldResult;
         assert old.query("world",95,64,5,0,0,1).isEmpty() : "Missing directed edge explains lost forward tracking";
         assert MarkerType.END.scansBothDirections() : "Rebuild must scan END's physical continuation";
         assert MarkerType.ORIGIN.scansBothDirections() : "Physical discovery is independent of mileage direction";

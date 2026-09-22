@@ -508,7 +508,7 @@ final class CabUiManager implements Listener {
                 holder, MENU_SIZE, Component.text("SkyTrain · " + shorten(train.name(), 20)));
         holder.inventory = inventory;
         return new CabSession(player.getUniqueId(), train.id(),
-                new CabSidebar(player.getUniqueId()), inventory, new MaBossBar());
+                new CabSidebar(player.getUniqueId()), inventory, new MaBossBar(), new ShadowSpeedNotice());
     }
 
     void announceStationBraking(Train train, AutomaticRun run) {
@@ -649,9 +649,11 @@ final class CabUiManager implements Listener {
         lines[10] = line(ui.text(language, "protection.atp"), ui.text(language, "protection.mode." + train.protectionMode));
         String unavailable = ui.text(language, train.protectionMode == ProtectionMode.ISOLATED ? "protection.isolated" : "ma.wait");
         lines[11] = line(ui.text(language, "protection.eoa"), unavailable);
-        lines[12] = line(ui.text(language, "protection.speedLimit"), ui.text(language, "protection.notImplemented"));
+        String curveLabel = localized(language, "影子限速", "Shadow limit", "Limite ombre", "影の制限速度");
+        lines[12] = line(curveLabel, "--");
         String maTitle = ui.text(language, "ma.shadow") + " MA | " + unavailable;
         Double maRemaining = null;
+        Double shadowLimitMps = null;
         lines[13] = line(ui.text(language, "protection.rbc"), ui.text(language,
                 train.protectionMode == ProtectionMode.ISOLATED ? "protection.isolated"
                         : !stcsEnabled ? "protection.noStcs" : "ma.stale"));
@@ -659,6 +661,23 @@ final class CabUiManager implements Listener {
             var desk = plugin.driverDesks().stream().filter(d -> d.trainId().equals(train.id())).findFirst().orElse(null);
             var display = plugin.telemetrySink().cabAuthority(train.id(), desk == null ? null : desk.leaseId(),
                     System.currentTimeMillis());
+            if (train.protectionMode == ProtectionMode.SHADOW && manager.isDriver(player, train)) {
+                double scale = plugin.getConfig().getDouble("infrastructure.blocks-per-meter", 1);
+                var input = plugin.telemetrySink().shadowCurveInput(train.id(), desk == null ? null : desk.leaseId(),
+                        System.currentTimeMillis(), train.reversed, train.reverser.name());
+                var curve = ShadowCurve.calculate(plugin.shadowCurveSettings(), input, speed * 20 / scale,
+                        plugin.trainSpeedLimit(train) * 20 / scale,
+                        plugin.vehicleProfile().brakeAcceleration(7) * 400 / scale);
+                shadowLimitMps = curve.permittedMps();
+                String warning = curve.state().equals("OVERSPEED") || curve.state().equals("EOA_OVERRUN")
+                        ? localized(language, " 超限", " EXCEEDED", " DEPASSE", " 超過") : "";
+                // Curve speed uses physical metres, unlike the legacy block-based speed preference.
+                lines[12] = line(curveLabel, curve.permittedMps() == null ? "-- (" + curve.state() + ")"
+                        : format(curve.permittedMps() * 3.6) + " km/h" + warning);
+                if (session.speedNotice.update(desk == null ? null : desk.leaseId(), curve.permittedMps(),
+                        speed * 20 / scale, System.currentTimeMillis(), plugin.shadowSpeedNoticeSettings()))
+                    plugin.playMaNotice(player.getUniqueId(), desk.leaseId(), "NEAR_LIMIT");
+            }
             if (display.live()) {
                 lines[13] = line(ui.text(language, "protection.rbc"), ui.text(language, "ma.link"));
                 if (display.remainingMeters() != null) {
@@ -677,7 +696,9 @@ final class CabUiManager implements Listener {
                 }
             }
         }
-        session.maBar.update(player, manager.isDriver(player, train), maTitle, maRemaining,
+        ShadowCurveDisplay.limitSecond(lines);
+        session.maBar.update(player, manager.isDriver(player, train),
+                ShadowCurveDisplay.bossTitle(maTitle, language, shadowLimitMps), maRemaining,
                 plugin.getConfig().getDouble("settings.cab-ma-bar-range-meters", 300.0));
         session.sidebar.show(player,
                 "SkyTrain 【" + shorten(train.name(), 14) + "】【" + train.memberCount() + "】", lines);
@@ -935,6 +956,7 @@ final class CabUiManager implements Listener {
         }
     }
 
-    private record CabSession(UUID playerId, UUID trainId, CabSidebar sidebar, Inventory inventory, MaBossBar maBar) {
+    private record CabSession(UUID playerId, UUID trainId, CabSidebar sidebar, Inventory inventory, MaBossBar maBar,
+            ShadowSpeedNotice speedNotice) {
     }
 }
