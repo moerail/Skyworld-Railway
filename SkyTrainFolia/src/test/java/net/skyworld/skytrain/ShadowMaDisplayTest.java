@@ -1,13 +1,13 @@
 package net.skyworld.skytrain;
 
 import java.util.*;
-import net.skyworld.sta.api.v4.ShadowAuthorityService.*;
+import net.skyworld.sta.api.v5.ShadowAuthorityService.*;
 
 public final class ShadowMaDisplayTest {
     private static final UUID train=UUID.randomUUID(),lease=UUID.randomUUID(),session=UUID.randomUUID();
     private static final long now=10000,revision=52;
     private static Snapshot snapshot(Authority authority,long at,long graph,String state) {
-        return new Snapshot(4,true,false,session,1,at,graph,state,List.of(authority),List.of());
+        return new Snapshot(5,true,false,session,1,at,graph,state,List.of(authority),List.of());
     }
     public static void main(String[] args) {
         var waiting=new Authority(train,lease,session,1,"WAITING","FLEET_UNCERTAIN",List.of(),null,null,null);

@@ -3,7 +3,7 @@ import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import net.skyworld.sta.api.v4.*;
+import net.skyworld.sta.api.v5.*;
 
 public final class SwitchGatewayTest {
     public static void main(String[] args) throws Exception {

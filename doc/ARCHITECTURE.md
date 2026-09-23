@@ -1,5 +1,13 @@
 # Architecture and Maintenance Boundaries
 
+## Current Protocol Baseline
+
+STF 3.0.0 / STCS 3.0.0 / STA 1.0.0 / SkyPCC 1.0.0 use STA v5.
+Telemetry/network/desk/authority/switch contracts live in `net.skyworld.sta.api.v5`;
+unchanged supporting v1 DTOs and v3 observation/event contracts remain.
+PCC exposes `/api/v5/` only. See [breaking migration and identifier namespaces](STA-V5-MIGRATION.md).
+This is an interface baseline for M3 development, not executable ATP or certified interlocking.
+
 SkyRail Suite is the repository name. Runtime identities remain SkyTrainFolia, STCS, SkyworldTrainAPI and SkyPCC. Renaming this repository does not migrate player data or change plugin dependency names.
 
 ## Modules

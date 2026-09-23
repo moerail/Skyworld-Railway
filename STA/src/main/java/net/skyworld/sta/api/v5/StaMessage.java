@@ -1,4 +1,4 @@
-package net.skyworld.sta.api.v2;
+package net.skyworld.sta.api.v5;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -7,9 +7,10 @@ import net.skyworld.sta.api.v1.TrackPositionSnapshot;
 
 /** STA application messages. IDs are private STA IDs, NOT ETCS wire identifiers. */
 public record StaMessage(Header header, Physical physical, Tracking tracking) {
-    public static final int VERSION = 2;
+    public static final int VERSION = StaTypes.VERSION;
     public enum Kind {
-        TELEMETRY_REPORT(1001), TRACK_REPORT(1002), TRAIN_REMOVED(1003);
+        TELEMETRY_REPORT(StaTypes.Message.TRAIN_POSITION_REPORT),
+        TRACK_REPORT(StaTypes.Message.TRACK_REPORT), TRAIN_REMOVED(StaTypes.Message.TRAIN_REMOVED);
         public final int id;
         Kind(int id) { this.id = id; }
         public static Kind of(int id) {

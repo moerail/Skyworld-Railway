@@ -1,7 +1,7 @@
 package net.skyworld.stcs;
 
 import java.util.*;
-import net.skyworld.sta.api.v4.ShadowAuthorityService.PathPart;
+import net.skyworld.sta.api.v5.ShadowAuthorityService.PathPart;
 
 /** Serial shadow allocation, mirroring WP1 path/bundle rules. Never operates a vehicle. */
 final class ShadowPlanner {

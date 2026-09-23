@@ -5,9 +5,9 @@ import java.util.concurrent.*;
 import java.nio.file.*;
 import org.bukkit.plugin.ServicePriority;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
-import net.skyworld.sta.api.v2.*;
+import net.skyworld.sta.api.v5.*;
 import net.skyworld.sta.api.v3.*;
-import net.skyworld.sta.api.v4.*;
+import net.skyworld.sta.api.v5.*;
 
 /** Observational model only. M1 durable evidence is never cleared or promoted by this adapter. */
 final class ShadowRuntime implements ShadowAuthorityService, SwitchControlService, AutoCloseable {
@@ -43,6 +43,10 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
     private boolean closed,failed,unbounded=true;
     private volatile Snapshot latest;
     private volatile Diagnostics diagnostics;
+    private final NodePassageMonitor integrity = new NodePassageMonitor();
+    private volatile String integrityFailure;
+    List<NodePassageMonitor.View> integritySnapshot() { return integrity.snapshot(); }
+    String integrityFailure() { return integrityFailure; }
     record Intent(UUID driver,UUID lease,UUID provider) {}
     record MaAction(UUID train, String trainName, UUID driver, String driverName,
             String action, String state, String reason) {}
@@ -124,7 +128,7 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
         this.settings=Objects.requireNonNull(settings);
         retained.putAll(ShadowOccupancyStore.load(file));
         retained.forEach((id,record)->{occupied.put(id,record.resources());uncertain.add(id);});
-        latest=new Snapshot(4,true,false,session,0,System.currentTimeMillis(),0,"STARTING",List.of(),List.of());
+        latest=new Snapshot(5,true,false,session,0,System.currentTimeMillis(),0,"STARTING",List.of(),List.of());
         diagnostics=new Diagnostics(latest,false,List.of(),Map.of(),Map.of(),List.of());
     }
     private static Inputs inputs(StcsPlugin plugin,RailGraphManager manager) {
@@ -192,6 +196,14 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
                 });
             }
             boolean available=input.available();
+            if (integrityFailure==null) try {
+                integrity.update(model,available && Objects.equals(input.driverSession(),input.rosterSession()),
+                        input.rosterSession(),input.roster(),input.switchStates(),now);
+            } catch (RuntimeException ex) {
+                integrityFailure=ex.getClass().getSimpleName();
+                if (plugin!=null) plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        "Read-only integrity monitor stopped; existing occupancy/MA logic unchanged",ex);
+            }
             Map<UUID,StaMessage> reports=new HashMap<>(); Map<UUID,DriverDeskService.Desk> drivers=new HashMap<>();
             if(available) {
                 for(var m:input.reports()) if(m.header().kind()==StaMessage.Kind.TRACK_REPORT) reports.put(m.header().trainId(),m);
@@ -366,7 +378,7 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
             }
             List<Section> sections=ShadowSections.build(model,occupied,reserved,uncertain);
             persist(false);
-            latest=new Snapshot(4,true,false,session,++sequence,now,graph.revision,available?"SHADOW":"SOURCE_UNAVAILABLE",authorities,sections);
+            latest=new Snapshot(5,true,false,session,++sequence,now,graph.revision,available?"SHADOW":"SOURCE_UNAVAILABLE",authorities,sections);
             Map<UUID,UUID> driven=new HashMap<>();drivers.values().forEach(d->driven.put(d.driverId(),d.trainId()));
             diagnostics=new Diagnostics(latest,available,blockers,driven,names,coverage);
             soundTracker.retain(intents.keySet());
@@ -379,7 +391,7 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
             if(plugin!=null)plugin.notifyPccUpdate();
         } catch(Exception|LinkageError ex) {
             failed=true;
-            latest=new Snapshot(4,true,false,session,++sequence,now,model==null?0:model.graph.revision,"FAILED",List.of(),latest.sections());
+            latest=new Snapshot(5,true,false,session,++sequence,now,model==null?0:model.graph.revision,"FAILED",List.of(),latest.sections());
             diagnostics=new Diagnostics(latest,false,diagnostics.blockers(),Map.of(),diagnostics.trainNames(),diagnostics.coverage());
             if(plugin!=null)plugin.getLogger().log(java.util.logging.Level.SEVERE,"Shadow MA stopped; no ATP action. Retained occupancy not cleared.",ex);
             else throw new IllegalStateException("Shadow runtime failed",ex);

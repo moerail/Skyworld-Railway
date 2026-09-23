@@ -1,6 +1,16 @@
 # SkyRail Suite
 
-## 2.1.5 更新（2026-09-23）
+## 破坏性升级：STA v5
+
+配套版本为 STF **3.0.0**、STCS **3.0.0**、STA **1.0.0**、SkyPCC **1.0.0**。旧插件与 HTTP 接口不兼容；停服备份后整体替换已安装组件，刷新 PCC。STF 仍可独立使用，轨道图与占用账本必须保留。
+
+Message 与 Packet 独立编号：已分配影子 MA 为 **Message 1003 / Packet 1015**，遥测为 **Message 1136**；自定义列车删除、图定位、等待/未分配状态分别为 **2001 / 2002 / 2003**。删除不等于出清。这只是 SUBSET-026 概念编号的致敬，不是 ETCS 编码或标准符合性声明，也不代表 M3 完成或 FS 开放。[升级说明](doc/STA-V5-MIGRATION.md)。
+
+## 节点通过完整度诊断
+
+`/stcs integrity [列车名|UUID]` 需要 `stcs.admin`。显示车厢在各边的分布、推断的节点通过与缺失观测造成的不确定状态。停车没有占用过期时限。这是内存中的只读诊断，重启后重新建立基线，不证明车尾出清、不释放占用、不批准 MA，尚不是完整的虚拟计轴器。本地测试已通过，仍需实服验证。
+
+## 先前更新：STF 2.1.5（2026-09-23）
 
 影子曲线只读，不改变手柄或制动。默认 EoA 前 1 m 零速，最后 5 m 内最高 5 km/h，并连续降至零。使用 B7 参数和实际速度进行平坡模型估算；延迟补偿不再按理论最高速度扣距离。
 
@@ -67,10 +77,10 @@ SkyTrain Suite 把 Minecraft 作为可交互的铁路运行环境：玩家建设
 
 | 组件 | 当前版本 | 主要职责 |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.5` | 矿车编组、运动与过弯、驾驶权、牵引制动、车型、牌子、实体道岔执行、HMI 和声音 |
-| STCS | `2.2.1` | 基础设施、有向 RailGraph、线路里程、定位、保留占用账本、影子 MA/EoA 和局部道岔检查 |
-| SkyworldTrainAPI / STA | `0.8.1` | 插件间带版本的服务契约、遥测、成员观测、驾驶台状态、许可和事件交换 |
-| SkyPCC | `0.8.1` | 网页线路图、车辆/设施 Inspector、占用与预约显示、事件栏、经鉴权的道岔控制 |
+| SkyTrainFolia / STF | `3.0.0` | 矿车编组、运动与过弯、驾驶权、牵引制动、车型、牌子、实体道岔执行、HMI 和声音 |
+| STCS | `3.0.0` | 基础设施、有向 RailGraph、线路里程、定位、保留占用账本、影子 MA/EoA 和局部道岔检查 |
+| SkyworldTrainAPI / STA | `1.0.0` | 插件间带版本的服务契约、遥测、成员观测、驾驶台状态、许可和事件交换 |
+| SkyPCC | `1.0.0` | 网页线路图、车辆/设施 Inspector、占用与预约显示、事件栏、经鉴权的道岔控制 |
 
 ```text
 Minecraft 玩家 / 矿车 / 轨道 / 红石
@@ -121,10 +131,10 @@ Minecraft 玩家 / 矿车 / 轨道 / 红石
 从仓库 Releases 获取匹配的一组 JAR；本地构建输出位于 `artifacts/`。当前文件名：
 
 ```text
-SkyTrainFolia-2.1.5.jar
-STCS-2.2.1.jar
-SkyworldTrainAPI-0.8.1.jar
-SkyPCC-0.8.1.jar
+SkyTrainFolia-3.0.0.jar
+STCS-3.0.0.jar
+SkyworldTrainAPI-1.0.0.jar
+SkyPCC-1.0.0.jar
 ```
 
 STF/STCS 对 STA 使用软依赖，但完整套件应四者一起安装。PCC 硬依赖 STCS 和 STA。STF 单独运行不具备完整套件的图、MA 与调度显示能力。
@@ -718,21 +728,21 @@ STA 首先是同一服务器 JVM 内的 Java 服务接口，不是自动开放�
 
 | 数据/接口 | 主要生产方 | 主要消费方 | 说明 |
 | --- | --- | --- | --- |
-| v2 TELEMETRY_REPORT / 1001 | STF | STCS、订阅者 | 物理遥测 |
-| v2 TRACK_REPORT / 1002 | STCS | PCC、订阅者 | 与原遥测身份绑定的线路/图定位 |
-| v2 TRAIN_REMOVED / 1003 | 来源清理流程 | 注册/订阅者 | 不等于清除安全占用账本 |
-| v2 RailNetworkService | STCS | STF 等 | 图、导航、边位置、车站前视 |
+| v5 TELEMETRY_REPORT / 1136 | STF | STCS、订阅者 | 物理遥测 |
+| v5 TRACK_REPORT / 2002 | STCS | PCC、订阅者 | 与原遥测身份绑定的线路/图定位 |
+| v5 TRAIN_REMOVED / 2001 | 来源清理流程 | 注册/订阅者 | 不等于清除安全占用账本 |
+| v5 RailNetworkService | STCS | STF 等 | 图、导航、边位置、车站前视 |
 | v3 ConsistObservation | STF | STCS | 成员观测与生命周期 |
 | v3 RailwayEvent | STF、STCS | PCC、订阅者 | 运行/操作事件 |
-| v4 DriverDeskService | STF | STCS | 司机、驾驶权、ATP 模式 |
-| v4 ShadowAuthorityService | STCS | STF、PCC | 非可执行 MA/EoA 与区段状态 |
-| v4 SwitchControl | PCC 等发请求，STCS 检查、STF 执行 | 请求方 | 状态/版本/坐标检查与 PENDING |
+| v5 DriverDeskService | STF | STCS | 司机、驾驶权、ATP 模式 |
+| v5 ShadowAuthorityService | STCS | STF、PCC | 非可执行 MA/EoA 与区段状态 |
+| v5 SwitchControl | PCC 等发请求，STCS 检查、STF 执行 | 请求方 | 状态/版本/坐标检查与 PENDING |
 
-“有几种报文”要区分层次：v2 通用消息 kind 有三种，整套 API 还有独立服务、快照、事件和命令契约，不能都计入那三种。
+“有几种报文”要区分层次：v5 通用消息 kind 有三种，整套 API 还有独立服务、快照、事件和命令契约，不能都计入那三种。
 
-v2 消息头包含 version、kind、source、sessionId、sequence、emittedAt、trainId。质量值包括 VALID、UNLOCATED、STALE、EXPIRED、GRAPH_CHANGED、SOURCE_UNAVAILABLE、SCALE_MISMATCH，消费方不能忽略质量、会话和序号只取坐标。
+v5 消息头包含 version、kind、source、sessionId、sequence、emittedAt、trainId。质量值包括 VALID、UNLOCATED、STALE、EXPIRED、GRAPH_CHANGED、SOURCE_UNAVAILABLE、SCALE_MISMATCH，消费方不能忽略质量、会话和序号只取坐标。
 
-v4 影子快照带 `simulationOnly=true`、`executable=false`。许可含路径、EoA 边/偏移、剩余距离及来源观测身份；Section 可带 `fromMeters/toMeters`，同一边可以有多个区间。消费端不能将一个区间出现理解成整边占用。
+v5 影子快照带 `simulationOnly=true`、`executable=false`。许可含路径、EoA 边/偏移、剩余距离及来源观测身份；Section 可带 `fromMeters/toMeters`，同一边可以有多个区间。消费端不能将一个区间出现理解成整边占用。
 
 领车中心不是已证明的最前端，名义编组长度不是完整性证明；名义 20 TPS 速度也不是卡顿时的墙钟速度。当前契约参考 ETCS 思想，**不是 SUBSET-026 报文编码或互操作实现**。
 
@@ -740,14 +750,14 @@ v4 影子快照带 `simulationOnly=true`、`executable=false`。许可含路径�
 
 | 接口 | 内容 |
 | --- | --- |
-| `GET /api/v1/graph` | RailGraph |
-| `GET /api/v1/trains` | 列车显示快照 |
-| `GET /api/v2/messages` | 遥测消息快照 |
-| `GET /api/v3/railway-events` | 运行事件 |
-| `GET /api/v4/shadow-ma` | 影子许可与区段 |
-| `GET /api/v1/config` | 网页公开配置，不提供私密 token |
-| `GET /api/v1/events` | SSE 更新流 |
-| `POST /api/v4/switch` | 经鉴权的道岔操作 |
+| `GET /api/v5/graph` | RailGraph |
+| `GET /api/v5/trains` | 列车显示快照 |
+| `GET /api/v5/messages` | 遥测消息快照 |
+| `GET /api/v5/railway-events` | 运行事件 |
+| `GET /api/v5/shadow-ma` | 影子许可与区段 |
+| `GET /api/v5/config` | 网页公开配置，不提供私密 token |
+| `GET /api/v5/events` | SSE 更新流 |
+| `POST /api/v5/switch` | 经鉴权的道岔操作 |
 
 接口路径版本与 JAR 版本不是同一编号；不能把显示快照重放成正式行车许可。这里是接口概览，不是完整 SDK 或生成的字段规范。外部客户端在发送命令前，必须核验部署版本的实际字段和契约；特别是区段端点为空时保留旧整边语义，而显式端点限定空间区间。
 

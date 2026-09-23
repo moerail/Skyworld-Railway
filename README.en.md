@@ -1,6 +1,16 @@
 # SkyRail Suite
 
-## 2.1.5 Update (2026-09-23)
+## Breaking Release: STA v5
+
+Use STF **3.0.0**, STCS **3.0.0**, STA **1.0.0** and SkyPCC **1.0.0** together. Stop and back up the server, replace installed components together and refresh PCC; old binaries and HTTP routes are incompatible. STF still works standalone. Keep RailGraph and occupancy ledgers.
+
+Message and Packet are separate namespaces: allocated shadow MA uses **Message 1003 / Packet 1015**, telemetry **Message 1136**. Custom removal, graph report and inactive/waiting status use **2001 / 2002 / 2003** respectively. Removal is not occupancy clearance. These are conceptual SUBSET-026 numbering references, not ETCS encoding or compliance. M3 is not complete and FS remains disabled. [Migration details](doc/STA-V5-MIGRATION.md).
+
+## Node-Passage Diagnostics
+
+`/stcs integrity [train-name|uuid]` requires `stcs.admin`. It reports member distribution across edges and inferred node passages, including uncertainty when observations are missing. A stationary train has no occupancy-expiry timer. This read-only diagnostic is held in memory and resets on restart; it neither proves tail clearance nor releases occupancy or grants MA. It is not a completed virtual axle counter. Local tests passed; live-server validation is still required.
+
+## Earlier Update: STF 2.1.5 (2026-09-23)
 
 Read-only shadow curves do not change handles or brakes. Defaults: stop 1 m before EoA; at most 5 km/h within the final 5 m, continuously decreasing to zero. This level-track estimate uses B7 parameters and measured speed, not the theoretical speed ceiling for telemetry-age compensation.
 
@@ -50,10 +60,10 @@ The project introduces explicit driving control, resource occupancy, conflicting
 
 | Component | Version | Responsibility |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.5` | Consists, movement and cornering, driving control, traction/braking, vehicle profiles, signs, physical turnout actuation, HMI and sounds |
-| STCS | `2.2.1` | Infrastructure, directed RailGraph, line mileage, localisation, retained occupancy ledger, shadow MA/EoA and local turnout checks |
-| SkyworldTrainAPI / STA | `0.8.1` | Versioned inter-plugin contracts, telemetry, member observations, cab state, authorities and events |
-| SkyPCC | `0.8.1` | Web track diagram, train/infrastructure inspector, occupancy/reservations, event log and authenticated turnout control |
+| SkyTrainFolia / STF | `3.0.0` | Consists, movement and cornering, driving control, traction/braking, vehicle profiles, signs, physical turnout actuation, HMI and sounds |
+| STCS | `3.0.0` | Infrastructure, directed RailGraph, line mileage, localisation, retained occupancy ledger, shadow MA/EoA and local turnout checks |
+| SkyworldTrainAPI / STA | `1.0.0` | Versioned inter-plugin contracts, telemetry, member observations, cab state, authorities and events |
+| SkyPCC | `1.0.0` | Web track diagram, train/infrastructure inspector, occupancy/reservations, event log and authenticated turnout control |
 
 ```text
 Minecraft players / minecarts / rails / redstone
@@ -104,10 +114,10 @@ This illustrates responsibilities, not a mandatory serial call chain. Browser in
 Current installation files:
 
 ```text
-SkyTrainFolia-2.1.5.jar
-STCS-2.2.1.jar
-SkyworldTrainAPI-0.8.1.jar
-SkyPCC-0.8.1.jar
+SkyTrainFolia-3.0.0.jar
+STCS-3.0.0.jar
+SkyworldTrainAPI-1.0.0.jar
+SkyPCC-1.0.0.jar
 ```
 
 STF/STCS declare STA as a soft dependency, but install all four for the complete suite. PCC requires STCS and STA. Standalone STF does not provide the complete graph, authority and dispatching functionality.
@@ -693,21 +703,21 @@ STA primarily exposes Java services inside the server JVM. It is not an automati
 
 | Contract/data | Main producer | Main consumer | Meaning |
 | --- | --- | --- | --- |
-| v2 TELEMETRY_REPORT / 1001 | STF | STCS/subscribers | Physical telemetry |
-| v2 TRACK_REPORT / 1002 | STCS | PCC/subscribers | Graph localisation bound to the original observation |
-| v2 TRAIN_REMOVED / 1003 | Source cleanup | Registries/subscribers | Not permission to clear retained occupancy |
-| v2 RailNetworkService | STCS | STF/others | Graph, navigation, edge position, station look-ahead |
+| v5 TELEMETRY_REPORT / 1136 | STF | STCS/subscribers | Physical telemetry |
+| v5 TRACK_REPORT / 2002 | STCS | PCC/subscribers | Graph localisation bound to the original observation |
+| v5 TRAIN_REMOVED / 2001 | Source cleanup | Registries/subscribers | Not permission to clear retained occupancy |
+| v5 RailNetworkService | STCS | STF/others | Graph, navigation, edge position, station look-ahead |
 | v3 ConsistObservation | STF | STCS | Member observations/lifecycle |
 | v3 RailwayEvent | STF/STCS | PCC/subscribers | Operational events |
-| v4 DriverDeskService | STF | STCS | Driver, control lease, ATP mode |
-| v4 ShadowAuthorityService | STCS | STF/PCC | Non-executable MA/EoA and sections |
-| v4 SwitchControl | Caller such as PCC; checked by STCS, actuated by STF | Caller | Version/state/location checks and PENDING |
+| v5 DriverDeskService | STF | STCS | Driver, control lease, ATP mode |
+| v5 ShadowAuthorityService | STCS | STF/PCC | Non-executable MA/EoA and sections |
+| v5 SwitchControl | Caller such as PCC; checked by STCS, actuated by STF | Caller | Version/state/location checks and PENDING |
 
-There are three generic v2 message kinds, but the whole API also contains separate snapshots, events and services. These are not all instances of those three messages.
+There are three generic v5 message kinds, but the whole API also contains separate snapshots, events and services. These are not all instances of those three messages.
 
-v2 headers include version, kind, source, sessionId, sequence, emittedAt and trainId. Quality states include VALID, UNLOCATED, STALE, EXPIRED, GRAPH_CHANGED, SOURCE_UNAVAILABLE and SCALE_MISMATCH. Consumers must not use coordinates while ignoring identity, ordering or quality.
+v5 headers include version, kind, source, sessionId, sequence, emittedAt and trainId. Quality states include VALID, UNLOCATED, STALE, EXPIRED, GRAPH_CHANGED, SOURCE_UNAVAILABLE and SCALE_MISMATCH. Consumers must not use coordinates while ignoring identity, ordering or quality.
 
-v4 shadow snapshots carry `simulationOnly=true` and `executable=false`. Authority data includes path, EoA edge/offset, remaining distance and observation provenance. Sections may include `fromMeters/toMeters`; several intervals may occur on the same edge. One interval must not be rendered/interpreted as whole-edge occupancy.
+v5 shadow snapshots carry `simulationOnly=true` and `executable=false`. Authority data includes path, EoA edge/offset, remaining distance and observation provenance. Sections may include `fromMeters/toMeters`; several intervals may occur on the same edge. One interval must not be rendered/interpreted as whole-edge occupancy.
 
 The leader's centre is not a proven train-front position, nominal consist length is not integrity proof, and nominal 20 TPS speed is not wall-clock speed during lag. These are project contracts inspired by ETCS, **not SUBSET-026 wire messages or interoperability**.
 
@@ -715,14 +725,14 @@ The leader's centre is not a proven train-front position, nominal consist length
 
 | Endpoint | Content |
 | --- | --- |
-| `GET /api/v1/graph` | RailGraph |
-| `GET /api/v1/trains` | Train display snapshot |
-| `GET /api/v2/messages` | Telemetry snapshot |
-| `GET /api/v3/railway-events` | Events |
-| `GET /api/v4/shadow-ma` | Shadow authorities/sections |
-| `GET /api/v1/config` | Public web settings, not the control token |
-| `GET /api/v1/events` | SSE |
-| `POST /api/v4/switch` | Authenticated turnout control |
+| `GET /api/v5/graph` | RailGraph |
+| `GET /api/v5/trains` | Train display snapshot |
+| `GET /api/v5/messages` | Telemetry snapshot |
+| `GET /api/v5/railway-events` | Events |
+| `GET /api/v5/shadow-ma` | Shadow authorities/sections |
+| `GET /api/v5/config` | Public web settings, not the control token |
+| `GET /api/v5/events` | SSE |
+| `POST /api/v5/switch` | Authenticated turnout control |
 
 Endpoint versions and JAR versions differ. Do not replay display snapshots as executable authorities. This is an interface overview, not a complete generated SDK/schema reference; an external client must validate the exact payload shapes and contracts of the deployed build before sending commands. In particular, nullable section endpoints retain legacy whole-edge meaning, whereas explicit endpoints delimit an interval.
 

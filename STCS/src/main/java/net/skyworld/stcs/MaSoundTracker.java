@@ -1,7 +1,7 @@
 package net.skyworld.stcs;
 
 import java.util.*;
-import net.skyworld.sta.api.v4.ShadowAuthorityService.Authority;
+import net.skyworld.sta.api.v5.ShadowAuthorityService.Authority;
 
 /** Notification heuristic only; never supplies control or reservation decisions. */
 final class MaSoundTracker {

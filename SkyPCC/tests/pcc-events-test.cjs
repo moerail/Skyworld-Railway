@@ -26,7 +26,7 @@ let rows = [
   { sequence: 2, type: 'DRIVER_UNAVAILABLE', reason: 'DISCONNECTED', driverName: 'Saionji_Rin' },
   { sequence: 3, type: 'DRIVER_RELEASED', reason: 'EXPLICIT_RELEASE', driverName: '<img src=x onerror=window.xss=1>' }
 ];
-const payload = () => ({ schemaVersion: 1, serverTimeMillis: Date.now(), graphRevision: 1, serviceStatus: 'AVAILABLE',
+const payload = () => ({ schemaVersion:5, serverTimeMillis: Date.now(), graphRevision: 1, serviceStatus: 'AVAILABLE',
   trains: awaitingPosition ? [{ trainId: tid, name: 'test1', quality: 'AWAITING_POSITION',
     stale: true, graphCurrent: false, mode: 'unknown', memberCount: 3 }] : [{ trainId: tid, name: 'test1', line: 'A', edgeId: 'e1', edgeOffsetMeters: offset,
     edgeLengthMeters: 100, graphCurrent: true, stale, moving: false, speedMetersPerSecond: 0,
@@ -35,15 +35,15 @@ const payload = () => ({ schemaVersion: 1, serverTimeMillis: Date.now(), graphRe
     events: rows.map(e => ({ session: epoch, emittedAtMillis: Date.now() - 5000, source: 'STF', trainId: tid, trainName: 'test1', ...e })) }
 });
 const server = http.createServer((req, res) => {
-  if (req.url === '/api/v1/events') {
+  if (req.url === '/api/v5/events') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' });
     const send = () => res.write(`event: snapshot\ndata: ${JSON.stringify(payload())}\n\n`);
     send(); const timer = setInterval(send, 150); req.on('close', () => clearInterval(timer)); return;
   }
   let json;
-  if (req.url === '/api/v1/config') json = { updateMode: mode, pollIntervalMillis: 150 };
-  if (req.url === '/api/v1/graph') json = graph;
-  if (req.url === '/api/v1/trains') json = payload();
+  if (req.url === '/api/v5/config') json = { updateMode: mode, pollIntervalMillis: 150 };
+  if (req.url === '/api/v5/graph') json = graph;
+  if (req.url === '/api/v5/trains') json = payload();
   if (json) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(json)); return; }
   const file = ({ '/': 'index.html', '/assets/app.js': 'app.js', '/assets/styles.css': 'styles.css',
     '/assets/day_logo.png': 'day_logo.png', '/assets/night_logo.png': 'night_logo.png' })[req.url];

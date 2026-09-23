@@ -3,7 +3,7 @@ package net.skyworld.skypcc;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
-import net.skyworld.sta.api.v4.SwitchControlService;
+import net.skyworld.sta.api.v5.SwitchControlService;
 
 /** Bounded idempotent jobs. HTTP threads only enqueue; the service runs on the async scheduler. */
 final class SwitchGateway {

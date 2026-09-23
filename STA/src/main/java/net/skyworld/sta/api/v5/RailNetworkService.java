@@ -1,9 +1,9 @@
-package net.skyworld.sta.api.v2;
+package net.skyworld.sta.api.v5;
 
 import net.skyworld.sta.api.v1.TrackPositionSnapshot;
 
 /** Read-only STCS topology/navigation service; no Bukkit objects cross the boundary.
- * Graph JSON keeps its existing schemaVersion=3; this is distinct from STA protocol v2. */
+ * Graph JSON keeps its existing schemaVersion=3; this is distinct from STA protocol v5. */
 public interface RailNetworkService {
     record RailQuery(String world, int railX, int railY, int railZ,
             double directionX, double directionY, double directionZ) {

@@ -105,7 +105,7 @@
   async function loadGraph(force = false) {
     if (!force && Date.now() - state.lastGraphCheck < 2000) return;
     state.lastGraphCheck = Date.now();
-    const graph = await fetchJson('/api/v1/graph');
+    const graph = await fetchJson('/api/v5/graph');
     if (!graph || !Array.isArray(graph.edges)) return;
     const sameTopology = !force && state.graph && state.graph.revision === graph.revision;
     state.graph = graph;
@@ -417,6 +417,9 @@
   }
 
   function updateTrainSamples(snapshot) {
+    if (snapshot.schemaVersion !== 5) {
+      snapshot = { schemaVersion: 5, serviceStatus: 'UNAVAILABLE', trains: [], shadowMa: null };
+    }
     shadowMa = snapshot.shadowMa || null;
     updateOperations(snapshot.operationalEvents);
     state.serviceStatus = snapshot.serviceStatus || 'AVAILABLE';
@@ -803,7 +806,7 @@
     const generation = pollGeneration;
     const cycle = async () => {
       try {
-        const snapshot = await fetchJson('/api/v1/trains');
+        const snapshot = await fetchJson('/api/v5/trains');
         updateTrainSamples(snapshot);
         await loadGraph(false);
         showConnected(state.updateMode === 'poll' ? 'Live / Poll' : 'Live / Poll fallback');
@@ -833,7 +836,7 @@
 
   function connectSse() {
     closeEventSource();
-    const source = new EventSource('/api/v1/events');
+    const source = new EventSource('/api/v5/events');
     eventSource = source;
     source.addEventListener('open', () => {
       if (eventSource !== source) return;
@@ -864,7 +867,7 @@
 
   async function startDataTransport() {
     try {
-      const config = await fetchJson('/api/v1/config');
+      const config = await fetchJson('/api/v5/config');
       state.updateMode = ['auto', 'sse', 'poll'].includes(config.updateMode)
         ? config.updateMode : 'auto';
       state.controlEnabled = config.controlEnabled === true;
@@ -936,7 +939,11 @@
 
   function liveAuthority() {
     const age = Date.now() + state.clockOffset - Number(shadowMa?.emittedAtMillis || 0);
-    return shadowMa?.version === 4 && shadowMa.simulationOnly === true && shadowMa.executable === false
+    return shadowMa?.version === 5 && Array.isArray(shadowMa.authorities)
+      && shadowMa.authorities.every(a => a.state === 'ALLOCATED_SHADOW'
+        ? a.NID_MESSAGE === 1003 && a.NID_PACKET === 1015
+        : a.NID_MESSAGE === 2003 && a.NID_PACKET == null)
+      && shadowMa.simulationOnly === true && shadowMa.executable === false
       && shadowMa.status === 'SHADOW' && shadowMa.graphRevision === state.graph?.revision
       && age >= 0 && age <= 1500 ? shadowMa : null;
   }
@@ -1034,7 +1041,7 @@
     try {
       const deadline = Date.now() + 50000;
       while (Date.now() < deadline) {
-        const response = await fetch('/api/v4/switch', { method: 'POST', cache: 'no-store',
+        const response = await fetch('/api/v5/switch', { method: 'POST', cache: 'no-store',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify(request), signal: AbortSignal.timeout(6000) });
         const result = await response.json();

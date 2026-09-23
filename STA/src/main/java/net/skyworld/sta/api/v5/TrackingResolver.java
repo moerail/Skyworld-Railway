@@ -1,4 +1,4 @@
-package net.skyworld.sta.api.v2;
+package net.skyworld.sta.api.v5;
 
 import java.util.*;
 import net.skyworld.sta.api.v1.TrackPositionSnapshot;
@@ -71,13 +71,13 @@ public final class TrackingResolver {
                     position.line(), position.mileageMeters(), s.observedAtMillis(), quality == StaMessage.Quality.VALID, false);
             var track = new StaMessage.Tracking(m.header().sessionId(), m.header().sequence(), e.getValue().receivedAt(),
                     now, staleAfter, expireAfter, rev, quality, position, quality == StaMessage.Quality.VALID ? "" : quality.name());
-            result.add(new StaMessage(new StaMessage.Header(2, StaMessage.Kind.TRACK_REPORT, StaMessage.Source.STCS,
+            result.add(new StaMessage(new StaMessage.Header(StaMessage.VERSION, StaMessage.Kind.TRACK_REPORT, StaMessage.Source.STCS,
                     session, ++sequence, now, e.getKey()), p, track));
         }
         return result;
     }
     private StaMessage removal(UUID id, long now) {
-        return new StaMessage(new StaMessage.Header(2, StaMessage.Kind.TRAIN_REMOVED, StaMessage.Source.STCS,
+        return new StaMessage(new StaMessage.Header(StaMessage.VERSION, StaMessage.Kind.TRAIN_REMOVED, StaMessage.Source.STCS,
                 session, ++sequence, now, id), null, null);
     }
 }

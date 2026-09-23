@@ -1,5 +1,15 @@
 # Migration Validation: 2026-09-14
 
+## 2026-09-23 STA v5 Breaking Release
+
+- Rebuilt STF 3.0.0, STCS 3.0.0, STA 1.0.0 and SkyPCC 1.0.0: 63 Java test entry points passed.
+- Protocol tests verify MA 1003/1015, telemetry 1136, removal 2001, graph report 2002, rejection of old versions and refusal to decode old removal 1003 as a telemetry message.
+- Standalone STF classloading/reflection and with-STA adapter tests passed.
+- PCC edge-line and 265-key four-language tests passed; Edge browser test passed four languages, desktop/mobile, follow/selection, persistence and pending switch control.
+- Shadow PCC browser regression passed MA colouring/EoA, invalid message ID rejection, old snapshot rejection, recovery, stale expiry, turnout confirmation and desktop/mobile themes. Updated its fixture to serve i18n assets and use the infrastructure inspector control.
+- No deployment or real-server mixed-version/startup validation performed. Deprecation/native-access warnings remain from the existing server API/dependencies.
+- Persistent RailGraph/occupancy formats are unchanged. Live M3/FS protection is not enabled by this release.
+
 ## Passed
 
 ### 2026-09-23 Follow-up (STF 2.1.5)

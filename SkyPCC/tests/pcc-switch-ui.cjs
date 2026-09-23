@@ -26,10 +26,10 @@ const graph = { revision: 12, nodes, edges: [0, 1].map(i => ({ id: `edge${i}`, f
       await page.route('**/*', async route => {
         const url = new URL(route.request().url());
         const json = data => route.fulfill({ contentType: 'application/json', body: JSON.stringify(data) });
-        if (url.pathname === '/api/v1/graph') return json(graph);
-        if (url.pathname === '/api/v1/config') return json({ updateMode: 'poll', pollIntervalMillis: 1000, controlEnabled: true });
-        if (url.pathname === '/api/v1/trains') return json({ trains: [], emittedAtMillis: Date.now() });
-        if (url.pathname === '/api/v4/switch') {
+        if (url.pathname === '/api/v5/graph') return json(graph);
+        if (url.pathname === '/api/v5/config') return json({ updateMode: 'poll', pollIntervalMillis: 1000, controlEnabled: true });
+        if (url.pathname === '/api/v5/trains') return json({ trains: [], emittedAtMillis: Date.now() });
+        if (url.pathname === '/api/v5/switch') {
           const request = route.request().postDataJSON(); requests.push(request);
           assert.deepEqual(request.position, nodes[1].rail);
           assert.equal(request.graphRevision, 12);

@@ -32,7 +32,23 @@ Minecraft 既是实际运行环境，也是可交互的铁路系统实验环境�
 
 Minecraft is both the live operating environment and an interactive railway-system test environment: users can build track, run trains and observe how points, occupancy, resource reservations and control information interact. The project also aims to make these relationships accessible to railway students and enthusiasts. That educational use is an exploration, not an established teaching platform or a validated railway simulator.
 
-## 2.1.5 更新 / Update
+## 破坏性协议升级 / Breaking Protocol Upgrade
+
+本批版本为 **STF 3.0.0 / STCS 3.0.0 / STA 1.0.0 / SkyPCC 1.0.0**。统一采用 STA v5 与 PCC `/api/v5/`，不兼容旧版组合；停服、备份后一起替换所安装的组件，网页强制刷新。STF 仍可独立安装。保留 RailGraph 与占用账本，不应删除数据来升级。
+
+This release uses **STF 3.0.0 / STCS 3.0.0 / STA 1.0.0 / SkyPCC 1.0.0**, STA v5 and PCC `/api/v5/`. Mixed old/new installations are unsupported. Stop and back up the server, replace installed components together, then hard-refresh the browser. STF remains standalone-capable. Keep the RailGraph and occupancy ledgers.
+
+编号彩蛋区分 Message 与 Packet：影子 MA 为 **Message 1003 / Packet 1015**，列车遥测为 **Message 1136**。自定义列车删除为 **Message 2001**，不代表占用出清；图定位与等待/未分配状态分别为 **Message 2002 / 2003**。仅借用 SUBSET-026 部分编号加 1000 的概念，不是 ETCS 报文编码或标准符合性声明。此次整理为 M3 开发准备接口，不代表 M3 或 FS 已完成。
+
+The numbering homage keeps Message and Packet namespaces separate: shadow MA is **Message 1003 / Packet 1015**, and train telemetry is **Message 1136**. Custom train removal is **Message 2001**, never occupancy clearance; graph reports and waiting/inactive authority status use **Message 2002 / 2003**. Selected SUBSET-026 identifiers plus 1000 are conceptual references only, not ETCS wire encoding or compliance. This prepares interfaces for M3; it does not complete M3 or enable FS.
+
+[编号、升级与安全边界 / Numbering, migration and boundaries](doc/STA-V5-MIGRATION.md)
+
+## 影子曲线 / Shadow Curves
+
+STCS 新增管理员只读指令 `/stcs integrity [列车名|UUID]`（权限 `stcs.admin`），显示成员跨边分布和推断的节点通过。它不是完整计轴器，不释放占用；停车不会使占用超时消失，内存诊断重启后重新建立基线，持久化账本保持不变。仍需实服验证。
+
+STCS adds the read-only admin command `/stcs integrity [train-name|uuid]` (`stcs.admin`) for member distribution and inferred node passages. It is not a completed axle counter and never clears occupancy. Parking does not expire occupancy; restarting resets the in-memory diagnostic baseline, not the persistent ledger. Live-server validation remains necessary.
 
 STF 现已提供只读影子速度曲线、司机接近限速提示音及中英法日 HMI。限速显示在计分板第二行和 BossBar；低速遥测补偿不再使用理论最高速度。Python 测试台新增只读账本诊断。**仍无 ATP 自动制动，不能直接启用 FS。**
 
@@ -44,10 +60,10 @@ STF now provides read-only shadow speed curves, driver near-limit audio and four
 
 | 插件 / Plugin | 版本 / Version | 职责 / Responsibility |
 | --- | --- | --- |
-| [SkyTrainFolia (STF)](SkyTrainFolia/) | 2.1.5 | 列车运动、编组、驾驶控制、车型、牌子、实体道岔执行与驾驶室 HMI。<br>Train motion, consists, driving control, vehicle profiles, signs, physical point actuation and cab HMI. |
-| [Skyworld Train Control System (STCS)](STCS/) | 2.2.1 | RailGraph、线路归属、定位、保留占用与实验性影子 MA/EoA 分配。<br>RailGraph, line attribution, localisation, retained occupancy and experimental shadow MA/EoA allocation. |
-| [SkyworldTrainAPI (STA)](STA/) | 0.8.1 | 插件之间的版本化进程内服务契约、遥测与行车事件。<br>Versioned in-process service contracts, telemetry and railway events between plugins. |
-| [SkyPCC](SkyPCC/) | 0.8.1 | HTTP/SSE 调度显示、基础设施详情、事件日志与经过身份验证的道岔操作请求。<br>HTTP/SSE dispatch display, infrastructure inspectors, event log and authenticated turnout requests. |
+| [SkyTrainFolia (STF)](SkyTrainFolia/) | 3.0.0 | 列车运动、编组、驾驶控制、车型、牌子、实体道岔执行与驾驶室 HMI。<br>Train motion, consists, driving control, vehicle profiles, signs, physical point actuation and cab HMI. |
+| [Skyworld Train Control System (STCS)](STCS/) | 3.0.0 | RailGraph、线路归属、定位、保留占用与实验性影子 MA/EoA 分配。<br>RailGraph, line attribution, localisation, retained occupancy and experimental shadow MA/EoA allocation. |
+| [SkyworldTrainAPI (STA)](STA/) | 1.0.0 | 插件之间的版本化进程内服务契约、遥测与行车事件。<br>Versioned in-process service contracts, telemetry and railway events between plugins. |
+| [SkyPCC](SkyPCC/) | 1.0.0 | HTTP/SSE 调度显示、基础设施详情、事件日志与经过身份验证的道岔操作请求。<br>HTTP/SSE dispatch display, infrastructure inspectors, event log and authenticated turnout requests. |
 
 [shared/](shared/) 包含编译进各插件的共通指令、帮助与版本界面代码，并非第五个运行时插件。STA 是进程内 Java API，而不是通用的 Python 网络协议。
 

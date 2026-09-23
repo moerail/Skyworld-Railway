@@ -1,6 +1,16 @@
 # SkyRail Suite
 
-## Mise à jour 2.1.5 (2026-09-23)
+## Mise à jour incompatible : STA v5
+
+Utiliser ensemble STF **3.0.0**, STCS **3.0.0**, STA **1.0.0** et SkyPCC **1.0.0**. Arrêter le serveur, sauvegarder, remplacer tous les composants installés et actualiser PCC. Les anciennes extensions et routes HTTP sont incompatibles. STF reste utilisable seul ; conserver RailGraph et les registres d’occupation.
+
+Message et Packet ont des espaces de numérotation distincts : MA fantôme attribuée **Message 1003 / Packet 1015**, télémétrie **Message 1136**. Les messages privés de suppression, localisation et attente/inactivité utilisent **2001 / 2002 / 2003**. Une suppression ne prouve pas la libération de la voie. Il s’agit d’un clin d’œil conceptuel à SUBSET-026, sans encodage ETCS ni conformité revendiquée. M3 n’est pas achevé et FS reste désactivé. [Migration](doc/STA-V5-MIGRATION.md).
+
+## Diagnostic des passages aux nœuds
+
+`/stcs integrity [nom-du-train|uuid]` nécessite `stcs.admin`. La commande montre la répartition des véhicules entre arêtes, les passages déduits et les incertitudes liées aux observations manquantes. Un arrêt ne fait pas expirer l’occupation. Ce diagnostic en lecture seule reste en mémoire et repart d’une nouvelle référence après redémarrage ; il ne prouve pas le dégagement de la queue du train, ne libère pas l’occupation et n’accorde pas de MA. Ce n’est pas un compteur d’essieux virtuel achevé. Les tests locaux ont réussi ; la validation sur serveur reste nécessaire.
+
+## Mise à jour antérieure : STF 2.1.5 (2026-09-23)
 
 Les courbes en mode ombre ne commandent ni traction ni freinage. Par défaut : arrêt 1 m avant EoA, au plus 5 km/h dans les derniers 5 m, puis diminution continue à zéro. Le modèle en palier utilise les paramètres B7 et les vitesses mesurées, sans compenser l’âge des données par la vitesse maximale théorique.
 
@@ -50,10 +60,10 @@ Le projet introduit la prise de conduite explicite, l’occupation des ressource
 
 | Composant | Version | Fonction principale |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.5` | Rames, mouvement et inscription en courbe, prise de conduite, traction/freinage, profils de véhicule, panneaux, manœuvre physique des appareils de voie, IHM et sons |
-| STCS | `2.2.1` | Infrastructure, RailGraph orienté, point kilométrique, localisation, registre d’occupation conservé, MA/EoA fantômes et contrôles locaux des appareils de voie |
-| SkyworldTrainAPI / STA | `0.8.1` | Contrats inter-greffons versionnés, télémétrie, observations des véhicules, état du pupitre, autorisations et événements |
-| SkyPCC | `0.8.1` | Tableau de contrôle optique Web, inspecteur des trains/infrastructures, occupations/réservations, journal d’événements et commande authentifiée des appareils de voie |
+| SkyTrainFolia / STF | `3.0.0` | Rames, mouvement et inscription en courbe, prise de conduite, traction/freinage, profils de véhicule, panneaux, manœuvre physique des appareils de voie, IHM et sons |
+| STCS | `3.0.0` | Infrastructure, RailGraph orienté, point kilométrique, localisation, registre d’occupation conservé, MA/EoA fantômes et contrôles locaux des appareils de voie |
+| SkyworldTrainAPI / STA | `1.0.0` | Contrats inter-greffons versionnés, télémétrie, observations des véhicules, état du pupitre, autorisations et événements |
+| SkyPCC | `1.0.0` | Tableau de contrôle optique Web, inspecteur des trains/infrastructures, occupations/réservations, journal d’événements et commande authentifiée des appareils de voie |
 
 ```text
 Joueurs Minecraft / wagonnets / rails / redstone
@@ -104,10 +114,10 @@ Ce schéma illustre les responsabilités, et non une chaîne d’appels série o
 Fichiers d’installation actuels :
 
 ```text
-SkyTrainFolia-2.1.5.jar
-STCS-2.2.1.jar
-SkyworldTrainAPI-0.8.1.jar
-SkyPCC-0.8.1.jar
+SkyTrainFolia-3.0.0.jar
+STCS-3.0.0.jar
+SkyworldTrainAPI-1.0.0.jar
+SkyPCC-1.0.0.jar
 ```
 
 STF/STCS déclarent STA comme dépendance facultative, mais installez les quatre éléments pour disposer de la suite complète. PCC requiert STCS et STA. STF seul ne fournit pas toutes les fonctions de graphe, d’autorisation et de régulation.
@@ -693,21 +703,21 @@ STA expose principalement des services Java dans la JVM du serveur. Ce n’est p
 
 | Contrat/donnée | Producteur principal | Consommateur principal | Signification |
 | --- | --- | --- | --- |
-| v2 TELEMETRY_REPORT / 1001 | STF | STCS/abonnés | Télémétrie physique |
-| v2 TRACK_REPORT / 1002 | STCS | PCC/abonnés | Localisation sur le graphe liée à l’observation d’origine |
-| v2 TRAIN_REMOVED / 1003 | Nettoyage de la source | Registres/abonnés | N’autorise pas l’effacement de l’occupation conservée |
-| v2 RailNetworkService | STCS | STF/autres | Graphe, navigation, position sur arête, anticipation des gares |
+| v5 TELEMETRY_REPORT / 1136 | STF | STCS/abonnés | Télémétrie physique |
+| v5 TRACK_REPORT / 2002 | STCS | PCC/abonnés | Localisation sur le graphe liée à l’observation d’origine |
+| v5 TRAIN_REMOVED / 2001 | Nettoyage de la source | Registres/abonnés | N’autorise pas l’effacement de l’occupation conservée |
+| v5 RailNetworkService | STCS | STF/autres | Graphe, navigation, position sur arête, anticipation des gares |
 | v3 ConsistObservation | STF | STCS | Observations/cycle de vie des véhicules de la rame |
 | v3 RailwayEvent | STF/STCS | PCC/abonnés | Événements d’exploitation |
-| v4 DriverDeskService | STF | STCS | Conducteur, prise de conduite, mode ATP |
-| v4 ShadowAuthorityService | STCS | STF/PCC | MA/EoA et sections non exécutables |
-| v4 SwitchControl | Appelant tel que PCC ; contrôlé par STCS, actionné par STF | Appelant | Contrôles de version/état/position et PENDING |
+| v5 DriverDeskService | STF | STCS | Conducteur, prise de conduite, mode ATP |
+| v5 ShadowAuthorityService | STCS | STF/PCC | MA/EoA et sections non exécutables |
+| v5 SwitchControl | Appelant tel que PCC ; contrôlé par STCS, actionné par STF | Appelant | Contrôles de version/état/position et PENDING |
 
-Il existe trois types de messages génériques v2, mais l’API complète comprend aussi des instantanés, événements et services distincts. Ils ne sont pas tous des instances de ces trois messages.
+Il existe trois types de messages génériques v5, mais l’API complète comprend aussi des instantanés, événements et services distincts. Ils ne sont pas tous des instances de ces trois messages.
 
-Les en-têtes v2 comprennent version, kind, source, sessionId, sequence, emittedAt et trainId. Les états de qualité comprennent VALID, UNLOCATED, STALE, EXPIRED, GRAPH_CHANGED, SOURCE_UNAVAILABLE et SCALE_MISMATCH. Les consommateurs ne doivent pas employer les coordonnées en ignorant l’identité, l’ordre ou la qualité.
+Les en-têtes v5 comprennent version, kind, source, sessionId, sequence, emittedAt et trainId. Les états de qualité comprennent VALID, UNLOCATED, STALE, EXPIRED, GRAPH_CHANGED, SOURCE_UNAVAILABLE et SCALE_MISMATCH. Les consommateurs ne doivent pas employer les coordonnées en ignorant l’identité, l’ordre ou la qualité.
 
-Les instantanés fantômes v4 portent `simulationOnly=true` et `executable=false`. Les données d’autorisation comprennent le chemin, l’arête/décalage EoA, la distance restante et la provenance de l’observation. Les sections peuvent comprendre `fromMeters/toMeters` ; plusieurs intervalles peuvent se trouver sur la même arête. Un intervalle ne doit pas être affiché ou interprété comme l’occupation de toute l’arête.
+Les instantanés fantômes v5 portent `simulationOnly=true` et `executable=false`. Les données d’autorisation comprennent le chemin, l’arête/décalage EoA, la distance restante et la provenance de l’observation. Les sections peuvent comprendre `fromMeters/toMeters` ; plusieurs intervalles peuvent se trouver sur la même arête. Un intervalle ne doit pas être affiché ou interprété comme l’occupation de toute l’arête.
 
 Le centre du véhicule de tête n’est pas une position prouvée de l’avant du train, la longueur nominale de la rame ne prouve pas l’intégrité, et la vitesse nominale à 20 TPS n’est pas une vitesse en temps réel en cas de latence. Ces contrats sont inspirés de l’ETCS, mais **ne sont ni des messages filaires SUBSET-026 ni une interopérabilité**.
 
@@ -715,14 +725,14 @@ Le centre du véhicule de tête n’est pas une position prouvée de l’avant d
 
 | Point d’accès | Contenu |
 | --- | --- |
-| `GET /api/v1/graph` | RailGraph |
-| `GET /api/v1/trains` | Instantané d’affichage des trains |
-| `GET /api/v2/messages` | Instantané de télémétrie |
-| `GET /api/v3/railway-events` | Événements |
-| `GET /api/v4/shadow-ma` | Autorisations/sections fantômes |
-| `GET /api/v1/config` | Réglages Web publics, pas le jeton de commande |
-| `GET /api/v1/events` | SSE |
-| `POST /api/v4/switch` | Commande authentifiée d’appareil de voie |
+| `GET /api/v5/graph` | RailGraph |
+| `GET /api/v5/trains` | Instantané d’affichage des trains |
+| `GET /api/v5/messages` | Instantané de télémétrie |
+| `GET /api/v5/railway-events` | Événements |
+| `GET /api/v5/shadow-ma` | Autorisations/sections fantômes |
+| `GET /api/v5/config` | Réglages Web publics, pas le jeton de commande |
+| `GET /api/v5/events` | SSE |
+| `POST /api/v5/switch` | Commande authentifiée d’appareil de voie |
 
 Les versions des points d’accès et des JAR diffèrent. Ne rejouez pas des instantanés d’affichage comme autorisations exécutables. Il s’agit d’un aperçu de l’interface, pas d’une référence complète de SDK/schéma généré ; un client externe doit valider les formes exactes des charges utiles et les contrats de la version déployée avant d’envoyer des commandes. En particulier, les extrémités de section nulles conservent l’ancien sens « arête entière », tandis que les extrémités explicites délimitent un intervalle.
 

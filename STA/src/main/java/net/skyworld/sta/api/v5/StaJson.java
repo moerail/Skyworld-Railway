@@ -1,4 +1,4 @@
-package net.skyworld.sta.api.v2;
+package net.skyworld.sta.api.v5;
 
 import com.google.gson.*;
 import java.util.*;
@@ -19,14 +19,14 @@ public final class StaJson {
         JsonArray packets = new JsonArray();
         if (m.physical() != null) {
             JsonObject p = GSON.toJsonTree(m.physical()).getAsJsonObject();
-            p.addProperty("NID_PACKET", 2001); p.addProperty("Q_REQUIRED", true);
+            p.addProperty("NID_PACKET", StaTypes.Packet.PHYSICAL_OBSERVATION); p.addProperty("Q_REQUIRED", true);
             p.addProperty("positionReference", "ACTIVE_LEADER_CART_CENTRE");
             p.addProperty("lengthQuality", "NOMINAL_CENTRE_SPAN");
             p.addProperty("speedTimebase", "NOMINAL_20_TPS"); packets.add(p);
         }
         if (m.tracking() != null) {
             JsonObject p = GSON.toJsonTree(m.tracking()).getAsJsonObject();
-            p.addProperty("NID_PACKET", 2002); p.addProperty("Q_REQUIRED", true); packets.add(p);
+            p.addProperty("NID_PACKET", StaTypes.Packet.GRAPH_POSITION); p.addProperty("Q_REQUIRED", true); packets.add(p);
         }
         root.add("packets", packets); return root;
     }
@@ -36,6 +36,8 @@ public final class StaJson {
         try {
             JsonObject root = JsonParser.parseString(json).getAsJsonObject(), h = root.getAsJsonObject("header");
             if (!"STA".equals(h.get("protocol").getAsString())) throw new IllegalArgumentException("protocol");
+            // Reject the old namespace BEFORE interpreting a reused numeric identifier.
+            if (integer(h,"M_VERSION") != StaTypes.VERSION) throw new IllegalArgumentException("STA v5 required; no legacy fallback");
             var header = new StaMessage.Header(Math.toIntExact(integer(h,"M_VERSION")), StaMessage.Kind.of(Math.toIntExact(integer(h,"NID_MESSAGE"))),
                     StaMessage.Source.valueOf(h.get("NID_SOURCE").getAsString()), UUID.fromString(h.get("NID_SESSION").getAsString()),
                     integer(h,"N_SEQUENCE"), integer(h,"T_EMITTED_MS"), UUID.fromString(h.get("NID_TRAIN").getAsString()));
@@ -45,7 +47,7 @@ public final class StaJson {
                 JsonObject p = element.getAsJsonObject(); int id = Math.toIntExact(integer(p,"NID_PACKET"));
                 if (!seen.add(id)) throw new IllegalArgumentException("Duplicate packet");
                 switch (id) {
-                    case 2001 -> {
+                    case StaTypes.Packet.PHYSICAL_OBSERVATION -> {
                         constant(p,"positionReference","ACTIVE_LEADER_CART_CENTRE");
                         constant(p,"lengthQuality","NOMINAL_CENTRE_SPAN");
                         constant(p,"speedTimebase","NOMINAL_20_TPS");
@@ -66,7 +68,7 @@ public final class StaJson {
                         finite(p,"blocksPerMeter");
                         physical = new StaMessage.Physical(GSON.fromJson(s, TrainTelemetrySnapshot.class), p.get("blocksPerMeter").getAsDouble());
                     }
-                    case 2002 -> {
+                    case StaTypes.Packet.GRAPH_POSITION -> {
                         for (String k : List.of("telemetrySequence","receivedAtMillis","resolvedAtMillis","staleAfterMillis","expireAfterMillis","graphRevision")) integer(p,k);
                         for (String k : List.of("telemetrySessionId","quality","reason")) string(p,k);
                         if (!p.has("position")) throw new IllegalArgumentException("position must be present or null");

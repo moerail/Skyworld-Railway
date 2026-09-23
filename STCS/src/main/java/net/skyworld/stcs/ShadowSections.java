@@ -1,6 +1,6 @@
 package net.skyworld.stcs;
 import java.util.*;
-import net.skyworld.sta.api.v4.ShadowAuthorityService.Section;
+import net.skyworld.sta.api.v5.ShadowAuthorityService.Section;
 
 /** Display intervals use the same spatial cells as allocation, not whole-edge coloring. */
 final class ShadowSections {

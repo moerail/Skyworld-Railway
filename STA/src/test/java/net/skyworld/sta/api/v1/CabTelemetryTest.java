@@ -1,7 +1,7 @@
 package net.skyworld.sta.api.v1;
 
 import java.util.UUID;
-import net.skyworld.sta.api.v2.*;
+import net.skyworld.sta.api.v5.*;
 
 public final class CabTelemetryTest {
     public static void main(String[] args) {
@@ -11,7 +11,7 @@ public final class CabTelemetryTest {
                 0.5, 64, 0.5, 1, 0, 0, 0, 10, 3, false, false, TrainMode.MANUAL, "Driver", cab, "G001");
         var tracking = new StaMessage.Tracking(session, 1, 1000, 1000, 2000, 10000, 1,
                 StaMessage.Quality.UNLOCATED, null, "test");
-        var message = new StaMessage(new StaMessage.Header(2, StaMessage.Kind.TRACK_REPORT,
+        var message = new StaMessage(new StaMessage.Header(StaMessage.VERSION, StaMessage.Kind.TRACK_REPORT,
                 StaMessage.Source.STCS, session, 2, 1000, id), new StaMessage.Physical(state, 1), tracking);
         var decoded = StaJson.decode(StaJson.encode(message));
         assert decoded.physical().state().cab().equals(cab);

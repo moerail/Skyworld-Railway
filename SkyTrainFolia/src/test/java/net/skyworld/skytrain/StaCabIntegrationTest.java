@@ -5,9 +5,9 @@ import java.lang.reflect.Proxy;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.ServicesManager;
 import net.skyworld.sta.api.v1.TrackPositionSnapshot;
-import net.skyworld.sta.api.v2.RailNetworkService;
-import net.skyworld.sta.api.v4.ShadowAuthorityService;
-import net.skyworld.sta.api.v4.ShadowAuthorityService.*;
+import net.skyworld.sta.api.v5.RailNetworkService;
+import net.skyworld.sta.api.v5.ShadowAuthorityService;
+import net.skyworld.sta.api.v5.ShadowAuthorityService.*;
 
 public final class StaCabIntegrationTest {
     public static void main(String[] args) {
@@ -28,7 +28,7 @@ public final class StaCabIntegrationTest {
         assert !adapter.cabAuthority(train,lease,1000).live();
         var authority=new Authority(train,lease,session,1,"ALLOCATED_SHADOW","TRACK_END",
                 List.of(new PathPart("e",0,50)),"e",50.,30.);
-        var curveSnapshot = new Snapshot(4,true,false,session,1,1000,2,"SHADOW",List.of(authority),List.of());
+        var curveSnapshot = new Snapshot(5,true,false,session,1,1000,2,"SHADOW",List.of(authority),List.of());
         var source = new net.skyworld.sta.api.v1.TrainTelemetrySnapshot(train,"test",1,1000,"world",
                 0,0,0,0,0,0,1,0,0,0,10,3,false,false,net.skyworld.sta.api.v1.TrainMode.MANUAL,"driver",
                 new net.skyworld.sta.api.v1.TrainTelemetrySnapshot.CabState("SHADOW","FORWARD",0,0,false,false));
@@ -50,7 +50,7 @@ public final class StaCabIntegrationTest {
         assert StaCabIntegration.curveInput(curveSnapshot,train,lease,2,1100,session,history,true,"BACKWARD")
                 .reason().equals("DIRECTION_CHANGED");
         providers.put(ShadowAuthorityService.class,(ShadowAuthorityService)()->
-                new Snapshot(4,true,false,session,1,1000,2,"SHADOW",List.of(authority),List.of()));
+                new Snapshot(5,true,false,session,1,1000,2,"SHADOW",List.of(authority),List.of()));
         var position=new TrackPositionSnapshot(2,"e","a","b",50,100,"Main",50.,1000,true,false);
         providers.put(RailNetworkService.class,Proxy.newProxyInstance(RailNetworkService.class.getClassLoader(),
                 new Class[]{RailNetworkService.class},(p,m,a)->switch(m.getName()) {

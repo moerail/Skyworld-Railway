@@ -1,7 +1,7 @@
 package net.skyworld.skytrain;
 
 import java.util.UUID;
-import net.skyworld.sta.api.v4.ShadowAuthorityService;
+import net.skyworld.sta.api.v5.ShadowAuthorityService;
 
 /** Read-only display selection. A live service is not the same as a valid train authority. */
 final class StaCabIntegration {
@@ -27,7 +27,7 @@ final class StaCabIntegration {
         try {
             var service=services.load(ShadowAuthorityService.class);
             var snapshot=service==null?null:service.snapshot();
-            var network=services.load(net.skyworld.sta.api.v2.RailNetworkService.class);
+            var network=services.load(net.skyworld.sta.api.v5.RailNetworkService.class);
             var view=select(snapshot,train,lease,network==null?-1:network.graphRevision(),now);
             var authority=view.authority();
             String location=null;
@@ -56,7 +56,8 @@ final class StaCabIntegration {
 
     static View select(ShadowAuthorityService.Snapshot snapshot, UUID train, UUID lease, long graphRevision, long now) {
         long age=snapshot==null?Long.MAX_VALUE:now-snapshot.emittedAtMillis();
-        if(snapshot==null || !snapshot.simulationOnly() || snapshot.executable() || age<0 || age>1500
+        if(snapshot==null || snapshot.version()!=net.skyworld.sta.api.v5.StaTypes.VERSION
+                || !snapshot.simulationOnly() || snapshot.executable() || age<0 || age>1500
                 || !snapshot.status().equals("SHADOW") || snapshot.graphRevision()!=graphRevision)
             return new View(false,null,"STALE");
         if(lease==null) return new View(true,null,"NO_DRIVER");

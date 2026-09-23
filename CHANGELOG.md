@@ -1,10 +1,23 @@
 # Updates / 更新说明
 
-## Pending Publication / 待发布 — 2026-09-23
+## Breaking STA v5 / 破坏性协议升级 - 2026-09-23
+
+Release set: **STF 3.0.0 / STCS 3.0.0 / STA 1.0.0 / SkyPCC 1.0.0**. Not yet deployed or published.
+
+- Moved v2/v4 service contracts to v5; version-first decoding rejects legacy message IDs. PCC uses `/api/v5/` only.
+- Added conceptual numbering: allocated MA Message 1003 / Packet 1015; telemetry Message 1136. Private removal/graph/status messages use 2001/2002/2003. Removal never grants clearance.
+- Updated consumers, browser fixtures and multilingual manuals. STF standalone support remains intact.
+- Added `/stcs integrity [train-name|uuid]`, an admin-only, in-memory observer of member distribution and inferred node passages. It does not clear occupancy, prove tail clearance or grant MA. [Diagnostic scope](doc/NODE-INTEGRITY.md).
+- Validation: 63 Java test entry points, PCC JavaScript and two browser regression suites passed. Live-server validation of this release remains outstanding.
+- No persistent ledger schema change, ATP actuation or FS activation. [Migration guide](doc/STA-V5-MIGRATION.md).
+
+四插件配套升级，不兼容旧组合；编号仅为致敬，不代表 ETCS 编码或标准符合性。新增节点通过只读诊断，不释放占用。保留轨道图和占用账本，不通过清空数据升级。以下为先前版本的开发记录，其功能继续保留。
+
+## STF 2.1.5 Baseline / 先前基线 — 2026-09-23
 
 Component versions / 组件版本：STF **2.1.5**, STCS **2.2.1**, STA **0.8.1**, SkyPCC **0.8.1**.
-Only STF's version changed in this batch. STCS source fixes below retain its existing version.
-本批仅提升 STF 版本号；下述 STCS 源码修正仍沿用现有版本。尚未创建 Git 标签或 GitHub Release。
+Only STF's version changed in that batch. STCS source fixes below retained its existing version.
+该批仅提升 STF 版本号；下述 STCS 源码修正当时沿用原版本。
 
 ### STF
 

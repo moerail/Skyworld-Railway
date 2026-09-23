@@ -6,7 +6,7 @@ import java.util.function.Consumer;
 import org.bukkit.plugin.ServicePriority;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.skyworld.sta.api.v1.*;
-import net.skyworld.sta.api.v2.*;
+import net.skyworld.sta.api.v5.*;
 
 final class StaTrackingProvider implements StaIntegration, TrackingService, RailNetworkService {
     private final StcsPlugin plugin;
@@ -33,7 +33,7 @@ final class StaTrackingProvider implements StaIntegration, TrackingService, Rail
         long now = System.currentTimeMillis();
         try {
             var provider = plugin.getServer().getServicesManager().load(TelemetryService.class);
-            available = provider != null && provider.protocolVersion() == 2;
+            available = provider != null && provider.protocolVersion() == net.skyworld.sta.api.v5.StaMessage.VERSION;
             if (available) {
                 owns = true;
                 for (var m : resolver.accept(provider.sessionId(), provider.snapshots(), now)) store.offer(m);

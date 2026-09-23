@@ -1,6 +1,16 @@
 # SkyRail Suite
 
-## 2.1.5 更新（2026-09-23）
+## 非互換更新：STA v5
+
+STF **3.0.0**、STCS **3.0.0**、STA **1.0.0**、SkyPCC **1.0.0** を組み合わせて使用してください。停止・バックアップ後、導入済み構成要素を一括交換し、PCC を再読み込みしてください。旧版と旧 HTTP 経路は非互換です。STF 単独運用は維持され、RailGraph と占有台帳は削除しません。
+
+Message と Packet は別の番号体系です。割当済み影方式 MA は **Message 1003 / Packet 1015**、遠隔測定は **Message 1136**。独自の列車削除・図上位置・待機/非稼働状態は **2001 / 2002 / 2003** です。削除は占有解放を意味しません。SUBSET-026 の番号への概念的な参照であり、ETCS 符号化や規格適合ではありません。M3 完了や FS 有効化を意味しません。[移行手順](doc/STA-V5-MIGRATION.md)。
+
+## ノード通過の編成完全性診断
+
+`/stcs integrity [列車名|UUID]` には `stcs.admin` が必要です。各辺の車両分布、推定されたノード通過、観測欠落による不確定状態を表示します。停車時間による占有の自動消去はありません。読み取り専用の診断状態はメモリ内に保持され、再起動で基準を作り直します。列車後端の完全通過を証明せず、占有解放や MA 許可も行いません。完成した仮想車軸検知器ではありません。ローカル試験は通過済みですが、実サーバー検証は今後必要です。
+
+## 以前の更新：STF 2.1.5（2026-09-23）
 
 影方式曲線は手柄や制動を操作しません。既定は EoA の 1 m 手前で零速、最後の 5 m は最高 5 km/h から連続的に零速へ低下します。平坡模型として B7 諸元と実測速度を用い、遙測遅延を理論最高速度で補償しなくなりました。
 
@@ -52,10 +62,10 @@ SkyTrain Suite は Minecraft を対話可能な鉄道運転環境として用い
 
 | 構成要素 | 現行版 | 主な責務 |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.5` | 列車編成、運動と曲線通過、運転権、力行・制動、車両諸元、標識、実体分岐器の転換、運転台表示および音響 |
-| STCS | `2.2.1` | 鉄道施設、有向 RailGraph、線路里程、位置標定、占有保持台帳、影方式 MA/EoA および局所的な分岐器検査 |
-| SkyworldTrainAPI / STA | `0.8.1` | 拡張機能間の版付き契約、遠隔測定、編成車両観測、運転台状態、走行許可および事象交換 |
-| SkyPCC | `0.8.1` | ウェブ式配線略図、列車・施設検査、占有・予約表示、事象欄および認証付き分岐器制御 |
+| SkyTrainFolia / STF | `3.0.0` | 列車編成、運動と曲線通過、運転権、力行・制動、車両諸元、標識、実体分岐器の転換、運転台表示および音響 |
+| STCS | `3.0.0` | 鉄道施設、有向 RailGraph、線路里程、位置標定、占有保持台帳、影方式 MA/EoA および局所的な分岐器検査 |
+| SkyworldTrainAPI / STA | `1.0.0` | 拡張機能間の版付き契約、遠隔測定、編成車両観測、運転台状態、走行許可および事象交換 |
+| SkyPCC | `1.0.0` | ウェブ式配線略図、列車・施設検査、占有・予約表示、事象欄および認証付き分岐器制御 |
 
 ```text
 Minecraft 利用者 / トロッコ / 線路 / 赤石回路
@@ -106,10 +116,10 @@ Minecraft 利用者 / トロッコ / 線路 / 赤石回路
 現行の導入ファイル：
 
 ```text
-SkyTrainFolia-2.1.5.jar
-STCS-2.2.1.jar
-SkyworldTrainAPI-0.8.1.jar
-SkyPCC-0.8.1.jar
+SkyTrainFolia-3.0.0.jar
+STCS-3.0.0.jar
+SkyworldTrainAPI-1.0.0.jar
+SkyPCC-1.0.0.jar
 ```
 
 STF/STCS は STA を任意依存として宣言していますが、全機能を使う場合は四つを一組で導入してください。PCC は STCS と STA を必須とします。STF 単独では、完全な線路図、走行許可、運行指令表示の機能を提供しません。
@@ -695,21 +705,21 @@ STA は主にサーバー JVM 内の Java 業務を公開します。自動公�
 
 | 契約・データ | 主生成元 | 主利用先 | 意味 |
 | --- | --- | --- | --- |
-| v2 TELEMETRY_REPORT / 1001 | STF | STCS/購読者 | 物理遠隔測定 |
-| v2 TRACK_REPORT / 1002 | STCS | PCC/購読者 | 原観測に結付く図上位置標定 |
-| v2 TRAIN_REMOVED / 1003 | 生成元整理 | 登録簿/購読者 | 保持占有消去の許可ではない |
-| v2 RailNetworkService | STCS | STF/その他 | 図、進路探索、辺上位置、駅前方探索 |
+| v5 TELEMETRY_REPORT / 1136 | STF | STCS/購読者 | 物理遠隔測定 |
+| v5 TRACK_REPORT / 2002 | STCS | PCC/購読者 | 原観測に結付く図上位置標定 |
+| v5 TRAIN_REMOVED / 2001 | 生成元整理 | 登録簿/購読者 | 保持占有消去の許可ではない |
+| v5 RailNetworkService | STCS | STF/その他 | 図、進路探索、辺上位置、駅前方探索 |
 | v3 ConsistObservation | STF | STCS | 編成車両観測・存続周期 |
 | v3 RailwayEvent | STF/STCS | PCC/購読者 | 運転事象 |
-| v4 DriverDeskService | STF | STCS | 運転士、運転権、ATP 状態 |
-| v4 ShadowAuthorityService | STCS | STF/PCC | 実行不能な MA/EoA と区間 |
-| v4 SwitchControl | PCC などの呼出元。STCS 検査、STF 転換 | 呼出元 | 版・状態・位置検査および PENDING |
+| v5 DriverDeskService | STF | STCS | 運転士、運転権、ATP 状態 |
+| v5 ShadowAuthorityService | STCS | STF/PCC | 実行不能な MA/EoA と区間 |
+| v5 SwitchControl | PCC などの呼出元。STCS 検査、STF 転換 | 呼出元 | 版・状態・位置検査および PENDING |
 
-汎用 v2 電文は三種類ですが、API 全体には別個の状態写し、事象、業務もあります。すべてが三電文の実体というわけではありません。
+汎用 v5 電文は三種類ですが、API 全体には別個の状態写し、事象、業務もあります。すべてが三電文の実体というわけではありません。
 
-v2 頭部には version、kind、source、sessionId、sequence、emittedAt、trainId が含まれます。品質状態には VALID、UNLOCATED、STALE、EXPIRED、GRAPH_CHANGED、SOURCE_UNAVAILABLE、SCALE_MISMATCH があります。受信側は識別、順序、品質を無視して座標だけを利用してはいけません。
+v5 頭部には version、kind、source、sessionId、sequence、emittedAt、trainId が含まれます。品質状態には VALID、UNLOCATED、STALE、EXPIRED、GRAPH_CHANGED、SOURCE_UNAVAILABLE、SCALE_MISMATCH があります。受信側は識別、順序、品質を無視して座標だけを利用してはいけません。
 
-v4 影方式状態写しは `simulationOnly=true` と `executable=false` を持ちます。走行許可データには経路、EoA の辺・偏倚、残距離、観測来歴が含まれます。区間は `fromMeters/toMeters` を含む場合があり、同じ辺に複数区間が存在できます。一つの区間を辺全体の占有として表示・解釈してはいけません。
+v5 影方式状態写しは `simulationOnly=true` と `executable=false` を持ちます。走行許可データには経路、EoA の辺・偏倚、残距離、観測来歴が含まれます。区間は `fromMeters/toMeters` を含む場合があり、同じ辺に複数区間が存在できます。一つの区間を辺全体の占有として表示・解釈してはいけません。
 
 先頭車中心は証明済み列車最前部位置ではなく、公称編成長は列車完全性の証明ではなく、遅延時の公称 20 TPS 速度は実時間速度ではありません。これらは ETCS に着想を得た計画内契約であり、**SUBSET-026 の伝送電文でも相互運用仕様でもありません**。
 
@@ -717,14 +727,14 @@ v4 影方式状態写しは `simulationOnly=true` と `executable=false` を持�
 
 | 接続口 | 内容 |
 | --- | --- |
-| `GET /api/v1/graph` | RailGraph |
-| `GET /api/v1/trains` | 列車表示状態写し |
-| `GET /api/v2/messages` | 遠隔測定状態写し |
-| `GET /api/v3/railway-events` | 事象 |
-| `GET /api/v4/shadow-ma` | 影方式走行許可・区間 |
-| `GET /api/v1/config` | 公開ウェブ設定。制御認証票は含まない |
-| `GET /api/v1/events` | SSE |
-| `POST /api/v4/switch` | 認証付き分岐器制御 |
+| `GET /api/v5/graph` | RailGraph |
+| `GET /api/v5/trains` | 列車表示状態写し |
+| `GET /api/v5/messages` | 遠隔測定状態写し |
+| `GET /api/v5/railway-events` | 事象 |
+| `GET /api/v5/shadow-ma` | 影方式走行許可・区間 |
+| `GET /api/v5/config` | 公開ウェブ設定。制御認証票は含まない |
+| `GET /api/v5/events` | SSE |
+| `POST /api/v5/switch` | 認証付き分岐器制御 |
 
 接続口の版と JAR の版は別です。表示用状態写しを実行可能な走行許可として再送しないでください。これは接続仕様の概要であり、完全自動生成された SDK・構造定義ではありません。外部利用側は指令送信前に、配備版の正確なデータ形状と契約を検証する必要があります。特に、区間端点が null の場合は旧来の辺全体という意味を保持し、明示端点が区間を限定します。
 

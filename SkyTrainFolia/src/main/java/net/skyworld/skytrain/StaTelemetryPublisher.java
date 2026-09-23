@@ -6,11 +6,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.bukkit.plugin.ServicePriority;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.skyworld.sta.api.v1.*;
-import net.skyworld.sta.api.v2.*;
+import net.skyworld.sta.api.v5.*;
 import net.skyworld.sta.api.v3.*;
 import java.util.function.Consumer;
 
-final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, ConsistObservationService, net.skyworld.sta.api.v4.DriverDeskService {
+final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, ConsistObservationService, net.skyworld.sta.api.v5.DriverDeskService {
     private final SkyTrainPlugin plugin;
     private final UUID session = UUID.randomUUID();
     private final AtomicLong sequence = new AtomicLong();
@@ -50,13 +50,13 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
         }, 50, 50, TimeUnit.MILLISECONDS);
         plugin.getServer().getServicesManager().register(TelemetryService.class, this, plugin, ServicePriority.Normal);
         plugin.getServer().getServicesManager().register(ConsistObservationService.class, this, plugin, ServicePriority.Normal);
-        plugin.getServer().getServicesManager().register(net.skyworld.sta.api.v4.DriverDeskService.class, this, plugin, ServicePriority.Normal);
-        plugin.getLogger().info("STA v2 telemetry provider active; legacy position reporting disabled.");
+        plugin.getServer().getServicesManager().register(net.skyworld.sta.api.v5.DriverDeskService.class, this, plugin, ServicePriority.Normal);
+        plugin.getLogger().info("STA v5 telemetry provider active; legacy position reporting disabled.");
     }
     public UUID sessionId() { return session; }
-    public Collection<net.skyworld.sta.api.v4.DriverDeskService.Desk> driverDesks() { return toDesks(plugin.driverDesks()); }
-    static List<net.skyworld.sta.api.v4.DriverDeskService.Desk> toDesks(Collection<DriverDeskSnapshot> desks) {
-        return desks.stream().map(d -> new net.skyworld.sta.api.v4.DriverDeskService.Desk(
+    public Collection<net.skyworld.sta.api.v5.DriverDeskService.Desk> driverDesks() { return toDesks(plugin.driverDesks()); }
+    static List<net.skyworld.sta.api.v5.DriverDeskService.Desk> toDesks(Collection<DriverDeskSnapshot> desks) {
+        return desks.stream().map(d -> new net.skyworld.sta.api.v5.DriverDeskService.Desk(
                 d.trainId(), d.driverId(), d.leaseId(), d.atpMode())).toList();
     }
     @Override public CabAuthorityView cabAuthority(UUID train, UUID lease, long now) {
@@ -66,7 +66,7 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
             boolean reversed, String reverser) {
         try {
             var services = plugin.getServer().getServicesManager();
-            var authority = services.load(net.skyworld.sta.api.v4.ShadowAuthorityService.class);
+            var authority = services.load(net.skyworld.sta.api.v5.ShadowAuthorityService.class);
             var network = services.load(RailNetworkService.class);
             if (network == null || Double.compare(network.blocksPerMeter(), scale) != 0
                     || Double.compare(plugin.getConfig().getDouble("infrastructure.blocks-per-meter", 1), scale) != 0)
@@ -181,7 +181,7 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
                     p.railX, p.railY, p.railZ, p.x, p.y, p.z, p.motionX, p.motionY, p.motionZ,
                     Math.max(0, speed) * 20.0 / scale, train.spacing * Math.max(0, train.memberCount() - 1) / scale,
                     train.memberCount(), moving, train.reversed, mode, driver, cab, train.properties().trainNumber);
-            var m = new StaMessage(new StaMessage.Header(2, StaMessage.Kind.TELEMETRY_REPORT,
+            var m = new StaMessage(new StaMessage.Header(StaMessage.VERSION, StaMessage.Kind.TELEMETRY_REPORT,
                     StaMessage.Source.STF, session, seq, now, train.id()), new StaMessage.Physical(state, scale), null);
             if (store.offer(m)) {
                 curveHistory.compute(train.id(), (id, history) -> {
@@ -206,12 +206,12 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
         if (id == null || closed) return;
         previous.remove(id);
         curveHistory.remove(id);
-        store.offer(new StaMessage(new StaMessage.Header(2, StaMessage.Kind.TRAIN_REMOVED,
+        store.offer(new StaMessage(new StaMessage.Header(StaMessage.VERSION, StaMessage.Kind.TRAIN_REMOVED,
                 StaMessage.Source.STF, session, sequence.incrementAndGet(), System.currentTimeMillis(), id), null, null));
     }
     public StcsTrackSnapshot query(TrainTrackPosition p) {
         var service = plugin.getServer().getServicesManager().load(RailNetworkService.class);
-        if (service == null || service.protocolVersion() != 2) return null;
+        if (service == null || service.protocolVersion() != net.skyworld.sta.api.v5.StaMessage.VERSION) return null;
         try {
             var n = service.query(new RailNetworkService.RailQuery(p.worldName, p.railX, p.railY, p.railZ,
                     p.motionX, p.motionY, p.motionZ));
@@ -227,7 +227,7 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
         closed = true; task.cancel();
         plugin.getServer().getServicesManager().unregister(TelemetryService.class, this);
         plugin.getServer().getServicesManager().unregister(ConsistObservationService.class, this);
-        plugin.getServer().getServicesManager().unregister(net.skyworld.sta.api.v4.DriverDeskService.class, this);
+        plugin.getServer().getServicesManager().unregister(net.skyworld.sta.api.v5.DriverDeskService.class, this);
         consists = List.of();
         store.close(); previous.clear();
         curveHistory.clear();
@@ -235,7 +235,7 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
     public StationForecast stationAhead(TrainTrackPosition p,double maxBlocks) {
         try {
             var service=plugin.getServer().getServicesManager().load(RailNetworkService.class);
-            if(service==null || service.protocolVersion()!=2 || Math.abs(service.blocksPerMeter()-scale)>0.000001) return null;
+            if(service==null || service.protocolVersion()!=net.skyworld.sta.api.v5.StaMessage.VERSION || Math.abs(service.blocksPerMeter()-scale)>0.000001) return null;
             var target=service.stationAhead(new RailNetworkService.RailQuery(p.worldName,p.railX,p.railY,p.railZ,
                     p.motionX,p.motionY,p.motionZ),maxBlocks/scale);
             if(target==null || target.graphRevision()!=service.graphRevision()

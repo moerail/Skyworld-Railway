@@ -17,12 +17,12 @@ const posts=[];
 const server=http.createServer((req,res)=>{
   const now=Date.now();
   let body, type='application/json';
-  if(req.url==='/api/v1/config')body={updateMode:'poll',pollIntervalMillis:250,controlEnabled:true};
-  else if(req.url==='/api/v1/graph')body=graph;
-  else if(req.url==='/api/v1/trains')body={serviceStatus:'AVAILABLE',serverTimeMillis:now,graphRevision:1,
+  if(req.url==='/api/v5/config')body={updateMode:'poll',pollIntervalMillis:250,controlEnabled:true};
+  else if(req.url==='/api/v5/graph')body=graph;
+  else if(req.url==='/api/v5/trains')body={schemaVersion:5,serviceStatus:'AVAILABLE',serverTimeMillis:now,graphRevision:1,
     trains:[{...train,observedAtMillis:now,ageMillis:0}],
-    shadowMa:{version:4,simulationOnly:true,executable:false,status:'SHADOW',graphRevision:1,emittedAtMillis:now,
-      authorities:[{trainId:'t1',state:'ALLOCATED_SHADOW',signedRemainingMeters:40,eoaEdgeId:'e',eoaOffsetMeters:70,reason:'SWITCH_UNKNOWN'}],sections:[
+    shadowMa:{version:5,simulationOnly:true,executable:false,status:'SHADOW',graphRevision:1,emittedAtMillis:now,
+      authorities:[{trainId:'t1',state:'ALLOCATED_SHADOW', NID_MESSAGE:1003, NID_PACKET:1015,signedRemainingMeters:40,eoaEdgeId:'e',eoaOffsetMeters:70,reason:'SWITCH_UNKNOWN'}],sections:[
         {edgeId:'e',resourceId:'r',state:'OCCUPIED',occupants:['t1'],reservations:[],fromMeters:25,toMeters:30},
         {edgeId:'e',resourceId:'r',state:'RESERVED_SHADOW',occupants:[],reservations:['t1'],fromMeters:30,toMeters:70}]},
     operationalEvents:{status:'AVAILABLE',session:'test',latestSequence:5,evictedCount:0,events:[
@@ -31,7 +31,7 @@ const server=http.createServer((req,res)=>{
       {session:'test',sequence:2,emittedAtMillis:now,trainId:'t1',trainName:'Train 原名',driverName:'Rin',type:'MA_REQUESTED',reason:'TRACK_END',details:{state:'ALLOCATED_SHADOW'}},
       {session:'test',sequence:3,emittedAtMillis:now,trainId:'t1',trainName:'Train 原名',driverName:'Rin',type:'MA_RELEASED',reason:'RELEASED'},
       {session:'test',sequence:4,emittedAtMillis:now,trainId:'t1',trainName:'Train 原名',driverName:'Rin',type:'MA_REQUESTED',reason:'NO_EXIT_CAPACITY',details:{state:'WAITING'}}]}};
-  else if(req.url==='/api/v4/switch') { posts.push(req.method);body={status:'PENDING',reason:'VERIFYING'};res.statusCode=202; }
+  else if(req.url==='/api/v5/switch') { posts.push(req.method);body={status:'PENDING',reason:'VERIFYING'};res.statusCode=202; }
   else {
     const name=req.url==='/'?'index.html':req.url.startsWith('/assets/')?req.url.slice(8):'';
     if(!['index.html','app.js','i18n.js','styles.css','day_logo.png','night_logo.png'].includes(name)){res.writeHead(404);res.end();return;}

@@ -1,6 +1,16 @@
 # SkyRail Suite
 
-## Update 2.1.5 (2026-09-23)
+## Incompatibele update: STA v5
+
+Gebruik STF **3.0.0**, STCS **3.0.0**, STA **1.0.0** en SkyPCC **1.0.0** samen. Stop de server, maak een back-up, vervang alle geïnstalleerde suitecomponenten en vernieuw PCC. Oude plugins en HTTP-routes zijn niet compatibel. STF blijft zelfstandig bruikbaar; behoud RailGraph en bezettingsregisters.
+
+Message en Packet hebben aparte nummerreeksen: toegewezen schaduw-MA gebruikt **Message 1003 / Packet 1015**, telemetrie **Message 1136**. Eigen berichten voor verwijdering, graafpositie en wachtende/inactieve autoriteit gebruiken **2001 / 2002 / 2003**. Verwijdering bewijst geen vrij spoor. De verwijzing naar SUBSET-026 is uitsluitend conceptueel, geen ETCS-codering of conformiteitsclaim. M3 is niet voltooid en FS blijft uitgeschakeld. [Migratie](doc/STA-V5-MIGRATION.md).
+
+## Diagnose van knooppuntpassages
+
+`/stcs integrity [treinnaam|uuid]` vereist `stcs.admin`. Het toont de verdeling van voertuigen over kanten en afgeleide passages, met onzekerheid bij ontbrekende waarnemingen. Stilstaan laat bezetting niet verlopen. Deze alleen-lezen diagnose staat in het geheugen en begint opnieuw na een herstart; ze bewijst geen volledige vrijmaking en geeft geen bezetting of MA vrij. Dit is geen voltooide virtuele assenteller. Lokale tests zijn geslaagd; servertests blijven nodig.
+
+## Eerdere update: STF 2.1.5 (2026-09-23)
 
 Schaduwcurves wijzigen geen rijstanden of remmen. Standaard: stilstand 1 m voor EoA en maximaal 5 km/h in de laatste 5 m, aflopend tot nul. Het model voor vlak spoor gebruikt B7-parameters en gemeten snelheid; vertraging wordt niet meer met de theoretische maximumsnelheid gecompenseerd.
 
@@ -50,10 +60,10 @@ Het project introduceert expliciete besturingsrechten, spoorbezetting, strijdige
 
 | Component | Versie | Verantwoordelijkheid |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `2.1.5` | Treinsamenstelling, beweging en bochten, besturingsrechten, tractie/remming, profielen, borden, fysieke wisselbediening, HMI en geluid |
-| STCS | `2.2.1` | Infrastructuur, gerichte RailGraph, lijnkilometrering, plaatsbepaling, bewaard bezettingsregister, schaduw-MA/EoA en lokale wisselcontroles |
-| SkyworldTrainAPI / STA | `0.8.1` | Versiegebonden plugincontracten, telemetrie, voertuigwaarnemingen, cabinestatus, rijtoestemmingen en gebeurtenissen |
-| SkyPCC | `0.8.1` | Webspoorschema, inspectiepaneel voor treinen/infrastructuur, bezetting/reserveringen, gebeurtenissenlog en geauthenticeerde wisselbediening |
+| SkyTrainFolia / STF | `3.0.0` | Treinsamenstelling, beweging en bochten, besturingsrechten, tractie/remming, profielen, borden, fysieke wisselbediening, HMI en geluid |
+| STCS | `3.0.0` | Infrastructuur, gerichte RailGraph, lijnkilometrering, plaatsbepaling, bewaard bezettingsregister, schaduw-MA/EoA en lokale wisselcontroles |
+| SkyworldTrainAPI / STA | `1.0.0` | Versiegebonden plugincontracten, telemetrie, voertuigwaarnemingen, cabinestatus, rijtoestemmingen en gebeurtenissen |
+| SkyPCC | `1.0.0` | Webspoorschema, inspectiepaneel voor treinen/infrastructuur, bezetting/reserveringen, gebeurtenissenlog en geauthenticeerde wisselbediening |
 
 ```text
 Minecraft spelers / mijnkarren / rails / redstone
@@ -104,10 +114,10 @@ Dit schema toont verantwoordelijkheden, geen verplichte opeenvolging van alle aa
 Huidige installatiebestanden:
 
 ```text
-SkyTrainFolia-2.1.5.jar
-STCS-2.2.1.jar
-SkyworldTrainAPI-0.8.1.jar
-SkyPCC-0.8.1.jar
+SkyTrainFolia-3.0.0.jar
+STCS-3.0.0.jar
+SkyworldTrainAPI-1.0.0.jar
+SkyPCC-1.0.0.jar
 ```
 
 STF/STCS declareren STA als zachte afhankelijkheid, maar installeer alle vier voor de volledige suite. PCC vereist STCS en STA. STF alleen levert niet de volledige graaf-, MA- en verkeersleidingsfunctionaliteit.
@@ -693,21 +703,21 @@ STA biedt voornamelijk Java-services binnen de server-JVM, niet automatisch een 
 
 | Contract/gegevens | Hoofdproducent | Hoofdafnemer | Betekenis |
 | --- | --- | --- | --- |
-| v2 TELEMETRY_REPORT / 1001 | STF | STCS/abonnees | Fysieke telemetrie |
-| v2 TRACK_REPORT / 1002 | STCS | PCC/abonnees | Graafpositie gekoppeld aan de oorspronkelijke waarneming |
-| v2 TRAIN_REMOVED / 1003 | Opruiming bij de bron | Registers/abonnees | Geen toestemming om bezettingsbewijs te wissen |
-| v2 RailNetworkService | STCS | STF/anderen | Graaf, navigatie, positie, stationvooruitkijken |
+| v5 TELEMETRY_REPORT / 1136 | STF | STCS/abonnees | Fysieke telemetrie |
+| v5 TRACK_REPORT / 2002 | STCS | PCC/abonnees | Graafpositie gekoppeld aan de oorspronkelijke waarneming |
+| v5 TRAIN_REMOVED / 2001 | Opruiming bij de bron | Registers/abonnees | Geen toestemming om bezettingsbewijs te wissen |
+| v5 RailNetworkService | STCS | STF/anderen | Graaf, navigatie, positie, stationvooruitkijken |
 | v3 ConsistObservation | STF | STCS | Voertuigwaarnemingen/levenscyclus |
 | v3 RailwayEvent | STF/STCS | PCC/abonnees | Bedrijfsgebeurtenissen |
-| v4 DriverDeskService | STF | STCS | Machinist, besturingsrecht, ATP-modus |
-| v4 ShadowAuthorityService | STCS | STF/PCC | Niet-uitvoerbare MA/EoA en secties |
-| v4 SwitchControl | Aanvrager zoals PCC; STCS controleert, STF voert uit | Aanvrager | Versie-/stand-/positiecontrole en PENDING |
+| v5 DriverDeskService | STF | STCS | Machinist, besturingsrecht, ATP-modus |
+| v5 ShadowAuthorityService | STCS | STF/PCC | Niet-uitvoerbare MA/EoA en secties |
+| v5 SwitchControl | Aanvrager zoals PCC; STCS controleert, STF voert uit | Aanvrager | Versie-/stand-/positiecontrole en PENDING |
 
-Er zijn drie generieke v2-berichttypen, maar de API bevat daarnaast afzonderlijke momentopnamen, gebeurtenissen en services. Die vallen niet allemaal onder die drie typen.
+Er zijn drie generieke v5-berichttypen, maar de API bevat daarnaast afzonderlijke momentopnamen, gebeurtenissen en services. Die vallen niet allemaal onder die drie typen.
 
-v2-headers bevatten version, kind, source, sessionId, sequence, emittedAt en trainId. Kwaliteitswaarden zijn onder andere VALID, UNLOCATED, STALE, EXPIRED, GRAPH_CHANGED, SOURCE_UNAVAILABLE en SCALE_MISMATCH. Gebruik geen coördinaten zonder identiteit, volgorde en kwaliteit mee te nemen.
+v5-headers bevatten version, kind, source, sessionId, sequence, emittedAt en trainId. Kwaliteitswaarden zijn onder andere VALID, UNLOCATED, STALE, EXPIRED, GRAPH_CHANGED, SOURCE_UNAVAILABLE en SCALE_MISMATCH. Gebruik geen coördinaten zonder identiteit, volgorde en kwaliteit mee te nemen.
 
-v4-schaduwmomentopnamen hebben `simulationOnly=true` en `executable=false`. Een MA bevat pad, EoA-verbinding/offset, resterende afstand en waarnemingsherkomst. Secties kunnen `fromMeters/toMeters` bevatten; één verbinding kan meerdere intervallen hebben. Een interval is geen bezetting van de hele verbinding.
+v5-schaduwmomentopnamen hebben `simulationOnly=true` en `executable=false`. Een MA bevat pad, EoA-verbinding/offset, resterende afstand en waarnemingsherkomst. Secties kunnen `fromMeters/toMeters` bevatten; één verbinding kan meerdere intervallen hebben. Een interval is geen bezetting van de hele verbinding.
 
 Het midden van de leidende kar is geen bewezen treinfront; nominale treinlengte is geen integriteitsbewijs; snelheid bij nominale 20 TPS is geen werkelijke snelheid in kloktijd bij lag. De contracten zijn geïnspireerd op ETCS, **geen SUBSET-026-berichtcodering of interoperabiliteit**.
 
@@ -715,14 +725,14 @@ Het midden van de leidende kar is geen bewezen treinfront; nominale treinlengte 
 
 | Eindpunt | Inhoud |
 | --- | --- |
-| `GET /api/v1/graph` | RailGraph |
-| `GET /api/v1/trains` | Treinweergave |
-| `GET /api/v2/messages` | Telemetriemomentopname |
-| `GET /api/v3/railway-events` | Gebeurtenissen |
-| `GET /api/v4/shadow-ma` | Schaduw-MA/secties |
-| `GET /api/v1/config` | Openbare webinstellingen, niet het controletoken |
-| `GET /api/v1/events` | SSE |
-| `POST /api/v4/switch` | Geauthenticeerde wisselbediening |
+| `GET /api/v5/graph` | RailGraph |
+| `GET /api/v5/trains` | Treinweergave |
+| `GET /api/v5/messages` | Telemetriemomentopname |
+| `GET /api/v5/railway-events` | Gebeurtenissen |
+| `GET /api/v5/shadow-ma` | Schaduw-MA/secties |
+| `GET /api/v5/config` | Openbare webinstellingen, niet het controletoken |
+| `GET /api/v5/events` | SSE |
+| `POST /api/v5/switch` | Geauthenticeerde wisselbediening |
 
 Eindpunt- en JAR-versies verschillen. Speel weergavemomentopnamen niet opnieuw af als uitvoerbare rijtoestemming. Dit is een interface-overzicht, geen volledig gegenereerde SDK-/schemareferentie. Een externe client moet het exacte berichtformaat en de contracten van de gebruikte build valideren vóór het verzenden van commando's. Lege sectie-eindpunten behouden met name de oude betekenis van een hele verbinding; expliciete eindpunten begrenzen een interval.
 

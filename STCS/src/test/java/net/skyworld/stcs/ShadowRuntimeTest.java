@@ -4,9 +4,9 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 import net.skyworld.sta.api.v1.*;
-import net.skyworld.sta.api.v2.*;
+import net.skyworld.sta.api.v5.*;
 import net.skyworld.sta.api.v3.*;
-import net.skyworld.sta.api.v4.*;
+import net.skyworld.sta.api.v5.*;
 
 public final class ShadowRuntimeTest {
     static final UUID train=UUID.randomUUID(),driver=UUID.randomUUID(),member=UUID.randomUUID(),session=UUID.randomUUID();
@@ -23,7 +23,7 @@ public final class ShadowRuntimeTest {
         var physical=new TrainTelemetrySnapshot(train,"T",1,at,"world",20,64,0,20.5,64.06,.5,1,0,0,
                 0,1,1,false,reverse,TrainMode.MANUAL,"Name is not a lease");
         var position=new TrackPositionSnapshot(graph.revision,"a-b","a","b",20.,100.,"L",20.,at,true,false);
-        var message=new StaMessage(new StaMessage.Header(2,StaMessage.Kind.TRACK_REPORT,StaMessage.Source.STCS,
+        var message=new StaMessage(new StaMessage.Header(StaMessage.VERSION,StaMessage.Kind.TRACK_REPORT,StaMessage.Source.STCS,
                 session,2,now,train),new StaMessage.Physical(physical,1),new StaMessage.Tracking(session,1,at,now,15000,60000,
                 graph.revision,StaMessage.Quality.VALID,position,"test"));
         return new ShadowRuntime.Inputs(graph,Map.of(),available,session,session,hasDriver?List.of(desk):List.of(),List.of(observation),List.of(message));

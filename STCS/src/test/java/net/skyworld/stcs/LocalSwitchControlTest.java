@@ -6,8 +6,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import java.util.function.*;
 import net.skyworld.sta.api.v1.TrackPositionSnapshot;
-import net.skyworld.sta.api.v2.StaMessage;
-import net.skyworld.sta.api.v4.SwitchControlService;
+import net.skyworld.sta.api.v5.StaMessage;
+import net.skyworld.sta.api.v5.SwitchControlService;
 
 public final class LocalSwitchControlTest {
     public static void main(String[] args) throws Exception {
@@ -18,8 +18,8 @@ public final class LocalSwitchControlTest {
         var graph=ShadowPlannerTest.graph(List.of(a,point,end),List.of(entry,exit)).graph;
         var through=ShadowPlannerTest.edge(a,end,"east","west");
         var geometric=ShadowPlannerTest.graph(List.of(a,point,end),List.of(through));
-        assert ShadowRuntime.pointsInPath(geometric,List.of(new net.skyworld.sta.api.v4.ShadowAuthorityService.PathPart(through.id(),20,99))).isEmpty();
-        assert ShadowRuntime.pointsInPath(geometric,List.of(new net.skyworld.sta.api.v4.ShadowAuthorityService.PathPart(through.id(),20,101))).contains(id.toString())
+        assert ShadowRuntime.pointsInPath(geometric,List.of(new net.skyworld.sta.api.v5.ShadowAuthorityService.PathPart(through.id(),20,99))).isEmpty();
+        assert ShadowRuntime.pointsInPath(geometric,List.of(new net.skyworld.sta.api.v5.ShadowAuthorityService.PathPart(through.id(),20,101))).contains(id.toString())
                 : "A geometric MA crossing must protect the point even without its node in the directed path";
         ShadowRuntimeTest.graph=graph;
         var position=new SwitchControlService.Position("world",100,64,0);

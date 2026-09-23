@@ -19,7 +19,7 @@ public final class StaPlugin extends JavaPlugin {
     public void onEnable() {
         getServer().getServicesManager().register(net.skyworld.sta.api.v3.RailwayEventService.class,
                 new net.skyworld.sta.api.v3.RailwayEventLog(500), this, org.bukkit.plugin.ServicePriority.Normal);
-        getLogger().info("Skyworld Train API: STA message protocol v2 available; v1 contracts retained.");
+        getLogger().info("Skyworld Train API: STA protocol v5 available; legacy v2/v4 services are not supported.");
     }
     @Override public void onDisable() { getServer().getServicesManager().unregisterAll(this); }
 }

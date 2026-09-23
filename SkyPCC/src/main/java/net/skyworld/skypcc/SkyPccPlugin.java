@@ -10,10 +10,10 @@ import java.util.*;
 import java.util.concurrent.*;
 import org.bukkit.plugin.java.JavaPlugin;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
-import net.skyworld.sta.api.v2.*;
+import net.skyworld.sta.api.v5.*;
 import net.skyworld.sta.api.v3.RailwayEventService;
 import net.skyworld.sta.api.v3.ConsistObservationService;
-import net.skyworld.sta.api.v4.*;
+import net.skyworld.sta.api.v5.*;
 
 /** Server source reconstructed for M0; the 0.2.2 web assets are preserved and adapted.
  * All HTTP handlers read cached bytes. No entity/region access or provider calls on HTTP threads. */
@@ -73,7 +73,7 @@ public final class SkyPccPlugin extends JavaPlugin {
             server.setExecutor(executor); server.createContext("/", this::handle);
             running = true; refresh();
             refreshTask = getServer().getAsyncScheduler().runAtFixedRate(this, t -> refresh(), 100, 250, TimeUnit.MILLISECONDS);
-            server.start(); getLogger().info("SkyPCC STA v2 map listening on " + server.getAddress());
+            server.start(); getLogger().info("SkyPCC STA v5 map listening on " + server.getAddress());
         } catch (IOException | RuntimeException ex) {
             onDisable(); getLogger().severe("SkyPCC could not start: " + ex);
             getServer().getPluginManager().disablePlugin(this);
@@ -84,11 +84,11 @@ public final class SkyPccPlugin extends JavaPlugin {
         var svc = getServer().getServicesManager();
         var tracking = svc.load(TrackingService.class); var network = svc.load(RailNetworkService.class);
         JsonObject report = new JsonObject();
-        report.addProperty("protocol", "STA"); report.addProperty("M_VERSION", 2); report.addProperty("serverTimeMillis", now);
+        report.addProperty("protocol", "STA"); report.addProperty("M_VERSION", StaMessage.VERSION); report.addProperty("serverTimeMillis", now);
         JsonArray encoded = new JsonArray(); List<Map<String,Object>> trains = new ArrayList<>();
         String status = "SERVICE_UNAVAILABLE"; long revision = 0;
         try {
-            if (tracking != null && network != null && tracking.protocolVersion() == 2 && network.protocolVersion() == 2) {
+            if (tracking != null && network != null && tracking.protocolVersion() == net.skyworld.sta.api.v5.StaMessage.VERSION && network.protocolVersion() == net.skyworld.sta.api.v5.StaMessage.VERSION) {
                 revision = network.graphRevision(); graph = bytes(network.graphJson());
                 status = tracking.sourceAvailable() ? "AVAILABLE" : "SOURCE_UNAVAILABLE";
                 for (StaMessage m : tracking.snapshots()) {
@@ -135,22 +135,22 @@ public final class SkyPccPlugin extends JavaPlugin {
             switchControl = svc.load(SwitchControlService.class);
         } catch (RuntimeException | LinkageError ex) { switchControl = null; }
         shadowMa = bytes(JSON.toJson(ma));
-        snapshot = bytes(JSON.toJson(Map.of("schemaVersion", 1, "serverTimeMillis", now, "graphRevision", revision,
+        snapshot = bytes(JSON.toJson(Map.of("schemaVersion", 5, "serverTimeMillis", now, "graphRevision", revision,
                 "serviceStatus", status, "trains", trains, "operationalEvents", eventReport, "shadowMa", ma)));
         synchronized (update) { generation++; update.notifyAll(); }
     }
     private void handle(HttpExchange x) throws IOException {
-        if ("/api/v4/switch".equals(x.getRequestURI().getPath())) { control(x); return; }
+        if ("/api/v5/switch".equals(x.getRequestURI().getPath())) { control(x); return; }
         if (!"GET".equals(x.getRequestMethod())) { reply(x, 405, "text/plain", bytes("GET required")); return; }
         String path = x.getRequestURI().getPath();
         switch (path) {
-            case "/api/v1/graph" -> reply(x, 200, "application/json", graph);
-            case "/api/v1/trains" -> reply(x, 200, "application/json", snapshot);
-            case "/api/v2/messages" -> reply(x, 200, "application/json", messages);
-            case "/api/v3/railway-events" -> reply(x, 200, "application/json", operationalEvents);
-            case "/api/v4/shadow-ma" -> reply(x, 200, "application/json", shadowMa);
-            case "/api/v1/config" -> reply(x, 200, "application/json", bytes(JSON.toJson(Map.of("updateMode", mode, "pollIntervalMillis", interval, "controlEnabled", controlEnabled))));
-            case "/api/v1/events" -> stream(x);
+            case "/api/v5/graph" -> reply(x, 200, "application/json", graph);
+            case "/api/v5/trains" -> reply(x, 200, "application/json", snapshot);
+            case "/api/v5/messages" -> reply(x, 200, "application/json", messages);
+            case "/api/v5/railway-events" -> reply(x, 200, "application/json", operationalEvents);
+            case "/api/v5/shadow-ma" -> reply(x, 200, "application/json", shadowMa);
+            case "/api/v5/config" -> reply(x, 200, "application/json", bytes(JSON.toJson(Map.of("updateMode", mode, "pollIntervalMillis", interval, "controlEnabled", controlEnabled))));
+            case "/api/v5/events" -> stream(x);
             case "/", "/index.html" -> reply(x, 200, "text/html", assets.get("index.html"));
             case "/assets/app.js" -> reply(x, 200, "text/javascript", assets.get("app.js"));
             case "/assets/i18n.js" -> reply(x, 200, "text/javascript", assets.get("i18n.js"));

@@ -176,6 +176,32 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
         if (SuiteCommandUi.handle(this, sender, "stcs", args)) return true;
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
         switch (sub) {
+            case "integrity" -> {
+                if (!hasAdminPermission(sender)) { send(sender,"&c"+protectionText(sender,"protection.permission"));return true; }
+                if (args.length>2) { send(sender,"&e/stcs integrity [train-name|uuid]");return true; }
+                send(sender,"&e完整度影子核对 / Integrity: snapshot-derived, NOT clearance / 不释放占用");
+                if (shadow==null || shadow.integrityFailure()!=null) { send(sender,"&cUNAVAILABLE");return true; }
+                long integrityAge=System.currentTimeMillis()-shadow.snapshot().emittedAtMillis();
+                if (integrityAge<0 || integrityAge>1500 || !shadow.snapshot().status().equals("SHADOW"))
+                    send(sender,"&cSTALE / SOURCE UNAVAILABLE: historical diagnostic only / 仅历史诊断");
+                var rows=shadow.integritySnapshot().stream().filter(v -> args.length==1
+                        || v.train().toString().equalsIgnoreCase(args[1]) || v.name().equalsIgnoreCase(args[1])).toList();
+                if (rows.isEmpty()) send(sender,"&7No observations / 尚无观测");
+                for (var row:rows.stream().limit(10).toList()) {
+                    send(sender,"&e"+row.name()+" | "+row.train()+" | "+row.status());
+                    send(sender,"&7manifest="+row.manifest()+" assigned="+row.memberResources().size()+"/"+row.expected().size()
+                            +" continuityLost="+row.continuityLost());
+                    if (args.length==2) {
+                        send(sender,"&7INFERRED totals: entered="+row.entered().values().stream().mapToInt(Integer::intValue).sum()
+                                +" exited="+row.exited().values().stream().mapToInt(Integer::intValue).sum());
+                        row.memberResources().entrySet().stream().limit(32).forEach(e -> send(sender,"&7"+e.getKey()+" -> "+e.getValue()));
+                        row.transfers().stream().skip(Math.max(0,row.transfers().size()-8)).forEach(e ->
+                                send(sender,"&7INFERRED "+e.member()+" @ "+e.node()+" "+e.entryPort()+">"+e.exitPort()));
+                    }
+                }
+                if (rows.size()>10) send(sender,"&7Showing 10; filter by name/UUID / 请按名称或UUID筛选");
+                return true;
+            }
             case "ma" -> {
                 if (args.length >= 2 && args[1].equalsIgnoreCase("clear")) {
                     if (!(sender instanceof org.bukkit.command.ConsoleCommandSender)) {
@@ -340,7 +366,7 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
             return List.of();
         }
         String prefix = args[0].toLowerCase(java.util.Locale.ROOT);
-        return List.of("help", "version", "inspect", "status", "rebuild", "export", "switch", "admin", "occupancy", "ma").stream()
+        return List.of("help", "version", "inspect", "status", "rebuild", "export", "switch", "admin", "occupancy", "ma", "integrity").stream()
                 .filter(value -> value.startsWith(prefix)).toList();
     }
 

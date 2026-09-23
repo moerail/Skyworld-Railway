@@ -1,6 +1,6 @@
 package net.skyworld.stcs;
 import java.util.*;
-import net.skyworld.sta.api.v4.ShadowAuthorityService.*;
+import net.skyworld.sta.api.v5.ShadowAuthorityService.*;
 
 public final class MaSoundTrackerTest {
     static final UUID train=UUID.randomUUID(),lease=UUID.randomUUID(),session=UUID.randomUUID();

@@ -4,7 +4,7 @@ import java.nio.file.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import net.skyworld.sta.api.v3.*;
-import net.skyworld.sta.api.v4.*;
+import net.skyworld.sta.api.v5.*;
 
 public final class ShadowSwitchControlTest {
     public static void main(String[] args) throws Exception {

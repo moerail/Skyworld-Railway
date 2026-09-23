@@ -4,7 +4,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 import net.skyworld.sta.api.v3.ConsistObservation;
-import net.skyworld.sta.api.v4.DriverDeskService;
+import net.skyworld.sta.api.v5.DriverDeskService;
 
 public final class ShadowCoverageTest {
     static final UUID other=UUID.randomUUID(),member=UUID.randomUUID(),missing=UUID.randomUUID();

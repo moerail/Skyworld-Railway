@@ -1,4 +1,4 @@
-package net.skyworld.sta.api.v4;
+package net.skyworld.sta.api.v5;
 
 import java.util.*;
 import java.util.concurrent.CompletionStage;

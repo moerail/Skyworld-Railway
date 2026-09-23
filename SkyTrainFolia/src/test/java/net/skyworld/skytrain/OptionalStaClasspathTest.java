@@ -32,7 +32,7 @@ public final class OptionalStaClasspathTest {
             assert process.exitValue()==0 : "Standalone JVM failed";
             return;
         }
-        try { Class.forName("net.skyworld.sta.api.v4.DriverDeskService"); throw new AssertionError("STA still present"); }
+        try { Class.forName("net.skyworld.sta.api.v5.DriverDeskService"); throw new AssertionError("STA still present"); }
         catch(ClassNotFoundException expected) { }
         Path root=Path.of(Train.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         int scanned=0;
