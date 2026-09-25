@@ -42,6 +42,10 @@ Minecraft is both the live operating environment and an interactive railway-syst
 
 **当前为预发布 / Current pre-release: [`suite-v4.0.0`](https://github.com/moerail/Skyworld-Railway/releases/tag/suite-v4.0.0)。** 自动检查已通过，最近修复尚待服务器复测。Automated checks passed; the latest fixes still await live-server retesting.
 
+**本地修复 / Local patch: STCS 4.0.2（未发布 / unpublished）**：包含 Windows 账本替换重试，以及 `/stcs admin ma restart`（权限 `stcs.admin`，支持控制台）。仅恢复 I/O 故障导致的 MA 停用；保留占用、备份账本，旧可执行许可对应列车需有新鲜停稳报告。恢复后司机重新申请 MA，不自动缓解制动；持续写入失败则继续停用。与上述发布的其他组件兼容，仅需替换 STCS。
+
+STCS 4.0.2 retries transient Windows ledger replacement failures and adds `/stcs admin ma restart` (`stcs.admin`, console supported). Recovery is limited to I/O faults, backs up the ledger, retains occupancy and requires fresh stationary reports for outstanding executable authorities. Drivers must demand MA again; brakes are not released. Persistent write failures remain fail-closed. Only STCS needs replacing; the other released components remain compatible.
+
 本批版本为 **STF 4.0.0 / STCS 4.0.0 / STA 2.0.0 / SkyPCC 2.0.0**。新增 STA v6 可执行授权与 PCC `/api/v6/operational-ma`、SR 审批接口；原有 v5 影子信息继续保留。不要混用旧版二进制：停服、备份后一起替换所安装的组件并强制刷新网页。STF 仍可独立安装。保留 RailGraph 与占用账本，不应删除数据来升级。
 
 This release uses **STF 4.0.0 / STCS 4.0.0 / STA 2.0.0 / SkyPCC 2.0.0**. It adds executable STA v6 permissions and PCC `/api/v6/operational-ma` and SR approval, while preserving v5 shadow information. Do not mix old and new binaries: stop and back up the server, replace installed components together, then hard-refresh the browser. STF remains standalone-capable. Keep RailGraph and occupancy ledgers.

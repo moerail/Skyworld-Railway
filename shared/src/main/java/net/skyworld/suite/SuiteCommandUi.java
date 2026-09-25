@@ -59,6 +59,7 @@ public final class SuiteCommandUi {
         new Entry("stcs", "ma demand|release", "司机申请／释放影子 MA；ATP 不动作", "Driver requests/releases shadow MA; no ATP intervention", "Demander/libérer la MA d'observation ; ATP inactif", "運転士がシャドー MA を要求／解放。ATP 非介入"),
         new Entry("stcs", "ma status", "管理员只读查询 MA 和阻塞原因", "Read-only MA/blocker diagnostics for administrators", "Diagnostic MA et blocages en lecture seule (administrateur)", "管理者用 MA・阻害要因の参照専用診断"),
         new Entry("stcs", "admin status", "查询 ATP 模式", "Show ATP mode", "Afficher le mode ATP", "ATP モードを確認"),
+        new Entry("stcs", "admin ma restart", "恢复因写入故障停用的 MA 服务；保留占用，需重新申请", "Recover MA after an I/O failure; retain occupancy, demand again", "Rétablir le service MA après une erreur E/S ; occupation conservée, nouvelle demande requise", "入出力障害後の MA サービス復旧。占有維持・再要求が必要"),
         new Entry("stcs", "admin isolate true|false", "切除／接通列控通道，保留只读里程", "Isolate/reconnect train control; retain read-only mileage", "Isoler/rétablir la commande ; conserver le kilométrage en lecture seule", "列控制御を開放／接続。キロ程の参照は維持"),
         new Entry("stcs", "admin bypass true|false", "切换监督旁路", "Toggle supervision bypass", "Activer/désactiver le contournement de supervision", "監視バイパスを切替"),
         new Entry("stcs", "admin shadow true|false", "切换无防护影子测试；受状态转换限制", "Toggle unprotected shadow testing; transition guards apply", "Basculer les essais sans protection ; transitions contrôlées", "無防護シャドーテストを切替。状態遷移条件あり"),

@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.nio.file.*;
 import java.util.*;
 import net.skyworld.sta.api.v3.ConsistObservation.Member;
@@ -59,9 +60,38 @@ final class ShadowOccupancyStore {
         return new Gson().toJson(new Document(2,trains));
     }
     static void save(Path file,String json) throws IOException {
+        save(file,json,(source,target,options)->Files.move(source,target,options),Thread::sleep);
+    }
+    @FunctionalInterface
+    interface Move {
+        void apply(Path source,Path target,CopyOption... options) throws IOException;
+    }
+    @FunctionalInterface
+    interface Pause {
+        void await(long millis) throws InterruptedException;
+    }
+    static void save(Path file,String json,Move move,Pause pause) throws IOException {
         Path tmp=file.resolveSibling(file.getFileName()+".tmp");
         Files.writeString(tmp,json);
-        try { Files.move(tmp,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING); }
-        catch(AtomicMoveNotSupportedException ex) { Files.move(tmp,file,StandardCopyOption.REPLACE_EXISTING); }
+        // Windows readers/scanners can briefly deny replacement. Retry the closed,
+        // unchanged snapshot; never delete or truncate the committed ledger to unlock it.
+        long[] delays={10,25,50,100};
+        for(int attempt=0;;attempt++) {
+            try {
+                try { move.apply(tmp,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING); }
+                catch(AtomicMoveNotSupportedException ex) { move.apply(tmp,file,StandardCopyOption.REPLACE_EXISTING); }
+                return;
+            } catch(AccessDeniedException ex) {
+                if(attempt==delays.length) throw ex;
+                try { pause.await(delays[attempt]); }
+                catch(InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    var failure=new InterruptedIOException("Interrupted while replacing occupancy ledger; snapshot retained: "+tmp);
+                    failure.initCause(interrupted);
+                    failure.addSuppressed(ex);
+                    throw failure;
+                }
+            }
+        }
     }
 }

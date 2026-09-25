@@ -42,6 +42,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
     private Map<UUID,Set<String>> persistedResources=Map.of();
     private Set<UUID> persistedOutside=Set.of();
     private boolean closed,failed,unbounded=true;
+    private boolean restartable;
     private volatile ShadowAuthorityService.Snapshot latest;
     private volatile net.skyworld.sta.api.v6.OperationalAuthorityService.Snapshot operational;
     private final Map<UUID,net.skyworld.sta.api.v6.OperationalAuthorityService.Grant> liveGrants=new HashMap<>();
@@ -565,11 +566,15 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
             if(plugin!=null)plugin.notifyPccUpdate();
         } catch(Exception|LinkageError ex) {
             failed=true;
+            restartable=ex instanceof java.io.IOException;
             latest=new ShadowAuthorityService.Snapshot(5,true,false,session,++sequence,now,model==null?0:model.graph.revision,"FAILED",List.of(),latest.sections());
             operational=new net.skyworld.sta.api.v6.OperationalAuthorityService.Snapshot(6,session,sequence,now,
                     model==null?0:model.graph.revision,"FAILED",List.of(),List.of());
             diagnostics=new Diagnostics(latest,false,diagnostics.blockers(),Map.of(),diagnostics.trainNames(),diagnostics.coverage());
-            if(plugin!=null)plugin.getLogger().log(java.util.logging.Level.SEVERE,"Shadow MA stopped; no ATP action. Retained occupancy not cleared.",ex);
+            if(plugin!=null)plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                    "MA service stopped; new shadow and operational authorities withheld. Retained occupancy not cleared. "
+                    + "Enforced trains retain onboard EoA supervision or brake hold. "
+                    + "For a ledger write failure, check file access and preserve both the ledger and its .tmp snapshot before restarting.",ex);
             else throw new IllegalStateException("Shadow runtime failed",ex);
         }
     }
@@ -671,9 +676,65 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
         long now=System.currentTimeMillis();
         if(!force && occupied.equals(persistedResources) && outside.equals(persistedOutside) && now-lastPersistedAt<1000) return;
         String json=ShadowOccupancyStore.encode(records);
-        if(json.equals(persisted))return;
+        if(!force && json.equals(persisted))return;
         ShadowOccupancyStore.save(file,json);
         persisted=json;lastPersistedAt=now;persistedResources=Map.copyOf(occupied);persistedOutside=Set.copyOf(outside);
+    }
+
+    synchronized String restartMa(String actor) {
+        if (closed) return "CLOSED";
+        if (!failed) return "ALREADY_RUNNING";
+        if (!restartable) return "SERVER_RESTART_REQUIRED";
+        try {
+            var input=inputSource.get();
+            if (!input.available() || input.graph()==null || input.driverSession()==null
+                    || !input.driverSession().equals(input.rosterSession())) return "SOURCE_UNAVAILABLE";
+            // An old executable authority can still be supervised onboard. Never discard it while moving or unobserved.
+            long now=System.currentTimeMillis();
+            for (var grant:liveGrants.values()) if (grant.executable()) {
+                var report=input.reports().stream().filter(m -> m.header().trainId().equals(grant.trainId())
+                        && m.header().kind()==StaMessage.Kind.TRACK_REPORT).findFirst().orElse(null);
+                if (report==null || !fresh(report.header().emittedAtMillis(),now)
+                        || !fresh(report.physical().state().observedAtMillis(),now)
+                        || !Double.isFinite(report.physical().state().speedMetersPerSecond())
+                        || Math.abs(report.physical().state().speedMetersPerSecond())>.05) return "STOP_TRAINS_FIRST";
+            }
+            String suffix=".restart-"+UUID.randomUUID()+".bak";
+            if (Files.exists(file)) {
+                ShadowOccupancyStore.load(file);
+                Files.copy(file,file.resolveSibling(file.getFileName()+suffix));
+            }
+            Path tmp=file.resolveSibling(file.getFileName()+".tmp");
+            if (Files.exists(tmp)) Files.copy(tmp,tmp.resolveSibling(tmp.getFileName()+suffix));
+            persist(true);
+            Files.writeString(file.resolveSibling("ma-restart-audit.log"),java.time.Instant.now()+" actor="
+                    +actor.replace('\n',' ').replace('\r',' ')+" ledger verified; demands reset\n",
+                    StandardOpenOption.CREATE,StandardOpenOption.APPEND);
+            intents.keySet().forEach(soundTracker::reset);
+            var previousIntents=Map.copyOf(intents);
+            intents.clear();reserved.clear();maPoints.clear();liveGrants.clear();
+            acknowledgedGrants.clear();warnedLostGrants.clear();reversed.clear();
+            pendingPoints.clear();
+            switchResults.forEach((id,result) -> result.complete(new Reply(id,"REJECTED","SERVICE_RESTARTED")));
+            uncertain.addAll(occupied.keySet());
+            restartable=false;
+            failed=false;
+            tick();
+            previousIntents.forEach((train,intent) -> {
+                try {
+                    eventSink.accept(new MaAction(train,diagnostics.trainNames().getOrDefault(train,train.toString()),
+                            intent.driver(),actor,"unavailable",failed?"FAILED":"INACTIVE",
+                            failed?"MA_RESTART_FAILED":"MA_RESTARTED_DEMAND_REQUIRED",intent.mode(),false));
+                } catch(RuntimeException ex) {
+                    if(plugin!=null) plugin.getLogger().warning("MA restart event delivery failed: "+ex.getClass().getSimpleName());
+                }
+            });
+            return failed?"FAILED":"RESTARTED";
+        } catch (java.io.IOException | RuntimeException ex) {
+            failed=true;
+            if (plugin!=null) plugin.getLogger().log(java.util.logging.Level.SEVERE,"MA restart rejected; occupancy retained",ex);
+            return "FAILED";
+        }
     }
 
     private void clearRetained(UUID id) {

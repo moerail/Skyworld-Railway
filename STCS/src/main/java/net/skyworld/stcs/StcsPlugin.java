@@ -339,6 +339,24 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
                 return true;
             }
             case "admin" -> {
+                if (args.length >= 2 && args[1].equalsIgnoreCase("ma")) {
+                    if (!hasAdminPermission(sender)) { send(sender,"&cYou do not have permission."); return true; }
+                    if (args.length != 3 || !args[2].equalsIgnoreCase("restart")) {
+                        send(sender,"&e/stcs admin ma restart"); return true;
+                    }
+                    String actor=sender.getName();
+                    send(sender,"&eMA recovery queued. Occupancy is retained; this does not release brakes.");
+                    getServer().getAsyncScheduler().runNow(this, task -> {
+                        String result=shadow==null?"SERVER_RESTART_REQUIRED":shadow.restartMa(actor);
+                        getLogger().info("MA restart actor="+actor+" result="+result);
+                        notifyPccUpdate();
+                        Runnable reply=() -> send(sender,"&eMA restart: "+result
+                                +". RESTARTED: drivers must demand MA again; brakes are not released.");
+                        if (sender instanceof Player player) player.getScheduler().run(this,t -> reply.run(),null);
+                        else getServer().getGlobalRegionScheduler().run(this,t -> reply.run());
+                    });
+                    return true;
+                }
                 handleProtection(sender, args);
                 return true;
             }
@@ -411,8 +429,8 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
                 ? List.of("demand", "sh", "sr", "ack", "release", "status") : List.of("demand", "sh", "sr", "ack", "release")).stream()
                 .filter(s -> s.startsWith(args[1].toLowerCase(java.util.Locale.ROOT))).toList();
         if (args.length >= 2 && args[0].equalsIgnoreCase("admin") && hasAdminPermission(sender)) {
-            List<String> options = args.length == 2 ? ProtectionCommand.actions()
-                    : args.length == 3 ? ProtectionCommand.values(args[1]) : List.of();
+            List<String> options = args.length == 2 ? java.util.stream.Stream.concat(ProtectionCommand.actions().stream(),java.util.stream.Stream.of("ma")).toList()
+                    : args.length == 3 ? (args[1].equalsIgnoreCase("ma")?List.of("restart"):ProtectionCommand.values(args[1])) : List.of();
             String prefix = args[args.length - 1].toLowerCase(java.util.Locale.ROOT);
             return options.stream().filter(s -> s.startsWith(prefix)).toList();
         }

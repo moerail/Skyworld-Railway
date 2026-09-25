@@ -1,5 +1,18 @@
 # Updates / 更新说明
 
+## STCS 4.0.2 local patch / 本地修复（未发布）
+
+- Add administrator/console command `/stcs admin ma restart` (`stcs.admin`) for a stopped MA service after an I/O failure. Back up the ledger and pending snapshot, force a real write, retain occupancy, reset demands and revalidate current inputs. Drivers must request MA again; recovery never releases brakes or changes ATP channels.
+- Require fresh stationary reports for outstanding executable authorities. Reject unavailable sources, persistent write failures and non-I/O runtime faults; those faults still require investigation/server restart. Running service returns `ALREADY_RUNNING` without disruption.
+- 新增管理员/控制台恢复指令，保留占用并备份账本；恢复后司机重新申请 MA，不自动缓解制动。旧有效许可对应列车必须有新鲜的停稳报告；数据源不可用、持续写入失败时拒绝恢复。其他运行时错误不允许用此指令绕过。
+- Includes the 4.0.1 Windows file-replacement retry fix. Compatible with STF 4.0.0 / STA 2.0.0 / SkyPCC 2.0.0; no protocol change. / 包含 4.0.1 文件替换重试；仅替换 STCS，无协议变更。
+
+## STCS 4.0.1 local patch / 本地修复（未发布）
+
+- Retry an access-denied occupancy-ledger replacement up to five attempts, with 185 ms of total backoff. This covers temporary Windows file sharing conflicts; persistent permission failures and other I/O failures still stop MA allocation.
+- Preserve the committed ledger and pending `.tmp` snapshot on failed replacement. Do not delete or truncate the live ledger to bypass a lock. Correct the failure message for the experimental Enforced channel.
+- 针对 Windows 拒绝替换占用账本增加有限重试；重试仍失败则继续停发 MA，不清除占用。修正错误日志中旧的“无 ATP 动作”描述。STCS 4.0.1 与本轮 STF 4.0.0 / STA 2.0.0 / SkyPCC 2.0.0 配套，协议未变。
+
 ## Experimental M3 manual-train protection / M3 手动列车实验保护 - 2026-09-25
 
 **Pre-release: `suite-v4.0.0`.** 73 Java test entry points and PCC edge-line / four-language resource checks passed before publication. The latest fixes have not completed another live-server acceptance run.
