@@ -1,5 +1,5 @@
 name: STCS
-version: 3.0.0
+version: 4.0.0
 main: net.skyworld.stcs.StcsPlugin
 api-version: '1.13'
 folia-supported: true

@@ -5,6 +5,8 @@ public final class ProtectionModeTest {
         UiMessages ui = new UiMessages(null);
         for (UiLanguage language : UiLanguage.values()) {
             check(!ui.text(language, "protection.tractionBlocked").equals("protection.tractionBlocked"));
+            check(!ui.text(language, "protection.operation").equals("protection.operation"));
+            check(!ui.text(language, "protection.operation.AUTO").equals("protection.operation.AUTO"));
             for (String key : new String[]{"atp", "eoa", "ma", "rbc", "train", "notImplemented", "isolated", "noStcs", "noRbc", "alpha", "permission", "select", "stop", "invalid", "compatible", "disableFirst"}) {
                 String id = "protection." + key;
                 check(!ui.text(language, id).equals(id));
@@ -15,15 +17,18 @@ public final class ProtectionModeTest {
                 check(ui.text(language, key).length() <= 30);
             }
         }
-        check(CabSidebar.LINE_COUNT == 14);
+        check(CabSidebar.LINE_COUNT == 15);
         for (ProtectionMode mode : ProtectionMode.values()) {
-            if (mode == ProtectionMode.RECOVERING) rejectsKey(mode::requireTraction, "protection.tractionBlocked");
-            else mode.requireTraction();
+            if (mode == ProtectionMode.RECOVERING || mode == ProtectionMode.ACTIVE)
+                rejectsKey(() -> mode.requireTraction(OperatingMode.SB), "protection.tractionBlocked");
+            else mode.requireTraction(OperatingMode.SB);
+            if (mode == ProtectionMode.ACTIVE) mode.requireTraction(OperatingMode.FS);
             check(mode.controlChannel() == (mode != ProtectionMode.ISOLATED));
-            for (String action : new String[]{"isolate", "bypass", "shadow"}) {
+            for (String action : new String[]{"isolate", "bypass", "shadow", "enforce"}) {
                 ProtectionMode target = switch (action) {
                     case "isolate" -> ProtectionMode.ISOLATED;
                     case "bypass" -> ProtectionMode.BYPASS;
+                    case "enforce" -> ProtectionMode.ACTIVE;
                     default -> ProtectionMode.SHADOW;
                 };
                 for (boolean stopped : new boolean[]{false, true}) {

@@ -56,6 +56,7 @@ final class CabUiManager implements Listener {
     private final Map<UUID, Long> reverserSwingTicks = new ConcurrentHashMap<>();
     private final Set<UUID> pendingSidebarRefreshes = ConcurrentHashMap.newKeySet();
     private volatile ScheduledTask refreshTask;
+    private volatile long sessionGeneration;
 
     CabUiManager(SkyTrainPlugin plugin, TrainManager manager,
             LineInfrastructureManager infrastructureManager, UiMessages ui) {
@@ -96,9 +97,59 @@ final class CabUiManager implements Listener {
         }
     }
 
+    record ReloadSnapshot(List<CabSession> sessions, Set<UUID> drivers) {}
+
+    ReloadSnapshot detachForReload(Set<UUID> declaredDrivers) {
+        synchronized (sessions) {
+            sessionGeneration++;
+            var affected = new java.util.HashSet<>(declaredDrivers);
+            affected.addAll(hotbarDrivers);
+            var previous = List.copyOf(sessions.values());
+            sessions.clear();
+            hotbarDrivers.clear();
+            reverserSwingTicks.clear();
+            pendingSidebarRefreshes.clear();
+            return new ReloadSnapshot(previous, Set.copyOf(affected));
+        }
+    }
+
+    Runnable resetForReload() {
+        var drivers = new java.util.HashSet<UUID>();
+        plugin.driverDesks().forEach(desk -> drivers.add(desk.driverId()));
+        var reset = detachForReload(drivers);
+        // Finish on owning entity schedulers only after the driver registry has been revoked.
+        return () -> finishReload(reset);
+    }
+
+    private void finishReload(ReloadSnapshot reset) {
+        for (CabSession session : reset.sessions()) {
+            Player player = Bukkit.getPlayer(session.playerId);
+            if (player != null) restorePlayer(player, session, true);
+        }
+        for (UUID driver : reset.drivers()) {
+            Player player = Bukkit.getPlayer(driver);
+            if (player == null) continue;
+            player.getScheduler().run(plugin, task -> {
+                if (player.isOnline() && manager.drivingTarget(player) == null) {
+                    plugin.send(player, "&e" + localized(ui.language(player),
+                            "配置已重载：驾驶权和热键驾驶已收回。请重新 /st drive；需要热键驾驶时先选中第 5 格，再 /st hotbar。",
+                            "Reload: driving control and hotbar cab were released. Use /st drive again; select slot 5 before /st hotbar.",
+                            "Rechargement : commande et barre rapide libérées. Refaites /st drive ; sélectionnez la case 5 avant /st hotbar.",
+                            "再読込により運転権限とホットバー運転を解除しました。再度 /st drive を実行し、5番スロットを選んで /st hotbar を実行してください。"));
+                }
+            }, () -> {});
+        }
+        start();
+    }
+
     void open(Player player, Train train) {
         requireDrivingControl(player, train);
         activate(player, train, true);
+    }
+
+    void showDriving(Player player, Train train) {
+        requireDrivingControl(player, train);
+        activate(player, train, false);
     }
 
     void release(Player player) {
@@ -128,6 +179,7 @@ final class CabUiManager implements Listener {
     }
 
     boolean toggleHotbar(Player player, Train train) {
+        long generation = sessionGeneration;
         UUID playerId = player.getUniqueId();
         if (hotbarDrivers.remove(playerId)) {
             reverserSwingTicks.remove(playerId);
@@ -140,7 +192,10 @@ final class CabUiManager implements Listener {
         requireNeutralHotbarSlot(ui.language(player), player.getInventory().getHeldItemSlot());
         requireDrivingControl(player, train);
         activate(player, train, false);
-        hotbarDrivers.add(playerId);
+        synchronized (sessions) {
+            if (generation != sessionGeneration) return false;
+            hotbarDrivers.add(playerId);
+        }
         sendHotbarHint(player);
         // Enabling an input device must not release brakes or change the current handle.
         return true;
@@ -155,6 +210,7 @@ final class CabUiManager implements Listener {
     }
 
     private void activate(Player player, Train train, boolean openInventory) {
+        long generation = sessionGeneration;
         if (player == null || train == null) {
             throw new IllegalArgumentException(localized(
                     player == null ? UiLanguage.ZH : ui.language(player),
@@ -162,11 +218,15 @@ final class CabUiManager implements Listener {
                     "Aucun train sélectionné.", "運転対象の列車がありません。"));
         }
         Bukkit.getGlobalRegionScheduler().run(plugin, task -> {
-            if (!player.isOnline() || manager.train(train.id()) != train) {
-                return;
+            CabSession session;
+            CabSession existing;
+            synchronized (sessions) {
+                if (generation != sessionGeneration || !player.isOnline() || manager.train(train.id()) != train) {
+                    return;
+                }
+                session = createSession(player, train);
+                existing = sessions.put(player.getUniqueId(), session);
             }
-            CabSession session = createSession(player, train);
-            CabSession existing = sessions.put(player.getUniqueId(), session);
             player.getScheduler().run(
                     plugin,
                     playerTask -> {
@@ -429,10 +489,11 @@ final class CabUiManager implements Listener {
     }
 
     private void scheduleRidingTrainSync(Player player) {
+        long generation = sessionGeneration;
         player.getScheduler().runDelayed(
                 plugin,
-                task -> syncRidingTrain(player),
-                () -> removeSession(player, false),
+                task -> { if (generation == sessionGeneration) syncRidingTrain(player); },
+                () -> { if (generation == sessionGeneration) removeSession(player, false); },
                 1L);
     }
 
@@ -507,8 +568,10 @@ final class CabUiManager implements Listener {
         Inventory inventory = Bukkit.createInventory(
                 holder, MENU_SIZE, Component.text("SkyTrain · " + shorten(train.name(), 20)));
         holder.inventory = inventory;
+        // A delayed cleanup from a pre-reload session must not remove the new sidebar objective.
         return new CabSession(player.getUniqueId(), train.id(),
-                new CabSidebar(player.getUniqueId()), inventory, new MaBossBar(), new ShadowSpeedNotice());
+                new CabSidebar(UUID.randomUUID()), inventory, new MaBossBar(), new ShadowSpeedNotice(),
+                new AtpDriverFeedback());
     }
 
     void announceStationBraking(Train train, AutomaticRun run) {
@@ -646,11 +709,19 @@ final class CabUiManager implements Listener {
                 driver == null ? "--" : driver);
         var stcsPlugin = Bukkit.getPluginManager().getPlugin("STCS");
         boolean stcsEnabled = stcsPlugin != null && stcsPlugin.isEnabled();
-        lines[10] = line(ui.text(language, "protection.atp"), ui.text(language, "protection.mode." + train.protectionMode));
+        String operating = train.properties().conductionMode.automatic()
+                ? ui.text(language, "protection.operation.AUTO") : train.operatingMode.name();
+        lines[10] = line(ui.text(language, "protection.atp"),
+                ui.text(language, "protection.mode." + train.protectionMode) + " | " + operating);
         String unavailable = ui.text(language, train.protectionMode == ProtectionMode.ISOLATED ? "protection.isolated" : "ma.wait");
         lines[11] = line(ui.text(language, "protection.eoa"), unavailable);
         String curveLabel = localized(language, "影子限速", "Shadow limit", "Limite ombre", "影の制限速度");
+        if (train.protectionMode == ProtectionMode.ACTIVE)
+            curveLabel = ui.text(language, "protection.speedLimit");
         lines[12] = line(curveLabel, "--");
+        if (train.protectionMode == ProtectionMode.ACTIVE)
+            lines[12] = line(curveLabel, train.activeAtpLimitMps == null ? "-- (" + train.activeAtpReason + ")"
+                    : format(train.activeAtpLimitMps * 3.6) + " km/h");
         String maTitle = ui.text(language, "ma.shadow") + " MA | " + unavailable;
         Double maRemaining = null;
         Double shadowLimitMps = null;
@@ -674,9 +745,9 @@ final class CabUiManager implements Listener {
                 // Curve speed uses physical metres, unlike the legacy block-based speed preference.
                 lines[12] = line(curveLabel, curve.permittedMps() == null ? "-- (" + curve.state() + ")"
                         : format(curve.permittedMps() * 3.6) + " km/h" + warning);
-                if (session.speedNotice.update(desk == null ? null : desk.leaseId(), curve.permittedMps(),
-                        speed * 20 / scale, System.currentTimeMillis(), plugin.shadowSpeedNoticeSettings()))
-                    plugin.playMaNotice(player.getUniqueId(), desk.leaseId(), "NEAR_LIMIT");
+                String speedCue = session.speedNotice.update(desk == null ? null : desk.leaseId(), curve.permittedMps(),
+                        speed * 20 / scale, plugin.shadowSpeedNoticeSettings());
+                if (speedCue != null) plugin.playMaNotice(player.getUniqueId(), desk.leaseId(), speedCue);
             }
             if (display.live()) {
                 lines[13] = line(ui.text(language, "protection.rbc"), ui.text(language, "ma.link"));
@@ -696,6 +767,47 @@ final class CabUiManager implements Listener {
                 }
             }
         }
+        if (train.protectionMode == ProtectionMode.ACTIVE
+                && !train.properties().conductionMode.automatic()) {
+            maRemaining = train.activeAtp.remainingMeters();
+            shadowLimitMps = train.activeAtpLimitMps;
+            maTitle = ui.text(language, "ma.active") + " MA | "
+                    + (maRemaining == null ? train.activeAtpReason
+                            : ui.text(language, "ma.remaining") + " " + format(maRemaining) + " m");
+            var desk = plugin.driverDesks().stream().filter(d -> d.trainId().equals(train.id())).findFirst().orElse(null);
+            var permission = plugin.telemetrySink() == null ? OperationalPermission.unavailable("NO_STA")
+                    : plugin.telemetrySink().operationalPermission(train.id(), desk == null ? null : desk.leaseId(),
+                            System.currentTimeMillis(), train.reversed, train.reverser.name());
+            lines[11] = line("EoA", maRemaining == null ? ui.text(language, "ma.notAllocated")
+                    : (permission.available() ? "" : ui.text(language, "ma.lastConfirmed") + " ")
+                            + format(maRemaining) + " m");
+            lines[13] = line(ui.text(language, "protection.rbc"),
+                    ui.text(language, permission.available() ? "ma.link" : "ma.stale"));
+            if (manager.isDriver(player, train) && desk != null) {
+                double scale = plugin.getConfig().getDouble("infrastructure.blocks-per-meter", 1);
+                String speedCue = session.speedNotice.update(desk.leaseId(), train.activeAtpLimitMps,
+                        speed * 20 / scale, plugin.shadowSpeedNoticeSettings());
+                if (speedCue != null) plugin.playMaNotice(player.getUniqueId(), desk.leaseId(), speedCue);
+            }
+        }
+        boolean activeManual = train.protectionMode == ProtectionMode.ACTIVE
+                && !train.properties().conductionMode.automatic();
+        double speedMps = speed * 20 / plugin.getConfig().getDouble("infrastructure.blocks-per-meter", 1);
+        boolean intervention = activeManual && AtpDriverFeedback.interventionVisible(
+                train.activeAtpBrakeLevel, train.operatingMode, train.activeAtpReason, speedMps);
+        String brake = train.activeAtpBrakeLevel >= 8 ? "ATP EB" : "ATP B7";
+        String reasonKey = "protection.intervention.reason." + train.activeAtpReason;
+        String reason = ui.text(language, reasonKey);
+        if (reason.equals(reasonKey)) reason = ui.text(language, "protection.intervention.reason.OTHER");
+        lines[14] = line(ui.text(language, "protection.intervention"),
+                intervention ? brake + " " + reason : "--");
+        if (intervention) maTitle += " | " + brake;
+        UUID driverLease = plugin.driverDesks().stream().filter(d -> d.trainId().equals(train.id())
+                && d.driverId().equals(player.getUniqueId())).map(d -> d.leaseId()).findFirst().orElse(null);
+        String interventionCue = session.atpFeedback.update(driverLease,
+                activeManual && manager.isDriver(player, train), train.activeAtpBrakeLevel,
+                intervention && train.operatingMode != OperatingMode.TR);
+        if (interventionCue != null) plugin.playMaNotice(player.getUniqueId(), driverLease, interventionCue);
         ShadowCurveDisplay.limitSecond(lines);
         session.maBar.update(player, manager.isDriver(player, train),
                 ShadowCurveDisplay.bossTitle(maTitle, language, shadowLimitMps), maRemaining,
@@ -882,8 +994,7 @@ final class CabUiManager implements Listener {
                         session.sidebar.hide(player);
                         session.maBar.close(player);
                     }
-                    if (closeInventory && player.getOpenInventory().getTopInventory().getHolder()
-                            instanceof CabInventoryHolder) {
+                    if (closeInventory && player.getOpenInventory().getTopInventory() == session.inventory) {
                         player.closeInventory();
                     }
                 },
@@ -957,6 +1068,6 @@ final class CabUiManager implements Listener {
     }
 
     private record CabSession(UUID playerId, UUID trainId, CabSidebar sidebar, Inventory inventory, MaBossBar maBar,
-            ShadowSpeedNotice speedNotice) {
+            ShadowSpeedNotice speedNotice, AtpDriverFeedback atpFeedback) {
     }
 }

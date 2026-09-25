@@ -5,11 +5,11 @@ import java.util.Locale;
 
 /** The single grammar for protection commands and their completion choices. */
 record ProtectionCommand(String action, boolean enabled) {
-    static List<String> actions() { return List.of("isolate", "bypass", "shadow", "status"); }
+    static List<String> actions() { return List.of("isolate", "bypass", "shadow", "enforce", "status"); }
     static List<String> values(String action) {
         return switch (action.toLowerCase(Locale.ROOT)) {
             case "mode" -> List.of("status");
-            case "isolate", "bypass", "shadow" -> List.of("true", "false");
+            case "isolate", "bypass", "shadow", "enforce" -> List.of("true", "false");
             default -> List.of();
         };
     }

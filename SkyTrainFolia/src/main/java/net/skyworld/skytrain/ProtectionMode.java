@@ -2,7 +2,7 @@ package net.skyworld.skytrain;
 
 /** Game-specific modes; not ETCS wire mode identifiers. */
 enum ProtectionMode {
-    SHADOW, ISOLATED, BYPASS, RECOVERING;
+    SHADOW, ACTIVE, ISOLATED, BYPASS, RECOVERING;
 
     static ProtectionMode restore(String value) {
         try { return valueOf(value); } catch (RuntimeException ex) { return RECOVERING; }
@@ -12,6 +12,7 @@ enum ProtectionMode {
             case "isolate" -> ISOLATED;
             case "bypass" -> BYPASS;
             case "shadow" -> SHADOW;
+            case "enforce" -> ACTIVE;
             default -> throw new IllegalArgumentException("protection.invalid");
         };
         if (!enabled) return RECOVERING;
@@ -21,7 +22,8 @@ enum ProtectionMode {
         return target;
     }
     boolean controlChannel() { return this != ISOLATED; }
-    void requireTraction() {
-        if (this == RECOVERING) throw new IllegalArgumentException("protection.tractionBlocked");
+    void requireTraction(OperatingMode operatingMode) {
+        if (this == RECOVERING || (this == ACTIVE && !operatingMode.permitsTraction()))
+            throw new IllegalArgumentException("protection.tractionBlocked");
     }
 }

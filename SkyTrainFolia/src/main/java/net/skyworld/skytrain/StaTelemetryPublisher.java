@@ -17,6 +17,8 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
     private final LatestMessageStore store;
     private final ConcurrentMap<UUID, TrainTelemetrySnapshot> previous = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, List<TrainTelemetrySnapshot>> curveHistory = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, UUID> acknowledgedOperational = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, UUID> acknowledgementPending = new ConcurrentHashMap<>();
     private final double scale;
     private final ScheduledTask task;
     private volatile boolean closed;
@@ -76,6 +78,44 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
                     curveHistory.getOrDefault(train, List.of()), reversed, reverser);
         } catch (RuntimeException | LinkageError ex) { return ShadowCurve.Input.unavailable("UNAVAILABLE"); }
     }
+    @Override public OperationalPermission operationalPermission(UUID train, UUID lease, long now,
+            boolean reversed, String reverser) {
+        try {
+            var services = plugin.getServer().getServicesManager();
+            var authority = services.load(net.skyworld.sta.api.v6.OperationalAuthorityService.class);
+            var network = services.load(RailNetworkService.class);
+            if (network == null || Double.compare(network.blocksPerMeter(), scale) != 0)
+                return OperationalPermission.unavailable("SOURCE_UNAVAILABLE");
+            if (authority == null)
+                return OperationalPermission.unavailable("SOURCE_UNAVAILABLE", network.graphRevision(), null);
+            return StaOperationalIntegration.select(authority.operationalSnapshot(), train, lease,
+                    network.graphRevision(), now, session,
+                    curveHistory.getOrDefault(train, List.of()), reversed, reverser);
+        } catch (RuntimeException | LinkageError ex) {
+            return OperationalPermission.unavailable("UNAVAILABLE");
+        }
+    }
+    @Override public void acknowledgeOperationalGrant(UUID train, UUID lease, UUID grant, long graphRevision) {
+        if (grant == null || grant.equals(acknowledgedOperational.get(train))
+                || grant.equals(acknowledgementPending.get(train))) return;
+        acknowledgementPending.put(train, grant);
+        try {
+            plugin.getServer().getAsyncScheduler().runNow(plugin, task -> {
+                try {
+                    var service = plugin.getServer().getServicesManager()
+                            .load(net.skyworld.sta.api.v6.OperationalAuthorityService.class);
+                    if (service != null && service.acknowledgeGrant(train, lease, grant, graphRevision))
+                        acknowledgedOperational.put(train, grant);
+                } catch (RuntimeException | LinkageError ignored) {
+                    // A lost acknowledgement conservatively retains the previous reservation.
+                } finally {
+                    acknowledgementPending.remove(train, grant);
+                }
+            });
+        } catch (RuntimeException ex) {
+            acknowledgementPending.remove(train, grant);
+        }
+    }
     public void driverEvent(Train train, UUID driver, String driverName, String type, String reason) {
         try {
             var service = plugin.getServer().getServicesManager().load(RailwayEventService.class);
@@ -101,6 +141,11 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
                         System.currentTimeMillis(), expected, members, true)));
     }
     public void protectionEvent(Train train, UUID actor, String actorName, String previous, String next) {
+        try {
+            var operational = plugin.getServer().getServicesManager()
+                    .load(net.skyworld.sta.api.v6.OperationalAuthorityService.class);
+            if (operational != null) operational.revokeForChannelChange(train.id());
+        } catch (RuntimeException | LinkageError ex) { warn("Protection-channel revocation failed: " + ex); }
         try {
             var service = plugin.getServer().getServicesManager().load(RailwayEventService.class);
             if (service != null) service.publishDetailed("STF", RailwayEvent.Type.ATP_MODE_CHANGED,
@@ -206,6 +251,8 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
         if (id == null || closed) return;
         previous.remove(id);
         curveHistory.remove(id);
+        acknowledgedOperational.remove(id);
+        acknowledgementPending.remove(id);
         store.offer(new StaMessage(new StaMessage.Header(StaMessage.VERSION, StaMessage.Kind.TRAIN_REMOVED,
                 StaMessage.Source.STF, session, sequence.incrementAndGet(), System.currentTimeMillis(), id), null, null));
     }
@@ -231,6 +278,8 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
         consists = List.of();
         store.close(); previous.clear();
         curveHistory.clear();
+        acknowledgedOperational.clear();
+        acknowledgementPending.clear();
     }
     public StationForecast stationAhead(TrainTrackPosition p,double maxBlocks) {
         try {

@@ -3,44 +3,53 @@ package net.skyworld.skytrain;
 import java.util.UUID;
 import org.bukkit.configuration.ConfigurationSection;
 
-/** Per-driver-session Schmitt trigger; a missing curve does not re-arm an active warning. */
+/** Driver-only warning priority with hysteresis; missing input suspends but does not re-arm it. */
 final class ShadowSpeedNotice {
-    record Settings(double enterGapKmh, double clearGapKmh, double minimumSpeedKmh, long cooldownMillis) {
+    record Settings(double enterGapKmh, double clearGapKmh, double minimumSpeedKmh,
+            double overspeedEnterMarginKmh, double overspeedClearGapKmh) {
         Settings {
             if (!Double.isFinite(enterGapKmh) || !Double.isFinite(clearGapKmh)
                     || !Double.isFinite(minimumSpeedKmh) || enterGapKmh < 0 || clearGapKmh <= enterGapKmh
-                    || minimumSpeedKmh <= 0 || cooldownMillis < 0)
+                    || minimumSpeedKmh <= 0 || !Double.isFinite(overspeedEnterMarginKmh)
+                    || !Double.isFinite(overspeedClearGapKmh) || overspeedEnterMarginKmh < 0
+                    || overspeedClearGapKmh < 0 || overspeedClearGapKmh >= clearGapKmh)
                 throw new IllegalArgumentException("Invalid shadow-atp warning hysteresis");
         }
         static Settings load(ConfigurationSection config) {
             return new Settings(config.getDouble("shadow-atp.warning.enter-gap-kmh", 2),
                     config.getDouble("shadow-atp.warning.clear-gap-kmh", 5),
                     config.getDouble("shadow-atp.warning.minimum-speed-kmh", 0.5),
-                    config.getLong("shadow-atp.warning.cooldown-millis", 5000));
+                    config.getDouble("shadow-atp.warning.overspeed-enter-margin-kmh", 0),
+                    config.getDouble("shadow-atp.warning.overspeed-clear-gap-kmh", 1));
         }
     }
     private UUID lease;
     private boolean latched;
-    private long lastNotice = Long.MIN_VALUE;
+    private boolean overspeed;
 
-    boolean update(UUID currentLease, Double limitMps, double actualMps, long now, Settings settings) {
+    String update(UUID currentLease, Double limitMps, double actualMps, Settings settings) {
         if (!java.util.Objects.equals(lease, currentLease)) {
             lease = currentLease;
             latched = false;
-            lastNotice = Long.MIN_VALUE;
+            overspeed = false;
         }
         if (lease == null || limitMps == null || !Double.isFinite(limitMps)
-                || !Double.isFinite(actualMps) || actualMps < 0 || limitMps < 0) return false;
+                || !Double.isFinite(actualMps) || actualMps < 0 || limitMps < 0) return null;
         double speed = actualMps * 3.6, limit = limitMps * 3.6;
-        if (speed < settings.minimumSpeedKmh() || speed <= Math.max(0, limit - settings.clearGapKmh())) {
+        if (!aboveClearThreshold(limitMps, actualMps, settings)) {
             latched = false;
-            return false;
+            overspeed = false;
+            return null;
         }
-        if (latched || speed < limit - settings.enterGapKmh()) return false;
-        if (lastNotice != Long.MIN_VALUE && (now < lastNotice || now - lastNotice < settings.cooldownMillis()))
-            return false;
-        latched = true;
-        lastNotice = now;
-        return true;
+        if (speed > limit + settings.overspeedEnterMarginKmh()) overspeed = true;
+        else if (speed <= Math.max(0, limit - settings.overspeedClearGapKmh())) overspeed = false;
+        if (speed >= limit - settings.enterGapKmh()) latched = true;
+        return overspeed ? "OVERSPEED" : latched ? "NEAR_LIMIT" : null;
+    }
+
+    static boolean aboveClearThreshold(Double limitMps, double actualMps, Settings settings) {
+        return limitMps != null && Double.isFinite(limitMps) && limitMps >= 0
+                && Double.isFinite(actualMps) && actualMps * 3.6 >= settings.minimumSpeedKmh()
+                && actualMps * 3.6 > Math.max(0, limitMps * 3.6 - settings.clearGapKmh());
     }
 }

@@ -377,6 +377,7 @@ final class SkyTrainCommand implements TabExecutor {
             throw new IllegalArgumentException(ui.text(sender, "error.need-near-train"));
         }
         requireDrivingTarget(player, train);
+        cabUiManager.showDriving(player, train);
         plugin.send(sender, "&a" + ui.text(sender, "drive.locked", ui.driveStatus(sender, train)));
     }
 

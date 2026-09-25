@@ -78,7 +78,9 @@ public final class TrainManagerRefactorTest {
         trains.clear();
         templates.clear();
         store.load();
-        assert trains.size() == 4 && names.size() == 4 && carts.size() == 8;
+        assert trains.size() == ProtectionMode.values().length
+                && names.size() == ProtectionMode.values().length
+                && carts.size() == ProtectionMode.values().length * 2;
         assert templates.get("template").memberCount == 2;
         for (Train train : trains.values()) {
             assert train.protectionMode.name().equals(train.name());

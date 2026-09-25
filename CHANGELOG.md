@@ -1,5 +1,24 @@
 # Updates / 更新说明
 
+## Experimental M3 manual-train protection / M3 手动列车实验保护 - 2026-09-25
+
+**Pre-release: `suite-v4.0.0`.** 73 Java test entry points and PCC edge-line / four-language resource checks passed before publication. The latest fixes have not completed another live-server acceptance run.
+
+**预发布：`suite-v4.0.0`。** 发布前已通过 73 个 Java 测试入口及 PCC 线路归属、四语言资源检查；最近修复尚未完成新一轮服务器验收。
+
+Release set: **STF 4.0.0 / STCS 4.0.0 / STA 2.0.0 / SkyPCC 2.0.0**. Built locally; live-server acceptance is still pending. Upgrade installed components together after backing up RailGraph and retained occupancy. Do not mix binaries.
+
+- Added a separate STA v6 operational-authority service. Manual trains alone use `SB/FS/SH/SR/TR/PT`; `/stcs admin enforce true|false` explicitly changes the ATP channel while stopped. Shadow MA/EoA remains observational.
+- Added conservative onboard MA/EoA supervision with configurable relaxed/strict braking profiles, last-confirmed EoA fallback within the same graph/control session, trip acknowledgement, and a latched EB for unresponsive ordinary overspeed. New grants are acknowledged before earlier forward reservations are released.
+- Added bounded SH requests and dispatcher-approved SR to a selected infrastructure node, exposed through an authenticated PCC control and `/stcs sr` admin command. MA loss produces a deduplicated PCC warning. SR approval is a service/event operation, not an ETCS telegram; executable MA reuses private Message 1003 / Packet 1015.
+- Cab ATP mode now displays translated **channel | unchanged operating code**, for example `Enforced | SR`. STF's built-in pseudo-ATO automatic trains are excluded, including passenger-entered MA/mode commands.
+- Fixed Enforced driver feedback: near-limit/overspeed warning playback now accepts the active channel. The sidebar and BossBar identify actual ATP B7/EB intervention, with short localized reasons in the sidebar. Configurable one-shot service/emergency cues play on intervention transitions, not repeatedly during a stationary SB hold.
+- SH/SR now apply B7 immediately above their configured mode speed ceiling, independently of the relaxed FS overspeed timer. EoA overrun sends a localized TR message and emergency cue to the driver; the sidebar and BossBar retain the ATP EB indication.
+- SR target reachability is checked over the saved graph independently of the short rolling MA window. Targets beyond the initial window can be approved, but each issued grant remains bounded by locally verified occupancy and switch state. Graph gaps, unknown points and conflicts still prevent unsafe extension. Added SR route regression tests and localized SR/Trip command results in STF and PCC.
+- This is experimental game software, not certified ATP, certified interlocking or ETCS compliance. A successful local build or a browser display is not a safety acceptance test.
+
+本轮仅手动列车进入运行模式状态机；影子通道继续只读，自动列车保持 STF 内置伪 ATO 行为。强制保护需管理员在停车时显式启用，并经过实服验证。四插件及中英法日荷文档同步更新，不清空轨道图和占用账本。
+
 ## Breaking STA v5 / 破坏性协议升级 - 2026-09-23
 
 Release set: **STF 3.0.0 / STCS 3.0.0 / STA 1.0.0 / SkyPCC 1.0.0**. Not yet deployed or published.

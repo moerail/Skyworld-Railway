@@ -9,7 +9,7 @@ public record RailwayEvent(UUID session, long sequence, long emittedAtMillis, St
         java.util.Map<String, String> details) {
     public enum Type { DRIVER_UNAVAILABLE, DRIVER_RELEASED, DRIVER_ACQUIRED,
         SWITCH_CHANGED, SWITCH_RUN_THROUGH_SUSPECTED, EMERGENCY_BRAKE_APPLIED,
-        MA_REQUESTED, MA_RELEASED, ATP_MODE_CHANGED }
+        MA_REQUESTED, MA_RELEASED, MA_UNAVAILABLE, SR_GRANTED, ATP_MODE_CHANGED }
     public RailwayEvent(UUID session, long sequence, long emittedAtMillis, String source,
             Type type, UUID trainId, String trainName, UUID driverId, String driverName, String reason) {
         this(session, sequence, emittedAtMillis, source, type, trainId, trainName, driverId, driverName, reason, java.util.Map.of());

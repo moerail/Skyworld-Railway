@@ -138,13 +138,47 @@ final class TrainMotionController {
         }
         Vector direction = RailMath.direction(rail.rail.getShape(), preference);
 
+        ActiveAtpState.Decision atp = null;
+        if (index == activeLeaderIndex(train) && train.protectionMode == ProtectionMode.ACTIVE
+                && !train.properties().conductionMode.automatic()) {
+            var desk = plugin.driverDesks().stream().filter(d -> d.trainId().equals(train.id()))
+                    .findFirst().orElse(null);
+            double scale = plugin.getConfig().getDouble("infrastructure.blocks-per-meter", 1);
+            OperationalPermission permission = plugin.telemetrySink() == null
+                    ? OperationalPermission.unavailable("NO_STA")
+                    : plugin.telemetrySink().operationalPermission(train.id(),
+                            desk == null ? null : desk.leaseId(), now, train.reversed, train.reverser.name());
+            permission = permission.cappedAt(plugin.trainSpeedLimit(train) * 20 / scale);
+            OperatingMode before = train.operatingMode;
+            atp = train.activeAtp.evaluate(permission, desk == null ? null : desk.leaseId(), before,
+                    train.currentSpeed() <= .001 && train.maxMemberSpeed() <= .001,
+                    train.reversed, train.reverser.name(),
+                    Math.max(train.currentSpeed(), train.maxMemberSpeed()) * 20 / scale,
+                    train.brakeNotch, now, plugin.activeAtpSettings());
+            train.operatingMode = atp.mode();
+            train.activeAtpLimitMps = permission.available() || atp.reason().equals("LAST_CONFIRMED_EOA")
+                    ? atp.limitMps() : null;
+            train.activeAtpReason = atp.reason();
+            train.activeAtpBrakeLevel = atp.emergency() ? 8 : atp.minimumBrakeNotch();
+            if (permission.available() && atp.mode().permitsTraction()
+                    && atp.mode().name().equals(permission.mode()) && plugin.telemetrySink() != null)
+                plugin.telemetrySink().acknowledgeOperationalGrant(train.id(), desk.leaseId(),
+                        permission.id(), permission.graphRevision());
+            if (before != OperatingMode.TR && atp.mode() == OperatingMode.TR) {
+                if (desk != null) plugin.announceAtpTrip(desk.driverId(), desk.leaseId());
+                if (plugin.telemetrySink() != null)
+                    plugin.telemetrySink().driverEvent(train, desk == null ? null : desk.driverId(),
+                            host.driverName(train), "EMERGENCY_BRAKE_APPLIED", atp.reason());
+            }
+        }
+
         if (index == activeLeaderIndex(train)) {
             signActions.refreshStationLatches(train);
-            if (host.tickAutomaticSigns(train, rail.block, location, direction, now)) return;
-            if (signActions.handleSignActions(train, rail.block, location, direction, now)) {
-                return;
+            if (atp == null || (atp.minimumBrakeNotch() == 0 && atp.tractionAllowed())) {
+                if (host.tickAutomaticSigns(train, rail.block, location, direction, now)) return;
+                if (signActions.handleSignActions(train, rail.block, location, direction, now)) return;
+                signActions.prepareStationDeparture(train, now);
             }
-            signActions.prepareStationDeparture(train, now);
         }
 
         StationMotion stationMotion = train.stationMotion();
@@ -155,9 +189,8 @@ final class TrainMotionController {
             train.pauseUntilMillis = 0L;
         }
         boolean settlingReverse = reverseBraking(train, now);
-
         boolean controlledStop = (!train.driveControlEnabled && !train.moving) || waiting || settlingReverse
-                || train.emergencyBrake;
+                || train.emergencyBrake || (atp != null && atp.emergency());
         boolean playerPushCoasting = controlledStop && train.playerPushActive;
         boolean automaticHandle = train.automaticRun != null && host.automaticEligible(train);
         double desiredTrainSpeed = controlledStop ? 0.0
@@ -179,7 +212,8 @@ final class TrainMotionController {
         VehicleProfile vehicle = plugin.vehicleProfile();
         boolean speedController = index == activeLeaderIndex(train) && !train.speedControlledRecently(now);
         double speed;
-        if (speedController && stationMoving && !controlledStop) {
+        if (speedController && stationMoving && !controlledStop
+                && (atp == null || atp.minimumBrakeNotch() == 0)) {
             speed = Math.min(obstacleLimit.speed,
                     stationMotion.commandedSpeed(signActions.stationMotionMinimumSpeed(stationMotion)));
             train.seedCurrentSpeed(speed);
@@ -191,13 +225,17 @@ final class TrainMotionController {
                     && train.powerNotch > 0
                     && train.brakeNotch == 0
                     && !train.emergencyBrake
+                    && (atp == null || atp.tractionAllowed())
                     && train.currentSpeed() <= obstacleLimit.speed + 0.001;
+            int effectiveBrake = Math.max(train.brakeNotch, atp == null ? 0 : atp.minimumBrakeNotch());
+            boolean externalEmergency = obstacleLimit.emergencyBrake || settlingReverse
+                    || (atp != null && atp.emergency());
             if (vehicle.forceMode()) {
                 speed = train.updateDrivenForceSpeed(
                         now,
                         obstacleLimit.speed,
                         vehicle.tractionForce(train.powerNotch),
-                        vehicle.brakeForce(train.brakeNotch),
+                        vehicle.brakeForce(effectiveBrake),
                         vehicle.mass(),
                         vehicle.rollingForce(),
                         vehicle.airForceFactor(),
@@ -208,19 +246,19 @@ final class TrainMotionController {
                         vehicle.minimumRatio(),
                         vehicle.autoDeceleration(),
                         vehicle.emergencyForce(),
-                        obstacleLimit.emergencyBrake || settlingReverse,
+                        externalEmergency,
                         tractionAllowed);
             } else {
                 speed = train.updateDrivenSpeed(
                         now,
                         obstacleLimit.speed,
                         vehicle.powerAcceleration(train.powerNotch),
-                        vehicle.brakeAcceleration(train.brakeNotch),
+                        vehicle.brakeAcceleration(effectiveBrake),
                         vehicle.rolling(),
                         vehicle.air(),
                         vehicle.autoDeceleration(),
                         vehicle.autoEmergency(),
-                        obstacleLimit.emergencyBrake || settlingReverse,
+                        externalEmergency,
                         tractionAllowed);
             }
         } else if (speedController) {
@@ -230,7 +268,7 @@ final class TrainMotionController {
                     vehicle.autoAcceleration(),
                     playerPushCoasting ? settings.playerPushDecelerationPerTick() : vehicle.autoDeceleration(),
                     vehicle.autoEmergency(),
-                    obstacleLimit.emergencyBrake || settlingReverse);
+                    obstacleLimit.emergencyBrake || settlingReverse || (atp != null && atp.emergency()));
             if (playerPushCoasting && speed <= 0.001) {
                 train.clearPlayerPush();
             }
@@ -331,6 +369,11 @@ final class TrainMotionController {
         } else {
             infrastructureManager.observeTrainMovement(
                     train, trackPath.probeAhead(0.0, train.reversed), 0.0);
+        }
+        if (train.protectionMode == ProtectionMode.ACTIVE
+                && !train.properties().conductionMode.automatic()) {
+            double scale = plugin.getConfig().getDouble("infrastructure.blocks-per-meter", 1);
+            if (Double.isFinite(scale) && scale > 0) train.activeAtp.advance(movedThisFrame / scale);
         }
         Map<UUID, TrainMemberTarget> targets = new LinkedHashMap<>();
         List<TrainRailPath.MemberPlacement> placements = trackPath.placements(

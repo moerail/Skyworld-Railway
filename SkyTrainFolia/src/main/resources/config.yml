@@ -11,26 +11,84 @@ shadow-atp:
   # Fraction of the selected vehicle profile's B7 deceleration; level-track model.
   service-brake-factor: 0.8
   warning:
-    # Warn when speed >= limit - enter-gap; re-arm below limit - clear-gap.
+    # Continuous driver-only warning: enter at limit - enter-gap (km/h).
+    # Stop at/below limit - clear-gap, or below minimum-speed. No burst cooldown.
     enter-gap-kmh: 2.0
     clear-gap-kmh: 5.0
     minimum-speed-kmh: 0.5
-    cooldown-millis: 5000
+    # Overspeed takes priority. Enter ABOVE limit + margin; return to near-limit
+    # at/below limit - overspeed-clear-gap. Clear gap must be below clear-gap-kmh.
+    overspeed-enter-margin-kmh: 0.0
+    overspeed-clear-gap-kmh: 1.0
+    # Legacy cooldown-millis is ignored; warning melodies loop without gaps.
+
+# Manual trains only. Experimental, non-certified onboard ATP intervention presets.
+# The administrator must explicitly select the ACTIVE channel; this does not affect pseudo-ATO trains.
+active-atp:
+  profile: relaxed
+  profiles:
+    relaxed:
+      stop-margin-meters: 1.0
+      approach-distance-meters: 5.0
+      approach-speed-kmh: 5.0
+      reaction-seconds: 1.0
+      service-brake-factor: 0.8
+      overspeed-tolerance-kmh: 10.0
+      overspeed-grace-seconds: 10.0
+      service-to-emergency-seconds: 5.0
+    strict:
+      stop-margin-meters: 1.0
+      approach-distance-meters: 5.0
+      approach-speed-kmh: 5.0
+      reaction-seconds: 1.5
+      service-brake-factor: 0.7
+      overspeed-tolerance-kmh: 2.0
+      overspeed-grace-seconds: 1.0
+      service-to-emergency-seconds: 2.0
 
 # MA audio is driver-only. Reload with /st reload after stopping all trains.
 # Sound IDs are namespace:path; omitted namespace defaults to minecraft.
 # Custom resource-pack IDs are allowed; the client must have the sound installed.
-# volume: 0..4; pitch: 0.5..2; count: 1..5; interval-ticks: 1..200 (20 ticks/s).
+# volume: 0..4; pitch: 0.5..2; count: 1..16; interval-ticks: 1..200 (20 ticks/s).
+# Optional pitch-sequence replaces pitch. count repeats the whole sequence; max 64 notes.
+# near-limit/overspeed loop continuously while active; interval is between notes.
 # category: MASTER, MUSIC, RECORDS, WEATHER, BLOCKS, HOSTILE, NEUTRAL, PLAYERS, AMBIENT, VOICE.
 ma-sounds:
   enabled: true
   near-limit:
     enabled: true
-    sound: minecraft:block.note_block.bell
+    sound: minecraft:block.note_block.flute
+    category: MASTER
+    volume: 1.0
+    # Vanilla approximation of C5-G5, not a recording of a CTCS buzzer.
+    pitch: 0.7071068
+    pitch-sequence: [0.7071068, 1.0594631]
+    count: 6
+    interval-ticks: 5
+  overspeed:
+    enabled: true
+    sound: minecraft:block.note_block.bit
     category: MASTER
     volume: 1.0
     pitch: 1.5
     count: 1
+    interval-ticks: 3
+  # One-shot cues on ATP brake transitions in Enforced, manual trains only.
+  atp-service:
+    enabled: true
+    sound: minecraft:block.bell.use
+    category: MASTER
+    volume: 0.9
+    pitch: 1.3
+    count: 1
+    interval-ticks: 5
+  atp-emergency:
+    enabled: true
+    sound: minecraft:block.note_block.basedrum
+    category: MASTER
+    volume: 1.2
+    pitch: 0.8
+    count: 3
     interval-ticks: 5
   granted:
     enabled: true
@@ -58,11 +116,11 @@ ma-sounds:
     interval-ticks: 5
   shrinking:
     enabled: true
-    sound: minecraft:entity.experience_orb.pickup
+    sound: minecraft:block.note_block.bit
     category: MASTER
     volume: 1.0
     pitch: 1.0
-    count: 1
+    count: 3
     interval-ticks: 5
   low:
     enabled: true

@@ -11,6 +11,7 @@ import java.util.concurrent.*;
 import org.bukkit.plugin.java.JavaPlugin;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.skyworld.sta.api.v5.*;
+import net.skyworld.sta.api.v6.OperationalAuthorityService;
 import net.skyworld.sta.api.v3.RailwayEventService;
 import net.skyworld.sta.api.v3.ConsistObservationService;
 import net.skyworld.sta.api.v5.*;
@@ -44,6 +45,11 @@ public final class SkyPccPlugin extends JavaPlugin {
     private String mode;
     private volatile long generation;
     private volatile byte[] shadowMa = bytes("{\"status\":\"UNAVAILABLE\"}");
+    private volatile byte[] operationalMa = bytes("{\"status\":\"UNAVAILABLE\"}");
+    private volatile OperationalAuthorityService operationalSource;
+    private volatile long operationalRevision = -1;
+    private volatile Set<UUID> pendingSrTrains = Set.of();
+    private final SrGateway srGateway = new SrGateway();
     private volatile SwitchControlService switchControl;
     private final SwitchGateway switchGateway = new SwitchGateway();
     private boolean controlEnabled;
@@ -135,12 +141,32 @@ public final class SkyPccPlugin extends JavaPlugin {
             switchControl = svc.load(SwitchControlService.class);
         } catch (RuntimeException | LinkageError ex) { switchControl = null; }
         shadowMa = bytes(JSON.toJson(ma));
+        Object activeMa = Map.of("status", "UNAVAILABLE");
+        try {
+            var source = svc.load(OperationalAuthorityService.class);
+            var view = source == null ? null : source.operationalSnapshot();
+            if (view != null && view.status().equals("AVAILABLE") && view.graphRevision() == revision
+                    && now >= view.emittedAtMillis() && now - view.emittedAtMillis() <= 1500) {
+                activeMa = view;
+                operationalSource = source;
+                operationalRevision = view.graphRevision();
+                pendingSrTrains = view.pendingSr().stream().map(OperationalAuthorityService.PendingSr::trainId)
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            } else {
+                operationalSource = null; operationalRevision = -1; pendingSrTrains = Set.of();
+            }
+        } catch (RuntimeException | LinkageError ex) {
+            operationalSource = null; operationalRevision = -1; pendingSrTrains = Set.of();
+        }
+        operationalMa = bytes(JSON.toJson(activeMa));
         snapshot = bytes(JSON.toJson(Map.of("schemaVersion", 5, "serverTimeMillis", now, "graphRevision", revision,
-                "serviceStatus", status, "trains", trains, "operationalEvents", eventReport, "shadowMa", ma)));
+                "serviceStatus", status, "trains", trains, "operationalEvents", eventReport,
+                "shadowMa", ma, "operationalMa", activeMa)));
         synchronized (update) { generation++; update.notifyAll(); }
     }
     private void handle(HttpExchange x) throws IOException {
         if ("/api/v5/switch".equals(x.getRequestURI().getPath())) { control(x); return; }
+        if ("/api/v6/sr".equals(x.getRequestURI().getPath())) { srControl(x); return; }
         if (!"GET".equals(x.getRequestMethod())) { reply(x, 405, "text/plain", bytes("GET required")); return; }
         String path = x.getRequestURI().getPath();
         switch (path) {
@@ -149,6 +175,7 @@ public final class SkyPccPlugin extends JavaPlugin {
             case "/api/v5/messages" -> reply(x, 200, "application/json", messages);
             case "/api/v5/railway-events" -> reply(x, 200, "application/json", operationalEvents);
             case "/api/v5/shadow-ma" -> reply(x, 200, "application/json", shadowMa);
+            case "/api/v6/operational-ma" -> reply(x, 200, "application/json", operationalMa);
             case "/api/v5/config" -> reply(x, 200, "application/json", bytes(JSON.toJson(Map.of("updateMode", mode, "pollIntervalMillis", interval, "controlEnabled", controlEnabled))));
             case "/api/v5/events" -> stream(x);
             case "/", "/index.html" -> reply(x, 200, "text/html", assets.get("index.html"));
@@ -184,6 +211,32 @@ public final class SkyPccPlugin extends JavaPlugin {
             if(result==null)result=switchGateway.progress(request,switchControl);
             reply(x, result.status().equals("PENDING") ? 202 : 200, "application/json", bytes(JSON.toJson(result)));
         } catch (RuntimeException ex) { reply(x, 400, "application/json", bytes("{\"status\":\"REJECTED\",\"reason\":\"INVALID_REQUEST\"}")); }
+    }
+    private void srControl(HttpExchange x) throws IOException {
+        var h = x.getRequestHeaders();
+        if (!ControlAccess.permitted(controlEnabled, controlToken, server.getAddress().getPort(),
+                x.getRemoteAddress().getAddress(), x.getRequestMethod(), h.getFirst("Host"),
+                h.getFirst("Origin"), h.getFirst("Authorization"), h.getFirst("Content-Type"))) {
+            reply(x, 403, "application/json", bytes("{\"status\":\"REJECTED\",\"reason\":\"LOCAL_AUTH_REQUIRED\"}"));
+            return;
+        }
+        byte[] body = x.getRequestBody().readNBytes(4097);
+        if (body.length > 4096) { reply(x, 413, "application/json", bytes("{}")); return; }
+        try {
+            JsonObject o = JsonParser.parseString(new String(body, StandardCharsets.UTF_8)).getAsJsonObject();
+            if (!o.keySet().equals(Set.of("requestId", "trainId", "targetNodeId", "graphRevision")))
+                throw new IllegalArgumentException("Invalid SR request");
+            var request = new SrGateway.Request(UUID.fromString(o.get("requestId").getAsString()),
+                    UUID.fromString(o.get("trainId").getAsString()),
+                    UUID.fromString(o.get("targetNodeId").getAsString()),
+                    o.get("graphRevision").getAsBigDecimal().longValueExact());
+            var result = srGateway.submit(request, operationalRevision, pendingSrTrains,
+                    operationalSource, work -> getServer().getAsyncScheduler().runNow(this, task -> work.run()),
+                    System.currentTimeMillis());
+            reply(x, result.status().equals("PENDING") ? 202 : 200, "application/json", bytes(JSON.toJson(result)));
+        } catch (RuntimeException ex) {
+            reply(x, 400, "application/json", bytes("{\"status\":\"REJECTED\",\"reason\":\"INVALID_REQUEST\"}"));
+        }
     }
     private void stream(HttpExchange x) throws IOException {
         if (!streamSlots.tryAcquire()) { reply(x, 503, "text/plain", bytes("Stream limit reached; use polling")); return; }

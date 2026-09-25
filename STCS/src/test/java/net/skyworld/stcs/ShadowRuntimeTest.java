@@ -14,6 +14,7 @@ public final class ShadowRuntimeTest {
     static RailGraph graph;
     static boolean hasDriver=true,available=true,reverse=false,stale=false;
     static String mode="SHADOW";
+    static TrainMode trainMode=TrainMode.MANUAL;
     static ConsistObservation.State memberState=ConsistObservation.State.OBSERVED;
     static ShadowRuntime.Inputs input() {
         long now=System.currentTimeMillis(),at=now-(stale?10000:0);
@@ -21,7 +22,7 @@ public final class ShadowRuntimeTest {
         var observation=new ConsistObservation(session,1,train,"T",at,List.of(member),List.of(
                 new ConsistObservation.Member(member,"world",20.5,64.06,.5,at,at,memberState)),false);
         var physical=new TrainTelemetrySnapshot(train,"T",1,at,"world",20,64,0,20.5,64.06,.5,1,0,0,
-                0,1,1,false,reverse,TrainMode.MANUAL,"Name is not a lease");
+                0,1,1,false,reverse,trainMode,"Name is not a lease");
         var position=new TrackPositionSnapshot(graph.revision,"a-b","a","b",20.,100.,"L",20.,at,true,false);
         var message=new StaMessage(new StaMessage.Header(StaMessage.VERSION,StaMessage.Kind.TRACK_REPORT,StaMessage.Source.STCS,
                 session,2,now,train),new StaMessage.Physical(physical,1),new StaMessage.Tracking(session,1,at,now,15000,60000,
@@ -93,6 +94,77 @@ public final class ShadowRuntimeTest {
                 runtime.tick();assert runtime.snapshot().sections().stream().anyMatch(s->s.state().equals("UNCERTAIN"));
                 assert authority(runtime).state().equals("INACTIVE");
             }
+            available=true; mode="ACTIVE"; hasDriver=true; reverse=false; stale=false;
+            memberState=ConsistObservation.State.OBSERVED;
+            Path activeDir=Files.createTempDirectory("active-authority");
+            Path activeFile=activeDir.resolve("shadow.json");
+            try {
+                try(var runtime=new ShadowRuntime(null,null,activeFile,600,2,
+                        ShadowRuntimeTest::input,r->CompletableFuture.completedFuture("COMPLETED"))) {
+                    List<ShadowRuntime.MaAction> activeEvents=new ArrayList<>();
+                    runtime.eventSink=activeEvents::add;
+                    trainMode=TrainMode.AUTOMATIC;
+                    assert runtime.command(driver,"request").equals("AUTOMATIC_TRAIN");
+                    trainMode=TrainMode.MANUAL;
+                    assert runtime.command(driver,"request").equals("REQUESTED_ACTIVE");
+                    var grants=runtime.operationalSnapshot().grants();
+                    assert grants.size()==1 && grants.getFirst().executable();
+                    var grant=grants.getFirst();
+                    assert runtime.command(driver,"sr").equals("RELEASE_FIRST")
+                            : "FS to SR requires releasing the old authority first";
+                    assert !runtime.acknowledgeGrant(train,UUID.randomUUID(),grant.id(),graph.revision);
+                    assert runtime.acknowledgeGrant(train,lease,grant.id(),graph.revision);
+                    assert !runtime.acknowledgeGrant(train,lease,grant.id(),graph.revision+1);
+                    runtime.revokeForChannelChange(train);
+                    assert runtime.operationalSnapshot().grants().isEmpty()
+                            : "old executable grant must disappear immediately";
+                    runtime.tick();
+                    assert runtime.operationalSnapshot().grants().isEmpty();
+                    assert runtime.snapshot().sections().stream().allMatch(s -> s.reservations().isEmpty());
+                    assert runtime.snapshot().sections().stream().anyMatch(s -> s.occupants().contains(train));
+                    assert runtime.command(driver,"request").equals("REQUESTED_ACTIVE");
+                    activeEvents.clear();
+                    mode="SHADOW";runtime.tick();
+                    assert runtime.operationalSnapshot().grants().isEmpty()
+                            : "channel change must revoke an old active demand";
+                    mode="ACTIVE";runtime.tick();
+                    assert runtime.operationalSnapshot().grants().isEmpty()
+                            : "returning to active must require a new demand";
+                    assert runtime.command(driver,"request").equals("REQUESTED_ACTIVE");
+                    activeEvents.clear();
+                    trainMode=TrainMode.AUTOMATIC;
+                    runtime.tick();
+                    assert runtime.operationalSnapshot().grants().isEmpty()
+                            : "an existing manual-train intent must be revoked on automatic conversion";
+                    assert activeEvents.stream().filter(e -> e.action().equals("unavailable")).count()==1;
+                    trainMode=TrainMode.MANUAL;
+                    assert runtime.command(driver,"request").equals("REQUESTED_ACTIVE");
+                    activeEvents.clear();
+                    available=false;
+                    runtime.tick();runtime.tick();
+                    assert activeEvents.stream().filter(e -> e.action().equals("unavailable")).count()==1
+                            : "active MA loss must warn once, not every poll: " + activeEvents;
+                    available=true;
+                }
+                var srA=ShadowPlannerTest.node("a","balise",0,0);
+                var srB=ShadowPlannerTest.node("b","balise",100,0);
+                var srC=ShadowPlannerTest.node("c","balise",200,0);
+                var srTarget=ShadowPlannerTest.node(UUID.randomUUID().toString(),"end",300,0);
+                graph=ShadowPlannerTest.graph(List.of(srA,srB,srC,srTarget),List.of(
+                        ShadowPlannerTest.edge(srA,srB,"east","west"),
+                        ShadowPlannerTest.edge(srB,srC,"east","west"),
+                        ShadowPlannerTest.edge(srC,srTarget,"east","west"))).graph;
+                Path srFile=activeDir.resolve("sr.json");
+                try(var runtime=new ShadowRuntime(null,null,srFile,600,2,
+                        ShadowRuntimeTest::input,r->CompletableFuture.completedFuture("COMPLETED"))) {
+                    assert runtime.command(driver,"sr").equals("SR_PENDING");
+                    assert runtime.approveSr(train,UUID.fromString(srTarget.id()),"dispatcher").equals("APPROVED");
+                    var granted=runtime.operationalSnapshot().grants();
+                    assert granted.size()==1 && granted.getFirst().mode().equals("SR")
+                            && granted.getFirst().remainingMeters()>0 && granted.getFirst().remainingMeters()<=120
+                            : "Distant SR target needs a short, locally verified initial MA: "+granted;
+                } finally {Files.deleteIfExists(srFile);Files.deleteIfExists(srFile.resolveSibling("sr.json.tmp"));}
+            } finally {Files.deleteIfExists(activeFile);Files.deleteIfExists(activeFile.resolveSibling("shadow.json.tmp"));Files.deleteIfExists(activeDir);}
         } finally {Files.deleteIfExists(file);Files.deleteIfExists(file.resolveSibling("shadow.json.tmp"));Files.deleteIfExists(dir);}
         System.out.println("PASS driver lease, stopped request, loss/reacquire, release, modes, stale/quit/rebuild and restart retention");
     }

@@ -4,6 +4,7 @@ import net.skyworld.suite.SuiteCommandUi;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -228,25 +229,83 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
                     return true;
                 }
                 if (!(sender instanceof Player player) || !sender.hasPermission("stcs.ma")) {
-                    send(sender, "&c/stcs ma demand|release (driver only)"); return true;
+                    send(sender, "&c" + protectionText(sender, "ma.usage")); return true;
                 }
-                if (args.length != 2 || !List.of("demand", "release").contains(args[1].toLowerCase(java.util.Locale.ROOT))) {
-                    send(sender, "&e/stcs ma demand|release|status"); return true;
+                if (args.length != 2 || !List.of("demand", "sh", "sr", "release", "ack").contains(args[1].toLowerCase(java.util.Locale.ROOT))) {
+                    send(sender, "&e" + protectionText(sender, "ma.usage")); return true;
                 }
                 var driver = player.getUniqueId(); String driverName = player.getName(); String action = args[1].toLowerCase(java.util.Locale.ROOT);
+                if (!action.equals("ack")) {
+                    var stf = getServer().getPluginManager().getPlugin("SkyTrainFolia");
+                    if (stf == null || !stf.isEnabled()) { send(player, "&c" + protectionText(player, "ma.NO_STF")); return true; }
+                    try {
+                        String eligibility = String.valueOf(stf.getClass()
+                                .getMethod("manualDrivingEligibility", Player.class).invoke(stf, player));
+                        if (!eligibility.equals("ELIGIBLE")) {
+                            send(player, "&c" + protectionText(player, "ma." + eligibility)); return true;
+                        }
+                    } catch (ReflectiveOperationException ex) {
+                        send(player, "&c" + protectionText(player, "ma.manualCheckUnavailable")); return true;
+                    }
+                }
+                if (action.equals("release")) {
+                    var stf = getServer().getPluginManager().getPlugin("SkyTrainFolia");
+                    if (stf != null && stf.isEnabled()) try {
+                        String onboard = String.valueOf(stf.getClass()
+                                .getMethod("releaseOperationalAuthority", Player.class).invoke(stf, player));
+                        if (!onboard.equals("RELEASED") && !onboard.equals("SHADOW")) {
+                            send(player, "&c" + protectionText(player, "ma." + onboard));
+                            return true;
+                        }
+                    } catch (ReflectiveOperationException ex) {
+                        send(player, "&c" + protectionText(player, "ma.releaseUnavailable"));
+                        return true;
+                    }
+                }
+                if(action.equals("ack")) {
+                    var stf=getServer().getPluginManager().getPlugin("SkyTrainFolia");
+                    if(stf==null || !stf.isEnabled()) { send(player,"&c"+protectionText(player,"ma.NO_PROVIDER")); return true; }
+                    try {
+                        String result=String.valueOf(stf.getClass().getMethod("acknowledgeTrainTrip", Player.class).invoke(stf,player));
+                        send(player,"&e"+protectionText(player,"ma."+result));
+                    } catch(ReflectiveOperationException ex) {send(player,"&c"+protectionText(player,"ma.ackUnavailable"));}
+                    return true;
+                }
                 Bukkit.getAsyncScheduler().runNow(this, task -> {
                     String result = shadow == null ? "UNAVAILABLE" : shadow.command(driver, action.equals("demand") ? "request" : action, driverName);
                     var diagnostics = shadow == null ? null : shadow.diagnostics();
                     player.getScheduler().run(this, reply -> {
                         if (player.isOnline()) {
                             send(player, "&e" + protectionText(player, "ma." + result));
-                            if (result.equals("REQUESTED") && diagnostics != null) {
-                                sendMaAuthority(player, diagnostics, diagnostics.drivenTrains().get(driver));
+                            if ((result.equals("REQUESTED") || result.equals("REQUESTED_ACTIVE")) && diagnostics != null) {
+                                UUID selectedTrain = diagnostics.drivenTrains().get(driver);
+                                if (result.equals("REQUESTED_ACTIVE")) sendActiveMaAuthority(player, selectedTrain);
+                                else sendMaAuthority(player, diagnostics, selectedTrain);
                                 if (!diagnostics.blockers().isEmpty() && hasAdminPermission(player))
                                     send(player, "&7" + protectionText(player, "ma.diagnosticHint"));
                             }
                         }
                     }, null);
+                });
+                return true;
+            }
+            case "sr" -> {
+                if(!hasAdminPermission(sender) || args.length!=3) {
+                    send(sender,"&c"+protectionText(sender,"ma.srUsage"));return true;
+                }
+                UUID target;
+                try { target=UUID.fromString(args[2]); }
+                catch(IllegalArgumentException ex) {send(sender,"&c"+protectionText(sender,"ma.invalidTargetUuid"));return true;}
+                var data=shadow==null?null:shadow.diagnostics();
+                UUID train=data==null?null:data.trainNames().entrySet().stream()
+                        .filter(e -> e.getValue().equalsIgnoreCase(args[1]) || e.getKey().toString().equals(args[1]))
+                        .map(Map.Entry::getKey).findFirst().orElse(null);
+                if(train==null) {send(sender,"&c"+protectionText(sender,"ma.trainNotFound"));return true;}
+                Bukkit.getAsyncScheduler().runNow(this, task -> {
+                    String result=shadow.approveSr(train,target,sender.getName());
+                    if(sender instanceof Player player) player.getScheduler().run(this,
+                            t -> send(player,"&eSR: "+protectionText(player,"ma."+result)),null);
+                    else send(sender,"&eSR: "+protectionText(sender,"ma."+result));
                 });
                 return true;
             }
@@ -349,13 +408,18 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length >= 2 && ("help".equalsIgnoreCase(args[0]) || "version".equalsIgnoreCase(args[0]))) return SuiteCommandUi.complete("stcs", args);
         if (args.length == 2 && args[0].equalsIgnoreCase("ma")) return (hasAdminPermission(sender)
-                ? List.of("demand", "release", "status") : List.of("demand", "release")).stream()
+                ? List.of("demand", "sh", "sr", "ack", "release", "status") : List.of("demand", "sh", "sr", "ack", "release")).stream()
                 .filter(s -> s.startsWith(args[1].toLowerCase(java.util.Locale.ROOT))).toList();
         if (args.length >= 2 && args[0].equalsIgnoreCase("admin") && hasAdminPermission(sender)) {
             List<String> options = args.length == 2 ? ProtectionCommand.actions()
                     : args.length == 3 ? ProtectionCommand.values(args[1]) : List.of();
             String prefix = args[args.length - 1].toLowerCase(java.util.Locale.ROOT);
             return options.stream().filter(s -> s.startsWith(prefix)).toList();
+        }
+        if(args.length==2 && args[0].equalsIgnoreCase("sr") && hasAdminPermission(sender)) {
+            var data=shadow==null?null:shadow.diagnostics();
+            return data==null?List.of():data.trainNames().values().stream()
+                    .filter(name -> name.toLowerCase(java.util.Locale.ROOT).startsWith(args[1].toLowerCase(java.util.Locale.ROOT))).toList();
         }
         if (args.length != 1) {
             if (args.length == 2 && "switch".equalsIgnoreCase(args[0])) {
@@ -366,7 +430,7 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
             return List.of();
         }
         String prefix = args[0].toLowerCase(java.util.Locale.ROOT);
-        return List.of("help", "version", "inspect", "status", "rebuild", "export", "switch", "admin", "occupancy", "ma", "integrity").stream()
+        return List.of("help", "version", "inspect", "status", "rebuild", "export", "switch", "admin", "occupancy", "ma", "sr", "integrity").stream()
                 .filter(value -> value.startsWith(prefix)).toList();
     }
 
@@ -390,7 +454,20 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
                     + " | " + protectionText(sender, "protection.atp") + ": " + protectionText(sender, "protection.mode." + mode));
             String eoa=protectionText(sender,isolated?"protection.isolated":"ma.wait"),ma=eoa;
             String link=protectionText(sender,isolated?"protection.isolated":"ma.stale");
-            if(!isolated&&shadow!=null) {
+            if (mode.equals("ACTIVE") && shadow != null) {
+                var view=shadow.operationalSnapshot();
+                long age=System.currentTimeMillis()-view.emittedAtMillis();
+                if (age>=0 && age<=1500 && view.graphRevision()==manager.revision()
+                        && view.status().equals("AVAILABLE")) {
+                    link=protectionText(sender,"ma.activeLink");
+                    var grant=view.grants().stream().filter(g -> g.trainId().toString().equals(state.get("trainId"))
+                            && g.executable()).findFirst().orElse(null);
+                    if (grant != null) {
+                        eoa=grant.eoaEdgeId()+" @ "+String.format(java.util.Locale.ROOT,"%.1f m",grant.eoaOffsetMeters());
+                        ma=String.format(java.util.Locale.ROOT,"%.1f m",grant.remainingMeters());
+                    }
+                }
+            } else if(!isolated&&shadow!=null) {
                 var snapshot=shadow.snapshot();long age=System.currentTimeMillis()-snapshot.emittedAtMillis();
                 if(age>=0&&age<=1500&&snapshot.graphRevision()==manager.revision()&&snapshot.status().equals("SHADOW")) {
                     link=protectionText(sender,"ma.link");
@@ -406,13 +483,33 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
                 }
             }
             send(sender,"&7EoA: "+eoa+" | MA: "+ma+" | "+protectionText(sender,"protection.rbc")+": "+link);
-            send(sender, "&6" + protectionText(sender, "protection.alpha"));
+            send(sender, "&6" + protectionText(sender, mode.equals("ACTIVE")
+                    ? "protection.activeExperimental" : "protection.alpha"));
         } catch (java.lang.reflect.InvocationTargetException ex) {
             String key = ex.getCause().getMessage();
             send(sender, "&c" + protectionText(sender, key != null && key.startsWith("protection.") ? key : "protection.invalid"));
         } catch (ReflectiveOperationException ex) {
             send(sender, "&c" + protectionText(sender, "protection.compatible"));
         }
+    }
+
+    private void sendActiveMaAuthority(CommandSender sender, UUID train) {
+        if (train == null || shadow == null) {
+            send(sender, "&7" + protectionText(sender, "ma.activePending")); return;
+        }
+        var view = shadow.operationalSnapshot();
+        long age = System.currentTimeMillis() - view.emittedAtMillis();
+        var grant = age >= 0 && age <= 1500 && view.status().equals("AVAILABLE")
+                && view.graphRevision() == manager.revision()
+                ? view.grants().stream().filter(g -> g.trainId().equals(train) && g.executable()).findFirst().orElse(null)
+                : null;
+        if (grant == null) {
+            send(sender, "&7" + protectionText(sender, "ma.activePending")); return;
+        }
+        send(sender, "&a" + protectionText(sender, "ma.activeAllocated") + " " + grant.mode()
+                + " | " + String.format(java.util.Locale.ROOT, "%.1f m", grant.remainingMeters())
+                + " | EoA " + grant.eoaEdgeId() + " @ "
+                + String.format(java.util.Locale.ROOT, "%.1f m", grant.eoaOffsetMeters()));
     }
 
     private void sendMaAuthority(CommandSender sender, ShadowRuntime.Diagnostics data, java.util.UUID train) {

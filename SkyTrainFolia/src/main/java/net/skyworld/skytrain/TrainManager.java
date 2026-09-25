@@ -195,14 +195,25 @@ final class TrainManager implements TrainMotionController.Host {
     }
 
     void reloadAll() {
-        if (trains.values().stream().anyMatch(t -> Math.max(t.currentSpeed(), t.maxMemberSpeed()) > 0.001)) {
-            throw new IllegalArgumentException("Stop all trains before reloading vehicle performance.");
+        synchronized (driverLock) {
+            if (trains.values().stream().anyMatch(t -> Math.max(t.currentSpeed(), t.maxMemberSpeed()) > 0.001)) {
+                throw new IllegalArgumentException("Stop all trains before reloading vehicle performance.");
+            }
+            long previousTickInterval = settings.tickInterval();
+            plugin.reloadVehicleConfiguration();
+            persistence.save();
+            Runnable finishCabReload = plugin.resetCabForReload();
+            try {
+                // A config reload is not a server restart. Retain live paths, motion frames,
+                // member tasks and display ownership; YAML cannot reconstruct their geometry.
+                drivers.shutdown();
+                persistence.save();
+                if (settings.tickInterval() != previousTickInterval) rescheduleMemberTasks();
+                startAutosave();
+            } finally {
+                finishCabReload.run();
+            }
         }
-        plugin.reloadVehicleConfiguration();
-        persistence.save();
-        shutdown();
-        persistence.load();
-        startAutosave();
     }
 
     Train createTrain(String name, List<Minecart> carts) {
@@ -1095,9 +1106,23 @@ final class TrainManager implements TrainMotionController.Host {
     }
 
     void ensureTask(Minecart cart, Train train) {
+        ensureTask(cart, train, false);
+    }
+
+    private void rescheduleMemberTasks() {
+        for (Minecart cart : List.copyOf(managedCarts.values())) {
+            cart.getScheduler().run(plugin, task -> {
+                Train train = trainForCart(cart);
+                if (train != null && managedCarts.get(cart.getUniqueId()) == cart)
+                    ensureTask(cart, train, true);
+            }, () -> {});
+        }
+    }
+
+    private void ensureTask(Minecart cart, Train train, boolean replace) {
         UUID entityId = cart.getUniqueId();
         ScheduledTask existing = memberTasks.get(entityId);
-        if (existing != null && !existing.isCancelled() && managedCarts.get(entityId) == cart) {
+        if (!replace && existing != null && !existing.isCancelled() && managedCarts.get(entityId) == cart) {
             return;
         }
         if (existing != null && !existing.isCancelled()) existing.cancel();

@@ -158,7 +158,7 @@ final class TrainDrivingControls {
     }
 
     void setPowerNotch(Train train, int notch) {
-        train.protectionMode.requireTraction();
+        train.protectionMode.requireTraction(train.operatingMode);
         if (train.driverEmergencyHold) throw new IllegalArgumentException("error.drive-declare");
         takeManualControl(train);
         train.clearPlayerPush();

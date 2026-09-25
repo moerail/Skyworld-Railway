@@ -10,7 +10,8 @@ import net.skyworld.sta.api.v3.*;
 import net.skyworld.sta.api.v5.*;
 
 /** Observational model only. M1 durable evidence is never cleared or promoted by this adapter. */
-final class ShadowRuntime implements ShadowAuthorityService, SwitchControlService, AutoCloseable {
+final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.api.v6.OperationalAuthorityService,
+        SwitchControlService, AutoCloseable {
     private final StcsPlugin plugin;
     private final RailGraphManager manager;
     private final java.util.function.Supplier<Inputs> inputSource;
@@ -41,15 +42,21 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
     private Map<UUID,Set<String>> persistedResources=Map.of();
     private Set<UUID> persistedOutside=Set.of();
     private boolean closed,failed,unbounded=true;
-    private volatile Snapshot latest;
+    private volatile ShadowAuthorityService.Snapshot latest;
+    private volatile net.skyworld.sta.api.v6.OperationalAuthorityService.Snapshot operational;
+    private final Map<UUID,net.skyworld.sta.api.v6.OperationalAuthorityService.Grant> liveGrants=new HashMap<>();
+    private final Map<UUID,UUID> acknowledgedGrants=new HashMap<>();
+    private final Set<UUID> warnedLostGrants=new HashSet<>();
     private volatile Diagnostics diagnostics;
     private final NodePassageMonitor integrity = new NodePassageMonitor();
     private volatile String integrityFailure;
     List<NodePassageMonitor.View> integritySnapshot() { return integrity.snapshot(); }
     String integrityFailure() { return integrityFailure; }
-    record Intent(UUID driver,UUID lease,UUID provider) {}
+    record Intent(UUID driver,UUID lease,UUID provider,String channel,String mode,UUID target,long requestedAt) {
+        Intent target(UUID node) { return new Intent(driver,lease,provider,channel,mode,node,requestedAt); }
+    }
     record MaAction(UUID train, String trainName, UUID driver, String driverName,
-            String action, String state, String reason) {}
+            String action, String state, String reason, String mode, boolean executable) {}
     java.util.function.Consumer<MaAction> eventSink = event -> {};
     record SoundNotice(UUID driver, UUID lease, String cue) {}
     java.util.function.Consumer<SoundNotice> soundSink = notice -> {};
@@ -61,7 +68,7 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
     record Coverage(UUID train,String name,String state,int resources,List<ConsistObservation.Member> positions) {
         Coverage { positions=List.copyOf(positions); }
     }
-    record Diagnostics(Snapshot snapshot,boolean sourceAvailable,List<Blocker> blockers,
+    record Diagnostics(ShadowAuthorityService.Snapshot snapshot,boolean sourceAvailable,List<Blocker> blockers,
             Map<UUID,UUID> drivenTrains,Map<UUID,String> trainNames,List<Coverage> coverage) {
         Diagnostics {
             blockers=List.copyOf(blockers);drivenTrains=Map.copyOf(drivenTrains);trainNames=Map.copyOf(trainNames);coverage=List.copyOf(coverage);
@@ -106,11 +113,16 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
         eventSink = event -> {
             var events = services.load(RailwayEventService.class);
             if (events != null) events.publishDetailed("STCS",
-                    event.action().equals("release") ? RailwayEvent.Type.MA_RELEASED : RailwayEvent.Type.MA_REQUESTED,
+                    event.action().equals("release") ? RailwayEvent.Type.MA_RELEASED
+                            : event.action().equals("unavailable") ? RailwayEvent.Type.MA_UNAVAILABLE
+                            : RailwayEvent.Type.MA_REQUESTED,
                     event.train(), event.trainName(), event.driver(), event.driverName(), event.reason(),
-                    Map.of("state", event.state(), "simulationOnly", "true", "executable", "false"));
+                    Map.of("state", event.state(), "mode", event.mode(),
+                            "simulationOnly", Boolean.toString(!event.executable()),
+                            "executable", Boolean.toString(event.executable())));
         };
         services.register(ShadowAuthorityService.class,this,plugin,ServicePriority.Normal);
+        services.register(net.skyworld.sta.api.v6.OperationalAuthorityService.class,this,plugin,ServicePriority.Normal);
         services.register(SwitchControlService.class,this,plugin,ServicePriority.Normal);
         task=plugin.getServer().getAsyncScheduler().runAtFixedRate(plugin,t->tick(),250,250,TimeUnit.MILLISECONDS);
     }
@@ -128,7 +140,9 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
         this.settings=Objects.requireNonNull(settings);
         retained.putAll(ShadowOccupancyStore.load(file));
         retained.forEach((id,record)->{occupied.put(id,record.resources());uncertain.add(id);});
-        latest=new Snapshot(5,true,false,session,0,System.currentTimeMillis(),0,"STARTING",List.of(),List.of());
+        latest=new ShadowAuthorityService.Snapshot(5,true,false,session,0,System.currentTimeMillis(),0,"STARTING",List.of(),List.of());
+        operational=new net.skyworld.sta.api.v6.OperationalAuthorityService.Snapshot(6,session,0,
+                System.currentTimeMillis(),0,"STARTING",List.of(),List.of());
         diagnostics=new Diagnostics(latest,false,List.of(),Map.of(),Map.of(),List.of());
     }
     private static Inputs inputs(StcsPlugin plugin,RailGraphManager manager) {
@@ -142,7 +156,8 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
                 roster==null?List.of():List.copyOf(roster.consistObservations()),
                 tracking==null?List.of():List.copyOf(tracking.snapshots()));
     }
-    public Snapshot snapshot() { return latest; }
+    public ShadowAuthorityService.Snapshot snapshot() { return latest; }
+    public net.skyworld.sta.api.v6.OperationalAuthorityService.Snapshot operationalSnapshot() { return operational; }
     Diagnostics diagnostics() { return diagnostics; }
     synchronized String command(UUID driver,String action) {
         return command(driver, action, "");
@@ -155,26 +170,112 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
         var matches=input.desks().stream().filter(d->d.driverId().equals(driver)).toList();
         if(matches.size()!=1) return "DECLARE_DRIVE";
         var desk=matches.getFirst(); UUID train=desk.trainId();
+        var report=input.reports().stream().filter(m -> m.header().trainId().equals(train)
+                && m.header().kind()==StaMessage.Kind.TRACK_REPORT).findFirst().orElse(null);
+        if (report != null && report.physical().state().mode()==net.skyworld.sta.api.v1.TrainMode.AUTOMATIC)
+            return "AUTOMATIC_TRAIN";
+        if (report == null && !action.equals("request") && !action.equals("release")) return "NO_REPORT";
         if(action.equals("release")) {
+            if (report == null && liveGrants.containsKey(train) && liveGrants.get(train).executable())
+                return "NO_REPORT";
+            if (report != null && report.physical().state().speedMetersPerSecond() > .05) return "STOP_FIRST";
             soundTracker.reset(train);
             intents.remove(train);reserved.remove(train);maPoints.remove(train);reversed.remove(train);reasons.put(train,"RELEASED");
-        } else if(action.equals("request")) {
+            liveGrants.remove(train);
+            acknowledgedGrants.remove(train);
+            warnedLostGrants.remove(train);
+        } else if(List.of("request","sh","sr").contains(action)) {
             if(Set.of("ISOLATED","RECOVERING").contains(desk.atpMode())) return desk.atpMode();
+            if(!action.equals("request") && report.physical().state().speedMetersPerSecond() > .05) return "STOP_FIRST";
+            String requestedMode=action.equals("request")?"FS":action.toUpperCase(Locale.ROOT);
+            var previousGrant=liveGrants.get(train);
+            if (previousGrant!=null && previousGrant.executable()
+                    && !previousGrant.mode().equals(requestedMode)
+                    && !(previousGrant.mode().equals("FS") && requestedMode.equals("SH")))
+                return "RELEASE_FIRST";
             if (!intents.containsKey(train)) { reversed.remove(train); soundTracker.reset(train); }
-            intents.put(train,new Intent(driver,desk.leaseId(),input.driverSession()));
+            intents.put(train,new Intent(driver,desk.leaseId(),input.driverSession(),desk.atpMode(),
+                    requestedMode,null,System.currentTimeMillis()));
             reasons.put(train,"REQUESTED");
         } else return "INVALID";
         tick();
         var authority = latest.authorities().stream().filter(a -> a.trainId().equals(train)).findFirst().orElse(null);
         if (action.equals("release")) sound(new SoundNotice(driver, desk.leaseId(), "RELEASED"));
         try {
+            var grant = liveGrants.get(train);
             eventSink.accept(new MaAction(train, diagnostics.trainNames().getOrDefault(train, train.toString()),
                     driver, driverName, action, authority == null ? "INACTIVE" : authority.state(),
-                    action.equals("release") ? "RELEASED" : authority == null ? "UNAVAILABLE" : authority.reason()));
+                    action.equals("release") ? "RELEASED" : authority == null ? "UNAVAILABLE" : authority.reason(),
+                    grant == null ? "SB" : grant.mode(), grant != null && grant.executable()));
         } catch (RuntimeException ex) {
             if (plugin != null) plugin.getLogger().warning("MA action event delivery failed: " + ex.getClass().getSimpleName());
         }
-        return action.equals("release")?"RELEASED":"REQUESTED";
+        return action.equals("release")?"RELEASED":action.equals("sr")?"SR_PENDING"
+                : desk.atpMode().equals("ACTIVE")?"REQUESTED_ACTIVE":"REQUESTED";
+    }
+
+    public synchronized String approveSr(UUID trainId, UUID targetNodeId, String actor) {
+        tick();
+        if (closed || failed || model == null || trainId == null || targetNodeId == null || actor == null || actor.isBlank())
+            return "UNAVAILABLE";
+        var intent=intents.get(trainId);
+        if (intent==null || !intent.mode().equals("SR") || intent.target()!=null) return "NO_PENDING_SR";
+        var node=model.nodes.get(targetNodeId.toString());
+        if (node==null || !Set.of("balise","switch","end","origin").contains(node.type())) return "INVALID_TARGET";
+        var input=inputSource.get();
+        var report=input.reports().stream().filter(m -> m.header().trainId().equals(trainId)
+                && m.header().kind()==StaMessage.Kind.TRACK_REPORT).findFirst().orElse(null);
+        if(report==null || report.physical().state().mode()!=net.skyworld.sta.api.v1.TrainMode.MANUAL
+                || report.physical().state().speedMetersPerSecond()>.05) return "STOP_FIRST";
+        if (report.tracking().graphRevision()!=model.graph.revision
+                || !fresh(report.physical().state().observedAtMillis(),System.currentTimeMillis())
+                || !report.tracking().telemetrySessionId().equals(input.driverSession())) return "POSITION_UNCERTAIN";
+        ShadowGraph.Start start = report.tracking().quality()==StaMessage.Quality.VALID
+                ? new ShadowGraph.Start(report.tracking().position().edgeId(),
+                        report.tracking().position().edgeOffsetMeters()) : null;
+        if(start==null) return "POSITION_UNCERTAIN";
+        var route=SrRoute.find(model,start,targetNodeId.toString(),
+                setting("ma.sr.max-target-distance-meters",5000,10,10000));
+        if(!route.reachable()) return route.reason();
+        intents.put(trainId,intent.target(targetNodeId));
+        tick();
+        boolean granted=operational.grants().stream().anyMatch(g -> g.trainId().equals(trainId)
+                && g.mode().equals("SR") && g.remainingMeters()>0);
+        if(!granted) {
+            String reason=reasons.getOrDefault(trainId,"ROUTE_UNAVAILABLE");
+            intents.put(trainId,intent);tick();return reason;
+        }
+        if (plugin != null) {
+            var events = plugin.getServer().getServicesManager().load(RailwayEventService.class);
+            if (events != null) events.publishDetailed("STCS", RailwayEvent.Type.SR_GRANTED,
+                    trainId, diagnostics.trainNames().getOrDefault(trainId, trainId.toString()),
+                    intent.driver(), actor, "SR_GRANTED",
+                    Map.of("targetNodeId", targetNodeId.toString(), "mode", "SR", "executable",
+                            Boolean.toString(operational.grants().stream().anyMatch(g -> g.trainId().equals(trainId)
+                                    && g.mode().equals("SR") && g.executable()))));
+        }
+        if(plugin!=null)plugin.getLogger().info("SR approved by "+actor+" train="+trainId+" target="+targetNodeId);
+        return "APPROVED";
+    }
+    public synchronized boolean acknowledgeGrant(UUID trainId, UUID driverLeaseId, UUID grantId, long graphRevision) {
+        var grant=liveGrants.get(trainId);
+        if (grant==null || !grant.executable() || !grant.id().equals(grantId)
+                || !grant.driverLeaseId().equals(driverLeaseId) || grant.graphRevision()!=graphRevision
+                || model==null || model.graph.revision!=graphRevision) return false;
+        acknowledgedGrants.put(trainId,grantId);
+        return true;
+    }
+    public synchronized void revokeForChannelChange(UUID trainId) {
+        if (trainId == null) return;
+        intents.remove(trainId); reserved.remove(trainId); maPoints.remove(trainId);
+        liveGrants.remove(trainId); acknowledgedGrants.remove(trainId);
+        warnedLostGrants.remove(trainId); reversed.remove(trainId);
+        soundTracker.reset(trainId); reasons.put(trainId,"CHANNEL_CHANGED");
+        var before=operational;
+        operational=new net.skyworld.sta.api.v6.OperationalAuthorityService.Snapshot(6,session,++sequence,
+                System.currentTimeMillis(),before.graphRevision(),before.status(),
+                before.grants().stream().filter(g -> !g.trainId().equals(trainId)).toList(),
+                before.pendingSr().stream().filter(p -> !p.trainId().equals(trainId)).toList());
     }
     synchronized void tick() {
         if(closed||failed)return;
@@ -185,7 +286,10 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
             now=System.currentTimeMillis();
             RailGraph graph=input.graph();
             if(model==null||model.graph!=graph) {
-                model=new ShadowGraph(graph);reserved.clear();maPoints.clear();intents.clear();reversed.clear();
+                model=new ShadowGraph(graph);
+                reserved.entrySet().removeIf(e -> !liveGrants.containsKey(e.getKey())
+                        || !liveGrants.get(e.getKey()).executable());
+                maPoints.clear();intents.clear();reversed.clear();acknowledgedGrants.clear();
                 occupied.keySet().forEach(id->{uncertain.add(id);reasons.put(id,"GRAPH_CHANGED");});
                 // A previously uncovered parked train can become covered after a graph expansion.
                 // Re-map saved bodies conservatively, without loading chunks or clearing old resources.
@@ -278,7 +382,9 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
                 }
                 else if(outside) {
                     occupied.put(train.train(),Set.of());uncertain.add(train.train());occupiedPoints.remove(train.train());
-                    reserved.remove(train.train());maPoints.remove(train.train());
+                    if (!liveGrants.containsKey(train.train()) || !liveGrants.get(train.train()).executable())
+                        reserved.remove(train.train());
+                    maPoints.remove(train.train());
                 } else {cells.addAll(previousResources);occupied.put(train.train(),Set.copyOf(cells));uncertain.add(train.train());}
                 Map<UUID,ConsistObservation.Member> positions=new LinkedHashMap<>();
                 if(!physicalComplete) old.positions().forEach(p->positions.put(p.id(),p));
@@ -313,6 +419,7 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
                 coverage.add(new Coverage(id,names.getOrDefault(id,"--"),state,entry.getValue().size(),record.positions()));
             }
             List<Authority> authorities=new ArrayList<>();
+            List<net.skyworld.sta.api.v6.OperationalAuthorityService.Grant> grants=new ArrayList<>();
             Map<String,String> switchStates=new HashMap<>(input.switchStates());
             pendingPoints.keySet().forEach(id->switchStates.put(id.toString(),"pending"));
             Set<String> pendingCrossings=new HashSet<>();
@@ -328,11 +435,18 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
                 String reason=reasons.getOrDefault(id,"IDLE");
                 boolean eligible=intent!=null;
                 if(intent!=null && (desk==null||!intent.lease().equals(desk.leaseId())||!intent.driver().equals(desk.driverId())
-                        || !intent.provider().equals(input.driverSession()))) {
-                    reason="NO_DRIVER";intents.remove(id);eligible=false;
+                        || !intent.provider().equals(input.driverSession())
+                        || !intent.channel().equals(desk.atpMode()))) {
+                    reason=desk!=null && !intent.channel().equals(desk.atpMode())
+                            ? "CHANNEL_CHANGED" : "NO_DRIVER";
+                    intents.remove(id);eligible=false;
                 }
                 if(desk!=null&&Set.of("ISOLATED","RECOVERING").contains(desk.atpMode())) {
                     reason=desk.atpMode();intents.remove(id);eligible=false;
+                }
+                if (eligible && m != null
+                        && m.physical().state().mode()==net.skyworld.sta.api.v1.TrainMode.AUTOMATIC) {
+                    reason="AUTOMATIC_TRAIN";intents.remove(id);eligible=false;
                 }
                 boolean provenance=m!=null&&m.tracking().graphRevision()==graph.revision
                         && fresh(m.physical().state().observedAtMillis(),now)&&fresh(m.header().emittedAtMillis(),now)
@@ -358,16 +472,54 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
                     reason=retained.containsKey(id)&&retained.get(id).outsideConfirmed()?"OUTSIDE_COVERAGE":"AWAITING_COVERAGE";eligible=false;
                 }
                 if(eligible&&(!located||uncertain.contains(id)||unbounded)) {reason=unbounded?"FLEET_UNCERTAIN":"POSITION_UNCERTAIN";eligible=false;}
+                if(eligible && intent.mode().equals("SR") && intent.target()==null) {
+                    reason="SR_PENDING";eligible=false;
+                }
                 if(eligible) {
                     Set<String> obstacles=new HashSet<>();
                     obstacles.addAll(pendingCrossings);
                     occupied.forEach((other,rs)->{if(!other.equals(id))obstacles.addAll(rs);});
                     reserved.forEach((other,rs)->{if(!other.equals(id))obstacles.addAll(rs);});
+                    MaSettings routeSettings=settings;
+                    if(!intent.mode().equals("FS")) {
+                        double distance=setting(intent.mode().equals("SH")
+                                ? "ma.sh.look-ahead-meters" : "ma.sr.max-distance-meters",120,10,10000);
+                        routeSettings=MaSettings.legacy(distance,intent.mode().equals("SR")?0:settings.marginMeters());
+                    }
                     var result=ShadowPlanner.plan(model,position.edge(),position.offset(),m.physical().state().lengthMeters()+1/graph.blocksPerMeter,
-                            settings,switchStates,obstacles);
-                    reserved.put(id,result.reserved());reason=result.reason();
-                    maPoints.put(id,pointsInPath(model,result.path()));
+                            routeSettings,switchStates,obstacles);
+                    if(intent.mode().equals("SR")) result=clipSr(result,intent.target(),position);
+                    reason=result.reason();
+                    var old=liveGrants.get(id);
                     boolean granted = result.remaining()!=null && result.remaining()>0 && !result.path().isEmpty();
+                    UUID grantId=null;
+                    if(granted) grantId=old!=null && old.mode().equals(intent.mode())
+                            && old.driverLeaseId().equals(desk.leaseId())
+                            && old.graphRevision()==graph.revision
+                            && old.eoaEdgeId().equals(result.edge())
+                            && old.eoaOffsetMeters()==result.offset()
+                            && old.path().stream().map(net.skyworld.sta.api.v6.OperationalAuthorityService.Segment::edgeId).toList()
+                                    .equals(result.path().stream().map(ShadowAuthorityService.PathPart::edgeId).toList())
+                            ? old.id():UUID.randomUUID();
+                    Set<String> held=new HashSet<>(result.reserved());
+                    if(old!=null && old.executable() && (!granted || !grantId.equals(acknowledgedGrants.get(id))))
+                        held.addAll(reserved.getOrDefault(id,Set.of()));
+                    reserved.put(id,Set.copyOf(held));
+                    maPoints.put(id,pointsInPath(model,result.path()));
+                    if(granted) {
+                        boolean executable=desk.atpMode().equals("ACTIVE");
+                        var grant=new net.skyworld.sta.api.v6.OperationalAuthorityService.Grant(grantId,id,
+                                desk.leaseId(),m.tracking().telemetrySessionId(),m.physical().state().sequence(),
+                                intent.mode(),executable,graph.revision,result.edge(),result.offset(),result.remaining(),
+                                intent.mode().equals("SH") ? setting("ma.sh.speed-kmh",40,1,120)
+                                    : intent.mode().equals("SR") ? setting("ma.sr.speed-kmh",40,1,120)
+                                    : 576.0,
+                                result.path().stream().map(p -> new net.skyworld.sta.api.v6.OperationalAuthorityService.Segment(
+                                        p.edgeId(),p.fromMeters(),p.toMeters())).toList(),
+                                net.skyworld.sta.api.v6.OperationalAuthorityService.MA_MESSAGE,
+                                net.skyworld.sta.api.v6.OperationalAuthorityService.MA_PACKET);
+                        liveGrants.put(id,grant);grants.add(grant);
+                    }
                     authorities.add(new Authority(id,desk.leaseId(),m.tracking().telemetrySessionId(),m.physical().state().sequence(),
                             granted ? "ALLOCATED_SHADOW" : "WAITING", reason,
                             granted ? result.path() : List.of(), granted ? result.edge() : null,
@@ -378,7 +530,29 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
             }
             List<Section> sections=ShadowSections.build(model,occupied,reserved,uncertain);
             persist(false);
-            latest=new Snapshot(5,true,false,session,++sequence,now,graph.revision,available?"SHADOW":"SOURCE_UNAVAILABLE",authorities,sections);
+            latest=new ShadowAuthorityService.Snapshot(5,true,false,session,++sequence,now,graph.revision,available?"SHADOW":"SOURCE_UNAVAILABLE",authorities,sections);
+            var pendingSr=intents.entrySet().stream().filter(e -> e.getValue().mode().equals("SR")
+                    && e.getValue().target()==null && drivers.containsKey(e.getKey()))
+                    .map(e -> new net.skyworld.sta.api.v6.OperationalAuthorityService.PendingSr(e.getKey(),
+                            names.getOrDefault(e.getKey(),e.getKey().toString()),e.getValue().driver(),
+                            e.getValue().lease(),e.getValue().requestedAt())).toList();
+            operational=new net.skyworld.sta.api.v6.OperationalAuthorityService.Snapshot(6,session,sequence,
+                    now,graph.revision,available?"AVAILABLE":"SOURCE_UNAVAILABLE",grants,pendingSr);
+            Set<UUID> executableNow=new HashSet<>();
+            for(var grant:grants) if(grant.executable()) executableNow.add(grant.trainId());
+            warnedLostGrants.removeAll(executableNow);
+            for(var entry:liveGrants.entrySet()) if(entry.getValue().executable()
+                    && !executableNow.contains(entry.getKey()) && warnedLostGrants.add(entry.getKey())) {
+                UUID id=entry.getKey();
+                try {
+                    eventSink.accept(new MaAction(id,names.getOrDefault(id,id.toString()),
+                            intents.containsKey(id)?intents.get(id).driver():null,"",
+                            "unavailable","WAITING",reasons.getOrDefault(id,"SOURCE_UNAVAILABLE"),
+                            entry.getValue().mode(),false));
+                } catch(RuntimeException ex) {
+                    if(plugin!=null)plugin.getLogger().warning("MA loss event delivery failed: "+ex.getClass().getSimpleName());
+                }
+            }
             Map<UUID,UUID> driven=new HashMap<>();drivers.values().forEach(d->driven.put(d.driverId(),d.trainId()));
             diagnostics=new Diagnostics(latest,available,blockers,driven,names,coverage);
             soundTracker.retain(intents.keySet());
@@ -391,13 +565,49 @@ final class ShadowRuntime implements ShadowAuthorityService, SwitchControlServic
             if(plugin!=null)plugin.notifyPccUpdate();
         } catch(Exception|LinkageError ex) {
             failed=true;
-            latest=new Snapshot(5,true,false,session,++sequence,now,model==null?0:model.graph.revision,"FAILED",List.of(),latest.sections());
+            latest=new ShadowAuthorityService.Snapshot(5,true,false,session,++sequence,now,model==null?0:model.graph.revision,"FAILED",List.of(),latest.sections());
+            operational=new net.skyworld.sta.api.v6.OperationalAuthorityService.Snapshot(6,session,sequence,now,
+                    model==null?0:model.graph.revision,"FAILED",List.of(),List.of());
             diagnostics=new Diagnostics(latest,false,diagnostics.blockers(),Map.of(),diagnostics.trainNames(),diagnostics.coverage());
             if(plugin!=null)plugin.getLogger().log(java.util.logging.Level.SEVERE,"Shadow MA stopped; no ATP action. Retained occupancy not cleared.",ex);
             else throw new IllegalStateException("Shadow runtime failed",ex);
         }
     }
     private static boolean fresh(long at,long now) {return at<=now&&now-at<=1500;}
+    private double setting(String key,double fallback,double min,double max) {
+        double value=plugin==null?fallback:plugin.getConfig().getDouble(key,fallback);
+        if(!Double.isFinite(value)||value<min||value>max) throw new IllegalArgumentException(key);
+        return value;
+    }
+    private ShadowPlanner.Result clipSr(ShadowPlanner.Result candidate, UUID target, ShadowGraph.Start position) {
+        if(target==null) return new ShadowPlanner.Result(List.of(),Set.of(),null,null,null,"SR_PENDING");
+        List<String> prefix=new ArrayList<>();
+        for(var part:candidate.path()) {
+            prefix.add(part.edgeId());
+            var edge=model.edges.get(part.edgeId());
+            if(edge!=null && edge.to().equals(target.toString()) && part.toMeters()>=edge.distanceMeters()-1e-6)
+                break;
+        }
+        var route=SrRoute.find(model,position,target.toString(),
+                setting("ma.sr.max-target-distance-meters",5000,10,10000),prefix);
+        if(!route.reachable()) return new ShadowPlanner.Result(List.of(),Set.of(),null,null,null,route.reason());
+        List<ShadowAuthorityService.PathPart> path=new ArrayList<>();
+        Set<String> resources=new HashSet<>();
+        double distance=0;
+        for(var part:candidate.path()) {
+            var edge=model.edges.get(part.edgeId());
+            if(edge==null) break;
+            if(path.size()>=route.edges().size() || !route.edges().get(path.size()).equals(edge.id()))
+                return new ShadowPlanner.Result(List.of(),Set.of(),null,null,null,"ROUTE_MISMATCH");
+            path.add(part);
+            resources.addAll(model.intervalResources(edge,part.fromMeters(),part.toMeters()));
+            distance+=part.toMeters()-part.fromMeters();
+            if(edge.to().equals(target.toString()) && part.toMeters()>=edge.distanceMeters()-1e-6)
+                return new ShadowPlanner.Result(List.copyOf(path),Set.copyOf(resources),edge.id(),
+                        edge.distanceMeters(),distance,"SR_AUTHORIZED");
+        }
+        return candidate;
+    }
     private void sound(SoundNotice notice) {
         try { soundSink.accept(notice); } catch (RuntimeException | LinkageError ignored) { /* Audio is not control. */ }
     }

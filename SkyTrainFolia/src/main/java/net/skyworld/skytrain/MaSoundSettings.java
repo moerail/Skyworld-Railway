@@ -6,37 +6,62 @@ import org.bukkit.SoundCategory;
 import org.bukkit.configuration.ConfigurationSection;
 
 final class MaSoundSettings {
-    record Tone(boolean enabled, String sound, SoundCategory category, float volume, float pitch, int count, long interval) {}
+    record Tone(boolean enabled, String sound, SoundCategory category, float volume, float pitch, int count,
+            long interval, List<Float> pitches) {
+        Tone { pitches = List.copyOf(pitches); }
+        int notes() { return count * pitches.size(); }
+        float pitchAt(int index) { return pitches.get(index % pitches.size()); }
+    }
     static Map<String, Tone> load(ConfigurationSection config, Consumer<String> warning) {
         Map<String, Tone> tones = new HashMap<>();
         add(tones, config, warning, "GRANTED", "granted", "block.anvil.land", 1, 2, 2);
         add(tones, config, warning, "CHANGED", "changed", "block.anvil.land", 1, 2, 1);
         add(tones, config, warning, "RELEASED", "released", "block.iron_trapdoor.close", .6f, 1.2f, 1);
-        add(tones, config, warning, "SHRINKING", "shrinking", "entity.experience_orb.pickup", 1, 1, 1);
+        add(tones, config, warning, "SHRINKING", "shrinking", "block.note_block.bit", 1, 1, 3);
         add(tones, config, warning, "LOW", "low", "block.note_block.pling", 1, 1, 1);
-        add(tones, config, warning, "NEAR_LIMIT", "near-limit", "block.note_block.bell", 1, 1.5f, 1);
+        add(tones, config, warning, "NEAR_LIMIT", "near-limit", "block.note_block.flute", 1, .7071068f, 6);
+        add(tones, config, warning, "OVERSPEED", "overspeed", "block.note_block.bit", 1, 1.5f, 1);
+        add(tones, config, warning, "ATP_SERVICE", "atp-service", "block.bell.use", .9f, 1.3f, 1);
+        add(tones, config, warning, "ATP_EMERGENCY", "atp-emergency", "block.note_block.basedrum", 1.2f, .8f, 3);
         return Map.copyOf(tones);
     }
     private static void add(Map<String, Tone> result, ConfigurationSection c, Consumer<String> warning,
             String cue, String key, String sound, float volume, float pitch, int count) {
         String p = "ma-sounds." + key + ".";
-        Tone fallback = new Tone(true, "minecraft:" + sound, SoundCategory.MASTER, volume, pitch, count, 5);
+        List<Float> defaults = cue.equals("NEAR_LIMIT") ? List.of(.7071068f, 1.0594631f) : List.of(pitch);
+        long defaultInterval = cue.equals("OVERSPEED") ? 3 : 5;
+        Tone fallback = new Tone(true, "minecraft:" + sound, SoundCategory.MASTER, volume, pitch, count, defaultInterval, defaults);
         try {
             String id = c.getString(p + "sound", fallback.sound()).trim();
             if (!id.contains(":")) id = "minecraft:" + id;
             if (!id.matches("[a-z0-9_.-]+:[a-z0-9/._-]+")) throw new IllegalArgumentException("invalid sound ID");
             double v = c.getDouble(p + "volume", volume), f = c.getDouble(p + "pitch", pitch);
             int n = c.getInt(p + "count", count);
-            long interval = c.getLong(p + "interval-ticks", 5);
+            long interval = c.getLong(p + "interval-ticks", defaultInterval);
+            // Do not merge a new default sequence into an existing scalar-only configuration.
+            List<Float> pitches = c.contains(p + "pitch", true) ? List.of((float) f) : defaults;
+            if (c.contains(p + "pitch-sequence", true)) {
+                Object configured = c.get(p + "pitch-sequence");
+                if (!(configured instanceof List<?> values) || values.isEmpty() || values.size() > 64)
+                    throw new IllegalArgumentException("invalid pitch-sequence");
+                pitches = new ArrayList<>();
+                for (Object value : values) {
+                    if (!(value instanceof Number number) || !Double.isFinite(number.doubleValue())
+                            || number.doubleValue() < .5 || number.doubleValue() > 2)
+                        throw new IllegalArgumentException("invalid pitch-sequence pitch");
+                    pitches.add(number.floatValue());
+                }
+            }
             if (!Double.isFinite(v) || v < 0 || v > 4 || !Double.isFinite(f) || f < .5 || f > 2
-                    || n < 1 || n > 5 || interval < 1 || interval > 200) throw new IllegalArgumentException("value out of range");
+                    || n < 1 || n > 16 || n * pitches.size() > 64 || interval < 1 || interval > 200)
+                throw new IllegalArgumentException("value out of range");
             result.put(cue, new Tone(c.getBoolean("ma-sounds.enabled", true) && c.getBoolean(p + "enabled", true), id,
                     SoundCategory.valueOf(c.getString(p + "category", "MASTER").toUpperCase(Locale.ROOT)),
-                    (float)v, (float)f, n, interval));
+                    (float)v, (float)f, n, interval, pitches));
         } catch (IllegalArgumentException ex) {
             warning.accept(p + ex.getMessage() + "; using default sound settings");
             result.put(cue, new Tone(c.getBoolean("ma-sounds.enabled", true) && c.getBoolean(p + "enabled", true),
-                    fallback.sound(), fallback.category(), volume, pitch, count, 5));
+                    fallback.sound(), fallback.category(), volume, pitch, count, defaultInterval, defaults));
         }
     }
 }

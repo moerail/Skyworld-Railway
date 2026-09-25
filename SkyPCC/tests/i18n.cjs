@@ -29,6 +29,8 @@ for (const lang of i.languages) {
   assert.equal(i.t('Train {name}',{name:'$& <A>'}),'Train $& <A>');
   assert(!i.t('{n} active',{n:3}).includes('{n}'));
   assert.notEqual(i.code('NO_EXIT_CAPACITY'),'NO_EXIT_CAPACITY');
+  for (const result of ['ROUTE_UNAVAILABLE','NO_PENDING_SR','SR_TARGET_TOO_FAR','ROUTE_MISMATCH'])
+    assert.notEqual(i.code(result),result,`${lang}: untranslated SR result ${result}`);
 }
 i.set('de'); assert.equal(i.language,'en');
 ctx.localStorage.getItem=()=>{throw new Error('denied');};

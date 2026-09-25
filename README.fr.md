@@ -1,10 +1,28 @@
 # SkyRail Suite
 
-## Mise à jour incompatible : STA v5
+**Joueurs : commencez par le [manuel de conduite](doc/driver/README.fr.md)** pour la montée à bord, la prise de conduite, la barre rapide, la MA fantôme et l'arrêt.
 
-Utiliser ensemble STF **3.0.0**, STCS **3.0.0**, STA **1.0.0** et SkyPCC **1.0.0**. Arrêter le serveur, sauvegarder, remplacer tous les composants installés et actualiser PCC. Les anciennes extensions et routes HTTP sont incompatibles. STF reste utilisable seul ; conserver RailGraph et les registres d’occupation.
+## M3 expérimental : protection des trains manuels
 
-Message et Packet ont des espaces de numérotation distincts : MA fantôme attribuée **Message 1003 / Packet 1015**, télémétrie **Message 1136**. Les messages privés de suppression, localisation et attente/inactivité utilisent **2001 / 2002 / 2003**. Une suppression ne prouve pas la libération de la voie. Il s’agit d’un clin d’œil conceptuel à SUBSET-026, sans encodage ETCS ni conformité revendiquée. M3 n’est pas achevé et FS reste désactivé. [Migration](doc/STA-V5-MIGRATION.md).
+**Préversion `suite-v4.0.0`.** Les vérifications automatiques ont réussi ; les derniers correctifs attendent une nouvelle validation sur serveur. [Notes de version](doc/releases/suite-v4.0.0.md).
+
+Utiliser ensemble STF **4.0.0**, STCS **4.0.0**, STA **2.0.0** et SkyPCC **2.0.0**. Arrêter le serveur et sauvegarder RailGraph et les registres d'occupation avant de remplacer les composants ; ne pas mélanger les versions. STF reste autonome, mais `Enforced` exige STA et STCS. Le service fantôme v5 reste consultatif ; l'autorisation opérationnelle STA v6 est un canal distinct.
+
+Seuls les **trains manuels** entrent dans l'automate `SB/FS/SH/SR/TR/PT`. Après prise de conduite, le train est en `SB`. `/stcs ma demand` demande `FS`, `/stcs ma sh` une autorisation limitée de manœuvre et `/stcs ma sr` attend l'approbation du PCC ou d'un administrateur jusqu'à un équipement choisi. Une demande acceptée n'est pas encore une MA exécutable. Après un dépassement de l'EoA (`TR`), arrêter le train, utiliser `/stcs ma ack` pour passer en `PT`, puis `/stcs ma release` avant une nouvelle demande. L'administrateur change explicitement de canal à l'arrêt avec `/stcs admin enforce true|false` ; `false` revient à `RECOVERING` avec frein maintenu. Le tableau de bord affiche le canal traduit et le code de mode invariant, par exemple **`Protection active | SR`**.
+
+Les trains automatiques du pseudo-ATO intégré à STF **n'entrent jamais dans cet automate** ; les commandes de mode ou de MA d'un passager ne les convertissent pas en trains `FS/SH/SR`. `shadow-atp` reste en lecture seule ; `active-atp` propose des réglages souples et stricts. Cette fonction expérimentale attend encore une validation sur serveur : **ce n'est ni un ATP certifié, ni un enclenchement certifié, ni une implémentation ETCS**. Un état inconnu ne prouve jamais que la voie est libre. L'approbation SR est un appel de service et un événement SkyRail, pas un nouveau télégramme ETCS ; la MA v6 réutilise Message 1003 / Packet 1015 privés.
+
+### Comportement M3 actuel
+
+En `Enforced`, SH/SR respectent le plafond du mode, fixé par défaut à 40 km/h dans STCS (`ma.sh.speed-kmh` / `ma.sr.speed-kmh`). Son dépassement au-delà d'une faible tolérance déclenche B7 sans attendre le délai de survitesse assoupli de FS ; la courbe vers l'EoA peut imposer une vitesse inférieure. Les avertissements d'approche de limite et de survitesse fonctionnent aussi dans ce canal. Une intervention ATP affiche `ATP B7` ou `ATP EB` dans le panneau latéral et la BossBar du conducteur. Un dépassement d'EoA provoque TR, un message traduit et le signal sonore de freinage d'urgence. Les sons STF se règlent sous `ma-sounds.atp-service` et `ma-sounds.atp-emergency`.
+
+L'approbation SR distingue l'accessibilité de la cible dans le RailGraph sauvegardé de la fenêtre MA actuelle. Dans STCS, `ma.sr.max-target-distance-meters` vaut 5000 m par défaut pour la recherche de cible ; `ma.sr.max-distance-meters` limite chaque autorisation glissante à 120 m par défaut. L'approbation ne réserve ni n'autorise tout le parcours jusqu'à la cible. La géométrie sauvegardée d'une voie simple peut être vérifiée à travers des chunks déchargés ; les arêtes manquantes, aiguilles inconnues, occupations incertaines et conflits continuent de limiter l'attribution ou son extension. Les réponses SR/Trip et les motifs de refus PCC sont traduits en chinois, anglais, français et japonais.
+
+## Mise à jour incompatible précédente : STA v5
+
+L'ancien ensemble v5 utilisait STF **3.0.0**, STCS **3.0.0**, STA **1.0.0** et SkyPCC **1.0.0**. Ce sont des versions historiques, non la cible d'installation actuelle. STF reste utilisable seul ; toujours conserver RailGraph et les registres d'occupation lors d'une mise à niveau.
+
+Message et Packet ont des espaces de numérotation distincts : MA fantôme attribuée **Message 1003 / Packet 1015**, télémétrie **Message 1136**. Les messages privés de suppression, localisation et attente/inactivité utilisent **2001 / 2002 / 2003**. Une suppression ne prouve pas la libération de la voie. Il s’agit d’un clin d’œil conceptuel à SUBSET-026, sans encodage ETCS ni conformité revendiquée. Ce paragraphe décrit l'ancienne base v5, non le canal opérationnel v6. [Migration](doc/STA-V5-MIGRATION.md).
 
 ## Diagnostic des passages aux nœuds
 
@@ -14,7 +32,9 @@ Message et Packet ont des espaces de numérotation distincts : MA fantôme attri
 
 Les courbes en mode ombre ne commandent ni traction ni freinage. Par défaut : arrêt 1 m avant EoA, au plus 5 km/h dans les derniers 5 m, puis diminution continue à zéro. Le modèle en palier utilise les paramètres B7 et les vitesses mesurées, sans compenser l’âge des données par la vitesse maximale théorique.
 
-Configuration dans `shadow-atp` ; `enforcement-enabled: true` est refusé. `shadow-atp.warning` : alerte à 2 km/h sous la limite, réarmement à 5 km/h sous celle-ci, silence sous 0.5 km/h, intervalle minimal de 5000 ms. `ma-sounds.near-limit` règle son, volume, hauteur, nombre et intervalle ; son par défaut `minecraft:block.note_block.bell`. Arrêter les trains avant `/st reload`.
+Configuration dans `shadow-atp` ; `enforcement-enabled: true` est refusé. `shadow-atp.warning` : alerte continue dès 2 km/h sous la limite, arrêt à 5 km/h sous celle-ci ou sous 0.5 km/h. L'alarme de survitesse prend la priorité au-dessus de la limite et revient à l'alerte normale à 1 km/h sous celle-ci. Seuils configurables ; l'ancien `cooldown-millis` est ignoré. `ma-sounds.near-limit` utilise `minecraft:block.note_block.flute` et `ma-sounds.overspeed` des impulsions plus rapides de `minecraft:block.note_block.bit`, sans pause entre les salves. Arrêter les trains avant `/st reload`.
+
+L'alerte répète six paires Do5-Sol5 par salve jusqu'au franchissement du seuil de désactivation ; une MA qui commence à diminuer produit trois bips courts. `pitch-sequence` remplace `pitch` et `count` répète la séquence (64 notes au maximum). Les anciens réglages sont conservés ; les nouvelles valeurs figurent dans le [guide audio](doc/SHADOW-ATP.md#existing-configurations--旧配置更新).
 
 L’inspecteur du banc lit railgraph et shadow-occupancy.json correspondants sans les modifier ni prouver la libération. Après vérification de la disparition de toute la rame d’origine seulement : `stcs ma clear <UUID-complet> confirm` dans la console. Toutes les preuves en mode ombre de cette identité sont effacées, avec sauvegarde et journal d’audit ; le registre historique M1 reste intact. Un train déchargé n’est pas nécessairement supprimé.
 
@@ -26,7 +46,7 @@ Suite d’exploitation ferroviaire, d’infrastructure, de contrôle-commande fe
 
 Ce manuel décrit l’état du code source local au **23 septembre 2026**. Édition française préparée le **14 septembre 2026**. Il s’adresse aux administrateurs de serveur, conducteurs, constructeurs de lignes et développeurs de greffons. Les idées évoquées pour des développements futurs ne sont pas nécessairement mises en œuvre.
 
-> **Limite de la version de développement :** la suite calcule, attribue et affiche des informations MA/EoA fantômes, mais l’ATP ne commande pas le freinage à partir de celles-ci. Une demande acceptée, une voie apparemment libre sur le PCC ou un indicateur RBC en ligne ne constituent pas une autorisation de circuler en sécurité. Le freinage d’urgence sur perte du conducteur, le freinage d’urgence manuel et le maintien du frein en mode RECOVERING sont des fonctions de commande distinctes et actives.
+> **Limite de la version de développement :** les MA/EoA fantômes ne commandent aucun freinage. Le canal distinct `Enforced` peut intervenir sur un train manuel uniquement après activation explicite et validation d'une autorisation exécutable ; il reste à valider sur serveur. Une demande acceptée, une voie apparemment libre sur le PCC ou un RBC en ligne ne prouvent pas la sécurité.
 
 **À l’intention des développeurs TrainCarts :** TrainCarts sert de référence pour certaines parties de l’interface des panneaux et des procédures d’exploitation. Ce document ne revendique ni une compatibilité intégrale avec TrainCarts, ni une physique équivalente, ni la compatibilité avec toutes les extensions TC. Le `switch` de STF n’est pas le `switcher` de TC. La suite ne requiert ni TC ni BKCommonLib, et deux systèmes de commande ne doivent pas piloter simultanément le même wagonnet.
 
@@ -60,10 +80,10 @@ Le projet introduit la prise de conduite explicite, l’occupation des ressource
 
 | Composant | Version | Fonction principale |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `3.0.0` | Rames, mouvement et inscription en courbe, prise de conduite, traction/freinage, profils de véhicule, panneaux, manœuvre physique des appareils de voie, IHM et sons |
-| STCS | `3.0.0` | Infrastructure, RailGraph orienté, point kilométrique, localisation, registre d’occupation conservé, MA/EoA fantômes et contrôles locaux des appareils de voie |
-| SkyworldTrainAPI / STA | `1.0.0` | Contrats inter-greffons versionnés, télémétrie, observations des véhicules, état du pupitre, autorisations et événements |
-| SkyPCC | `1.0.0` | Tableau de contrôle optique Web, inspecteur des trains/infrastructures, occupations/réservations, journal d’événements et commande authentifiée des appareils de voie |
+| SkyTrainFolia / STF | `4.0.0` | Rames, mouvement, conduite, aiguilles physiques, IHM et exécution ATP expérimentale des trains manuels |
+| STCS | `4.0.0` | RailGraph, localisation, occupation conservée, MA/EoA fantômes et opérationnelles expérimentales |
+| SkyworldTrainAPI / STA | `2.0.0` | Contrats inter-greffons, télémétrie, autorisations opérationnelles et événements |
+| SkyPCC | `2.0.0` | Affichage de régulation, inspections, événements, commande d'aiguilles et approbation SR |
 
 ```text
 Joueurs Minecraft / wagonnets / rails / redstone
@@ -87,11 +107,11 @@ Ce schéma illustre les responsabilités, et non une chaîne d’appels série o
 | Rames, mouvement en coordonnées de voie, adaptation de l’affichage à grande vitesse | Réalisé ; les grandes vitesses, transferts de région et combinaisons de greffons tiers doivent encore être validés sur serveur réel |
 | Conduite pseudo-automatique en gare | MVP utilisant les crans de traction/freinage du véhicule, pas un ATO complet |
 | Graphe, affectation de ligne, point kilométrique, occupation conservée | Réalisé ; expiration ou déchargement ne prouvent pas que la voie est libre |
-| MA/EoA en ligne et réservations spatiales | Implémentation fantôme ; aucun freinage ATP |
+| MA/EoA en ligne et réservations spatiales | Service fantôme conservé ; permissions opérationnelles expérimentales pour trains manuels |
 | Commande Web des appareils de voie | Authentification, contrôles locaux et état asynchrone PENDING réalisés |
-| Courbes de vitesse embarquées et intervention ATP pour survitesse/EoA | Courbes de vitesse en mode ombre disponibles en lecture seule ; freinage automatique pour survitesse/EoA non réalisé. |
+| Courbes de vitesse embarquées et intervention ATP pour survitesse/EoA | Courbes fantômes consultatives ; intervention expérimentale `Enforced` pour trains manuels, non validée en sécurité sur serveur |
 | Tracé automatique complet des itinéraires et ATO à l’horaire | Système complet non réalisé ; les métadonnées d’itinéraire ne constituent pas un itinéraire établi |
-| Modes ETCS FS/SR/SH/SB/TR/PT | Non réalisés ; les modes actuels ne sont pas des équivalents complets |
+| Modes SkyRail SB/FS/SH/SR/TR/PT pour trains manuels | Automate expérimental, sans revendication de conformité ETCS ; pseudo-ATO exclu |
 | SIR, SkyCBI ou service RBC Python séparé | Pistes d’architecture, non composants installables actuels |
 
 ## 2. Installation et mises à niveau
@@ -114,10 +134,10 @@ Ce schéma illustre les responsabilités, et non une chaîne d’appels série o
 Fichiers d’installation actuels :
 
 ```text
-SkyTrainFolia-3.0.0.jar
-STCS-3.0.0.jar
-SkyworldTrainAPI-1.0.0.jar
-SkyPCC-1.0.0.jar
+SkyTrainFolia-4.0.0.jar
+STCS-4.0.0.jar
+SkyworldTrainAPI-2.0.0.jar
+SkyPCC-2.0.0.jar
 ```
 
 STF/STCS déclarent STA comme dépendance facultative, mais installez les quatre éléments pour disposer de la suite complète. PCC requiert STCS et STA. STF seul ne fournit pas toutes les fonctions de graphe, d’autorisation et de régulation.
@@ -671,10 +691,10 @@ ma-sounds:
 | granted | `minecraft:block.anvil.land` | Autorisation demandée accordée ; hauteur 2, deux fois |
 | changed | `minecraft:block.anvil.land` | Variation importante ; hauteur 2, une fois |
 | released | `minecraft:block.iron_trapdoor.close` | Libération |
-| shrinking | `minecraft:entity.experience_orb.pickup` | La MA glissante restante commence à diminuer en marche |
+| shrinking | `minecraft:block.note_block.bit` | La MA glissante restante commence à diminuer en marche |
 | low | `minecraft:block.note_block.pling` | Faible distance restante |
 
-Utilisez les identifiants Java Edition `namespace:path` ; si l’espace de noms est omis, `minecraft` est utilisé. Les identifiants personnalisés nécessitent un paquet de ressources client. Plages : volume 0..4, hauteur 0,5..2, répétitions 1..5, `interval-ticks` 1..200.
+Utilisez les identifiants Java Edition `namespace:path` ; si l’espace de noms est omis, `minecraft` est utilisé. Les identifiants personnalisés nécessitent un paquet de ressources client. Plages : volume 0..4, hauteur 0,5..2, répétitions 1..16, `interval-ticks` 1..200.
 
 Réglages de déclenchement STCS :
 
@@ -792,7 +812,7 @@ Le banc d’essai Python hors ligne couvre topologie, direction, occupation, ré
 
 Les contrats/modes M0 et les observations/conservations M1 sont implémentés et testés par des joueurs. M2 comprend désormais la MA fantôme en ligne et des perfectionnements des ressources spatiales. Une réception antérieure ne remplace pas les essais de non-régression et n’établit pas l’aptitude ATP.
 
-Prochaine étape : valider la courbe en mode ombre, la fraîcheur de localisation et le modèle de freinage avant de réaliser la commande des freins. La configuration actuelle ne permet pas d’activer FS.
+Prochaine étape : valider sur serveur contrôlé la nouvelle chaîne `Enforced` des trains manuels, la fraîcheur de localisation, les changements de graphe/session, le freinage et le flux SR. FS exige un changement explicite de canal à l'arrêt et une autorisation STCS exécutable, non un raccourci de configuration.
 
 Avant un ATP réel restent notamment à réaliser : enveloppes/cohérence du train complet, identité/acquittement/révocation des autorisations, règles de perte de contact/gel/contournement, limitations de vitesse/modèles de freinage, libération justifiée des ressources et essais d’injection de pannes.
 

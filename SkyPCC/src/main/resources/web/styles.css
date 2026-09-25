@@ -180,6 +180,9 @@ dialog p { overflow-wrap: anywhere; }
 .infrastructure-hit { cursor: pointer; }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 14; vector-effect: non-scaling-stroke; pointer-events: stroke; }
 #infrastructureSwitch { margin: 8px 0; }
+.sr-controls { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+.sr-controls select { width: 100%; }
+#srApprove { margin: 8px 0; }
 #infrastructureInspector dd { overflow-wrap: anywhere; }
 @media (max-width: 700px) { .event-panel.expanded[open] .event-list { height: 25dvh; } }
 .event-row { display: grid; grid-template-columns: 82px 78px minmax(90px, 160px) minmax(0, 1fr); align-items: start; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
@@ -215,6 +218,7 @@ dialog p { overflow-wrap: anywhere; }
   .map-shell { grid-row: 1; }
   .left-panel { grid-row: 2; border: 0; border-top: 1px solid var(--border); padding: 9px 12px; }
   .left-panel .panel-heading, .left-panel .field-label, .left-panel select, .section-title { display: none; }
+  .left-panel .sr-controls .field-label, .left-panel .sr-controls select { display: block; }
   .train-list { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
   .system-status .divider, .system-status span:nth-last-child(-n+2) { display: none; }
   .event-list { height: 110px; padding: 0 10px 6px; }

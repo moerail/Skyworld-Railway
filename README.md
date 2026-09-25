@@ -12,15 +12,21 @@
 
 **Full manuals / 完整手册:** [中文](README.zh.md) | [English](README.en.md) | [Nederlands](README.nl.md) | [Français](README.fr.md) | [日本語](README.ja.md)
 
+**Driver quick start / 玩家司机手册:** [中文](doc/driver/README.zh.md) | [English](doc/driver/README.en.md) | [Français](doc/driver/README.fr.md) | [日本語](doc/driver/README.ja.md)
+
+从上车、取得驾驶权到手柄控制、MA 申请与停车交接；面向普通玩家，无需阅读管理员配置章节。
+
+From boarding and claiming control to notches, MA requests and handover, without the administrator configuration chapters.
+
 **趣味别册 / Just for fun:** [鐵道運轉試驗規程 · 舊式技術訓令體](README.ja.classical.md)
 
 日语旧式技术训令体节编，非历史文献，不替代完整手册；技术限制与安全边界照旧。*文體ハ舊式ナレドモ、運轉ハ非同期ナリ。*
 
 An abridged Japanese companion in an old-fashioned technical-regulations style, not a historical document or a replacement for the full manual. Technical and safety limitations remain unchanged. *Old-fashioned prose, asynchronous trains.*
 
-**已用于 Skyworld，持续开发中。** 行车许可（MA）与行车许可终点（EoA）目前仅进行实验性的影子计算，不提供 ATP 制动监督。本项目不是认证铁路安全系统。
+**已用于 Skyworld，持续开发中。** 影子 MA/EoA 仍只读；新增的 `Enforced` 车载制动监督仅面向手动列车、需管理员显式启用，尚待实服验证。本项目不是认证铁路安全系统。
 
-**In use on Skyworld; under active development.** Movement Authority (MA) and End of Authority (EoA) are currently experimental, shadow-only calculations. They do not provide ATP braking supervision. This is not a certified railway safety system.
+**In use on Skyworld; under active development.** Shadow MA/EoA remains advisory. Experimental onboard brake supervision is available only for manually driven trains after an explicit admin switch to `Enforced`; live validation is still pending. This is not a certified railway safety system.
 
 ## 项目概览 / Overview
 
@@ -34,13 +40,15 @@ Minecraft is both the live operating environment and an interactive railway-syst
 
 ## 破坏性协议升级 / Breaking Protocol Upgrade
 
-本批版本为 **STF 3.0.0 / STCS 3.0.0 / STA 1.0.0 / SkyPCC 1.0.0**。统一采用 STA v5 与 PCC `/api/v5/`，不兼容旧版组合；停服、备份后一起替换所安装的组件，网页强制刷新。STF 仍可独立安装。保留 RailGraph 与占用账本，不应删除数据来升级。
+**当前为预发布 / Current pre-release: [`suite-v4.0.0`](https://github.com/moerail/Skyworld-Railway/releases/tag/suite-v4.0.0)。** 自动检查已通过，最近修复尚待服务器复测。Automated checks passed; the latest fixes still await live-server retesting.
 
-This release uses **STF 3.0.0 / STCS 3.0.0 / STA 1.0.0 / SkyPCC 1.0.0**, STA v5 and PCC `/api/v5/`. Mixed old/new installations are unsupported. Stop and back up the server, replace installed components together, then hard-refresh the browser. STF remains standalone-capable. Keep the RailGraph and occupancy ledgers.
+本批版本为 **STF 4.0.0 / STCS 4.0.0 / STA 2.0.0 / SkyPCC 2.0.0**。新增 STA v6 可执行授权与 PCC `/api/v6/operational-ma`、SR 审批接口；原有 v5 影子信息继续保留。不要混用旧版二进制：停服、备份后一起替换所安装的组件并强制刷新网页。STF 仍可独立安装。保留 RailGraph 与占用账本，不应删除数据来升级。
 
-编号彩蛋区分 Message 与 Packet：影子 MA 为 **Message 1003 / Packet 1015**，列车遥测为 **Message 1136**。自定义列车删除为 **Message 2001**，不代表占用出清；图定位与等待/未分配状态分别为 **Message 2002 / 2003**。仅借用 SUBSET-026 部分编号加 1000 的概念，不是 ETCS 报文编码或标准符合性声明。此次整理为 M3 开发准备接口，不代表 M3 或 FS 已完成。
+This release uses **STF 4.0.0 / STCS 4.0.0 / STA 2.0.0 / SkyPCC 2.0.0**. It adds executable STA v6 permissions and PCC `/api/v6/operational-ma` and SR approval, while preserving v5 shadow information. Do not mix old and new binaries: stop and back up the server, replace installed components together, then hard-refresh the browser. STF remains standalone-capable. Keep RailGraph and occupancy ledgers.
 
-The numbering homage keeps Message and Packet namespaces separate: shadow MA is **Message 1003 / Packet 1015**, and train telemetry is **Message 1136**. Custom train removal is **Message 2001**, never occupancy clearance; graph reports and waiting/inactive authority status use **Message 2002 / 2003**. Selected SUBSET-026 identifiers plus 1000 are conceptual references only, not ETCS wire encoding or compliance. This prepares interfaces for M3; it does not complete M3 or enable FS.
+编号彩蛋区分 Message 与 Packet：v5 影子 MA 与 v6 实验性可执行 MA 均使用私有 **Message 1003 / Packet 1015**，列车遥测为 **Message 1136**。自定义列车删除为 **Message 2001**，不代表占用出清；图定位与等待/未分配状态分别为 **Message 2002 / 2003**。SR 审批是 SkyRail 服务调用和行车事件，不是新增的 ETCS 报文。仅借用 SUBSET-026 部分编号加 1000 的概念，不是 ETCS 报文编码或标准符合性声明。
+
+The numbering homage keeps Message and Packet namespaces separate: v5 shadow MA and v6 experimental executable MA both use private **Message 1003 / Packet 1015**; telemetry uses **Message 1136**. Custom removal is **Message 2001**, never occupancy clearance; graph reports and waiting/inactive status use **Message 2002 / 2003**. SR approval is a SkyRail service call and railway event, not a new ETCS telegram. Selected SUBSET-026 identifiers plus 1000 are conceptual references only, not ETCS wire encoding or compliance.
 
 [编号、升级与安全边界 / Numbering, migration and boundaries](doc/STA-V5-MIGRATION.md)
 
@@ -50,20 +58,24 @@ STCS 新增管理员只读指令 `/stcs integrity [列车名|UUID]`（权限 `st
 
 STCS adds the read-only admin command `/stcs integrity [train-name|uuid]` (`stcs.admin`) for member distribution and inferred node passages. It is not a completed axle counter and never clears occupancy. Parking does not expire occupancy; restarting resets the in-memory diagnostic baseline, not the persistent ledger. Live-server validation remains necessary.
 
-STF 现已提供只读影子速度曲线、司机接近限速提示音及中英法日 HMI。限速显示在计分板第二行和 BossBar；低速遥测补偿不再使用理论最高速度。Python 测试台新增只读账本诊断。**仍无 ATP 自动制动，不能直接启用 FS。**
+STF 提供只读影子速度曲线，以及仅对手动列车生效的实验性 `Enforced` 制动监督。影子通道仍不施加制动；管理员须在停车时显式切换通道，司机取得可执行 MA 后才能进入 `FS/SH/SR`。ATP 状态在计分板显示为“通道 | 运行模式”，例如 `强制保护 | SR`。STF 内置伪 ATO 自动列车不进入该状态机。
 
-STF now provides read-only shadow speed curves, driver near-limit audio and four-language HMI. The limit appears on sidebar line two and the BossBar; low-speed telemetry extrapolation no longer uses the theoretical speed ceiling. The Python testbench adds read-only ledger inspection. **No automatic ATP braking or FS activation.**
+STF provides read-only shadow speed curves and experimental `Enforced` brake supervision for manual trains only. The shadow channel never intervenes; an admin must explicitly change channels while stopped, and a driver needs an executable MA to enter `FS/SH/SR`. The sidebar shows `channel | operating mode`, for example `Enforced | SR`. STF's built-in pseudo-ATO automatic trains do not enter this state machine.
 
 [更新说明 / Release notes](CHANGELOG.md)
+
+本轮修正了 SH/SR 模式限速制动、TR 冒进提示和远端 SR 审批。强制保护下，SH/SR 默认 40 km/h 上限超限后按小幅判定容差投入 B7，不等待 FS 的宽松超速计时；EoA 曲线仍可要求更低速度。计分板与司机 BossBar 显示实际 ATP B7/EB，TR 另有消息和可配置音效。SR 目标搜索与每次 MA 窗口分开，默认分别为 5000 m 与 120 m；已保存轨道图可跨未加载普通区块核对，但未知状态和资源冲突仍限制授权。四语言司机手册现从 MA、EoA、ATP 等术语入门。
+
+This update corrects SH/SR mode-speed braking, TR overrun feedback and distant SR approval. In the enforced channel, SH/SR default to a 40 km/h ceiling with B7 beyond a small detection tolerance, without the relaxed FS overspeed delay; the EoA curve can require a lower speed. The sidebar and driver BossBar show ATP B7/EB, and TR adds a message and configurable sound. SR target search and each rolling MA window are separate, defaulting to 5000 m and 120 m respectively. Saved geometry can span unloaded plain-track chunks, while unknown states and conflicts still restrict authority. The four-language driver manuals now begin with MA, EoA and ATP terminology.
 
 ## 主要模块 / Main Modules
 
 | 插件 / Plugin | 版本 / Version | 职责 / Responsibility |
 | --- | --- | --- |
-| [SkyTrainFolia (STF)](SkyTrainFolia/) | 3.0.0 | 列车运动、编组、驾驶控制、车型、牌子、实体道岔执行与驾驶室 HMI。<br>Train motion, consists, driving control, vehicle profiles, signs, physical point actuation and cab HMI. |
-| [Skyworld Train Control System (STCS)](STCS/) | 3.0.0 | RailGraph、线路归属、定位、保留占用与实验性影子 MA/EoA 分配。<br>RailGraph, line attribution, localisation, retained occupancy and experimental shadow MA/EoA allocation. |
-| [SkyworldTrainAPI (STA)](STA/) | 1.0.0 | 插件之间的版本化进程内服务契约、遥测与行车事件。<br>Versioned in-process service contracts, telemetry and railway events between plugins. |
-| [SkyPCC](SkyPCC/) | 1.0.0 | HTTP/SSE 调度显示、基础设施详情、事件日志与经过身份验证的道岔操作请求。<br>HTTP/SSE dispatch display, infrastructure inspectors, event log and authenticated turnout requests. |
+| [SkyTrainFolia (STF)](SkyTrainFolia/) | 4.0.0 | 列车运动、编组、驾驶控制、车型、牌子、实体道岔执行与驾驶室 HMI。<br>Train motion, consists, driving control, vehicle profiles, signs, physical point actuation and cab HMI. |
+| [Skyworld Train Control System (STCS)](STCS/) | 4.0.0 | RailGraph、线路归属、定位、保留占用与实验性 MA/EoA 分配。<br>RailGraph, line attribution, localisation, retained occupancy and experimental MA/EoA allocation. |
+| [SkyworldTrainAPI (STA)](STA/) | 2.0.0 | 插件之间的版本化进程内服务契约、遥测与行车事件。<br>Versioned in-process service contracts, telemetry and railway events between plugins. |
+| [SkyPCC](SkyPCC/) | 2.0.0 | HTTP/SSE 调度显示、基础设施详情、事件日志与经过身份验证的道岔操作、SR 审批。<br>HTTP/SSE dispatch display, inspectors, event log, authenticated turnout control and SR approval. |
 
 [shared/](shared/) 包含编译进各插件的共通指令、帮助与版本界面代码，并非第五个运行时插件。STA 是进程内 Java API，而不是通用的 Python 网络协议。
 
@@ -74,6 +86,7 @@ STF now provides read-only shadow speed curves, driver near-limit audio and four
 - **列车运行：** 基于轨道的编组运动、牵引与制动级位、车型参数、手动控制，以及基础的牌子驱动自动停站。这种伪 ATO 并非完整 ATO 系统。
 - **基础设施与定位：** 有向 RailGraph、物理连通关系、线路与里程归属、应答器、道岔及列车位置跟踪。
 - **占用与影子许可：** 保留占用证据、空间资源冲突、预约，以及实验性的 MA/EoA 计算与显示。不可用或不确定的观测被显式表达，而不是视为空闲。
+- **实验性手动列车保护：** 显式启用的 `Enforced` 通道、STA v6 可执行许可、`SB/FS/SH/SR/TR/PT` 状态和车载制动干预；仍待实服验证，不适用于内置伪 ATO 列车。
 - **调度与车载信息：** 实时 PCC 轨道图、占用与预约着色、列车和基础设施详情、事件、道岔控制请求，以及面向司机的 HMI。
 - **开发工具：** Java 回归测试、PCC JavaScript/浏览器测试，以及验证拓扑、占用、预约和 EoA 的离线 Python 测试台。这些工具补充而不替代实服测试。
 
@@ -82,6 +95,7 @@ STF now provides read-only shadow speed curves, driver near-limit audio and four
 - **Train operation:** track-based consist movement, traction/brake notches, vehicle profiles, manual controls and basic sign-driven automatic station operation. This pseudo-ATO is not a complete ATO system.
 - **Infrastructure and localisation:** a directed RailGraph, physical connectivity, line/mileage attribution, balises, points and train-position tracking.
 - **Occupancy and shadow authority:** retained occupancy evidence, spatial resource conflicts, reservations and experimental MA/EoA calculation and display. Unavailable or uncertain observations are represented rather than assumed clear.
+- **Experimental manual-train protection:** explicitly enabled `Enforced` channel, STA v6 executable permission, `SB/FS/SH/SR/TR/PT` states and onboard brake intervention; live validation remains outstanding and built-in pseudo-ATO trains are excluded.
 - **Dispatching and onboard information:** a live PCC track diagram, occupancy/reservation colouring, train and infrastructure inspectors, events, turnout-control requests and driver-facing HMI.
 - **Development tools:** Java regression tests, PCC JavaScript/browser tests and an offline Python testbench for topology, occupancy, reservations and EoA. These complement, rather than replace, live-server testing.
 
@@ -116,7 +130,7 @@ Unlike a static diagram, an interactive world lets learners observe train motion
 ## 安全与适用边界 / Safety and Scope Limitations
 
 - **不得用于真实铁路安全关键场景。** 本项目既不是认证铁路安全系统，也不是认证联锁。
-- **影子 MA/EoA 属于实验功能。** 计算、预约和显示不能被表述为真实 ATP 实现；MA/EoA 目前不触发 ATP 制动监督。
+- **影子 MA/EoA 仍不触发制动。** `Enforced` 是另一个需要显式启用的实验通道，仅对手动列车按有效授权施加制动，尚非实服验证或认证的 ATP 实现。
 - 司机失能紧急制动、手动紧急制动和 RECOVERING 制动保持是独立的实际控制功能，其存在不代表已实现基于 MA 的防护。
 - 使用铁路术语或借鉴设计思想，不构成符合 **ETCS SUBSET-026 或任何其他铁路安全标准**的声明。
 - 区块卸载、观测缺失或基础设施未知，不能自动解释为轨道空闲。保留证据与实物状态核验承担不同职责。
@@ -127,7 +141,7 @@ Unlike a static diagram, an interactive world lets learners observe train motion
 **English:**
 
 - **Not for real railway safety-critical use.** This is neither a certified railway safety system nor a certified interlocking.
-- **Shadow MA/EoA is experimental.** Calculation, reservation and display must not be presented as a real ATP implementation. MA/EoA currently do not trigger ATP braking supervision.
+- **Shadow MA/EoA never applies brakes.** `Enforced` is a separate, explicitly enabled experimental channel for manual-train braking against validated permission. It has not been live safety-validated or certified as ATP.
 - Driver-loss emergency braking, manual emergency braking and RECOVERING brake hold are separate active functions; their existence does not establish MA-based protection.
 - Railway terminology and design inspiration do not constitute compliance with **ETCS SUBSET-026 or any other railway safety standard**.
 - Unloaded chunks, missing observations and unknown infrastructure must not automatically be interpreted as clear track. Retained evidence and physical validation have different roles.
@@ -220,9 +234,9 @@ SkyRail Suite 正在 **Skyworld Minecraft Server** 中运行和持续测试。�
 
 SkyRail Suite is running and being tested on **Skyworld Minecraft Server**. Join us in-game or explore the live SkyPCC dashboard to see our player-built railway network in operation.
 
-> 这是实际部署与持续测试的展示，不代表所有功能已完成或不存在缺陷。目前 MA/EoA 仍处于影子阶段，不执行 ATP 制动监督。
+> 这是实际部署与持续测试的展示，不代表所有功能已完成或不存在缺陷。影子 MA/EoA 不执行制动；新 `Enforced` 功能需单独实服验证。
 >
-> This is a live deployment, not a guarantee of completeness or reliability. MA/EoA currently operate in shadow mode without ATP braking supervision.
+> This is a live deployment, not a guarantee of completeness or reliability. Shadow MA/EoA does not brake; the new `Enforced` mode still requires separate live validation.
 
 ### 加入服务器 / Join the Server
 

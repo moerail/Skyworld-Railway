@@ -40,7 +40,8 @@ public final class OptionalStaClasspathTest {
             for(Path file:files.filter(p->p.toString().endsWith(".class")).toList()) {
                 String name=root.relativize(file).toString().replace(File.separatorChar,'.').replaceAll("\\.class$","");
                 if(name.startsWith("net.skyworld.skytrain.StaTelemetryPublisher")
-                        || name.startsWith("net.skyworld.skytrain.StaCabIntegration")) continue;
+                        || name.startsWith("net.skyworld.skytrain.StaCabIntegration")
+                        || name.startsWith("net.skyworld.skytrain.StaOperationalIntegration")) continue;
                 String bytes=new String(Files.readAllBytes(file),StandardCharsets.ISO_8859_1);
                 assert !bytes.contains("net/skyworld/sta/") && !bytes.contains("net.skyworld.sta.") : name;
                 Class<?> type=Class.forName(name,false,OptionalStaClasspathTest.class.getClassLoader());
@@ -61,6 +62,7 @@ public final class OptionalStaClasspathTest {
         assert TelemetrySink.create(disabled,()->{throw new AssertionError("Disabled STA invoked factory");})==null;
         var fallback=new TelemetrySink() {};
         assert !fallback.cabAuthority(UUID.randomUUID(),null,1000).live();
+        assert !fallback.operationalPermission(UUID.randomUUID(),null,1000,false,"FORWARD").available();
         assert fallback.stationAhead(null,256)==null && fallback.query(null)==null;
         fallback.close();
         assert scanned>50;

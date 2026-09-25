@@ -19,7 +19,7 @@ import net.minecraft.world.scores.Scoreboard;
 import net.minecraft.world.scores.criteria.ObjectiveCriteria;
 
 final class CabSidebar {
-    static final int LINE_COUNT = 14;
+    static final int LINE_COUNT = 15;
 
     private final String objectiveName;
     private final Objective objective;

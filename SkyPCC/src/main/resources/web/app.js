@@ -16,6 +16,7 @@
     renderedOffsets: new Map(),
     selectedTrainId: null,
     selectedTrainSnapshot: null,
+    selectedSrTrainId: null,
     followTrainId: null,
     lineFilter: '',
     clockOffset: 0,
@@ -36,8 +37,11 @@
   let operations = { status: 'UNAVAILABLE', session: '', latestSequence: 0, evictedCount: 0, events: [] };
   let operationsKey = '';
   let shadowMa = null;
+  let operationalMa = null;
   let switchRequest = null;
   let switchPending = false;
+  let srRequest = null;
+  let srPending = false;
 
   const ui = Object.fromEntries([
     'railMap', 'edgeLayer', 'switchLayer', 'nodeLayer', 'labelLayer', 'trainLayer', 'lineFilter',
@@ -50,7 +54,8 @@
     'cameraControls', 'followTrain', 'cancelFollow', 'followStatus',
     'eventPanel', 'eventCount', 'eventStatus', 'eventFilter', 'eventRetention', 'eventList',
     'authorityLayer', 'detailMa', 'detailEoa', 'detailMaReason', 'maStatus',
-    'switchDialog', 'switchTitle', 'switchTransition', 'switchToken', 'switchResult', 'switchConfirm', 'switchClose'
+    'switchDialog', 'switchTitle', 'switchTransition', 'switchToken', 'switchResult', 'switchConfirm', 'switchClose',
+    'srControls', 'srTrainSelect', 'srApprove', 'srDialog', 'srTitle', 'srTarget', 'srToken', 'srResult', 'srConfirm', 'srClose'
   ].map(id => [id, document.getElementById(id)]));
 
   function setTheme(theme) {
@@ -112,6 +117,7 @@
     state.edges = new Map(graph.edges.map(edge => [edge.id, edge]));
     graph.nodes = (graph.nodes || []).map(node => ({ ...node, type: String(node.type || '').toLowerCase() }));
     state.nodes = new Map(graph.nodes.map(node => [node.id, node]));
+    renderPendingSr();
     if (sameTopology) {
       renderSwitchDirections();
       return;
@@ -418,9 +424,10 @@
 
   function updateTrainSamples(snapshot) {
     if (snapshot.schemaVersion !== 5) {
-      snapshot = { schemaVersion: 5, serviceStatus: 'UNAVAILABLE', trains: [], shadowMa: null };
+      snapshot = { schemaVersion: 5, serviceStatus: 'UNAVAILABLE', trains: [], shadowMa: null, operationalMa: null };
     }
     shadowMa = snapshot.shadowMa || null;
+    operationalMa = snapshot.operationalMa || null;
     updateOperations(snapshot.operationalEvents);
     state.serviceStatus = snapshot.serviceStatus || 'AVAILABLE';
     state.lastSnapshotAt = Date.now();
@@ -438,7 +445,32 @@
     ui.trainCount.textContent = String(next.size);
     ui.activeCount.textContent = t('{n} active', { n: [...next.values()].filter(t => !t.stale).length });
     renderTrainList();
+    renderPendingSr();
+    updateInspector();
     if (snapshot.graphRevision !== state.graph?.revision) loadGraph(true).catch(showDisconnected);
+  }
+
+  function liveOperational() {
+    const age = Date.now() + state.clockOffset - Number(operationalMa?.emittedAtMillis || 0);
+    return operationalMa?.version === 6 && operationalMa.status === 'AVAILABLE'
+      && operationalMa.graphRevision === state.graph?.revision
+      && age >= 0 && age <= 1500 ? operationalMa : null;
+  }
+
+  function renderPendingSr() {
+    const pending = liveOperational()?.pendingSr || [];
+    ui.srControls.hidden = pending.length === 0;
+    if (!pending.some(item => item.trainId === state.selectedSrTrainId)) state.selectedSrTrainId = null;
+    ui.srTrainSelect.replaceChildren();
+    const prompt = document.createElement('option');
+    prompt.value = ''; prompt.textContent = t('Pending SR'); ui.srTrainSelect.append(prompt);
+    for (const item of pending) {
+      const option = document.createElement('option');
+      option.value = item.trainId;
+      option.textContent = item.trainName || item.trainId;
+      ui.srTrainSelect.append(option);
+    }
+    ui.srTrainSelect.value = state.selectedSrTrainId || '';
   }
 
   function updateOperations(report) {
@@ -464,6 +496,7 @@
     let count = 0;
     for (const event of events) {
       const warning = event.type === 'DRIVER_UNAVAILABLE' || event.type === 'SWITCH_RUN_THROUGH_SUSPECTED'
+        || event.type === 'MA_UNAVAILABLE'
         || (event.type === 'EMERGENCY_BRAKE_APPLIED' && event.reason !== 'EB_INPUT');
       if (ui.eventFilter.value === 'warning' && !warning) continue;
       count++;
@@ -498,8 +531,14 @@
       else if (event.type === 'DRIVER_UNAVAILABLE') message.textContent = t('Driver unavailable: {driver} ({reason}). Control revoked; EB commanded.', { driver, reason });
       else if (event.type === 'DRIVER_ACQUIRED') message.textContent = t('{driver} acquired control via /st drive. EB retained until handle input.', { driver });
       else if (event.type === 'DRIVER_RELEASED') message.textContent = t('{driver} released control ({reason}). EB commanded.', { driver, reason });
-      else if (event.type === 'MA_REQUESTED') message.textContent = t('{driver} requested shadow MA. Result at request: {state} ({reason}). No ATP intervention.', { driver, state: code(event.details?.state || 'UNKNOWN'), reason });
-      else if (event.type === 'MA_RELEASED') message.textContent = t('{driver} released forward shadow reservations. Train occupancy retained; no brake command.', { driver });
+      else if (event.type === 'MA_REQUESTED') message.textContent = t('{driver} requested {mode} MA. Result: {state} ({reason}); executable: {executable}.', {
+        driver, mode: code(event.details?.mode || '--'), state: code(event.details?.state || 'UNKNOWN'),
+        reason, executable: code(event.details?.executable || 'false') });
+      else if (event.type === 'MA_RELEASED') message.textContent = t('{driver} released forward MA reservation. Train occupancy retained.', { driver });
+      else if (event.type === 'MA_UNAVAILABLE') message.textContent = t('Executable MA unavailable for {train} ({reason}). Stop at the last confirmed EoA.', {
+        train: event.trainName || event.trainId, reason });
+      else if (event.type === 'SR_GRANTED') message.textContent = t('{operator} approved SR for {train} to {node}.', {
+        operator: driver, train: event.trainName || event.trainId, node: event.details?.targetNodeId || '--' });
       else if (event.type === 'ATP_MODE_CHANGED') message.textContent = t('{operator} changed ATP mode: {from} → {to}.', { operator: event.details?.actorName || event.details?.actorId || '--', from: code(event.details?.previous || 'UNKNOWN'), to: code(event.details?.next || 'UNKNOWN') });
       else message.textContent = `${event.source}: ${code(event.type)} (${reason})`;
       message.title = `${event.type} / ${event.reason || '--'}`;
@@ -664,6 +703,23 @@
   function renderInfrastructure(panel, control) {
     const { kind, id } = state.selectedInfrastructure;
     const item = kind === 'edge' ? state.edges.get(id) : state.nodes.get(id);
+    ui.srApprove.hidden = true;
+    const pending = liveOperational()?.pendingSr?.find(entry => entry.trainId === state.selectedSrTrainId);
+    if (kind === 'node' && item && pending && state.controlEnabled
+        && ['balise', 'switch', 'origin', 'end'].includes(item.type)) {
+      ui.srApprove.hidden = false;
+      ui.srApprove.disabled = srPending;
+      ui.srApprove.onclick = () => {
+        if (srPending || !liveOperational()) return;
+        srRequest = { requestId: crypto.randomUUID(), trainId: pending.trainId,
+          targetNodeId: id, graphRevision: state.graph.revision };
+        ui.srTarget.textContent = `${pending.trainName || pending.trainId} → ${item.name || id}`;
+        ui.srToken.value = '';
+        ui.srResult.textContent = t('Ready');
+        ui.srConfirm.disabled = false;
+        ui.srDialog.showModal();
+      };
+    }
     const rows = [[kind === 'edge' ? 'Edge' : 'Infrastructure', item?.name || id]];
     if (!item) rows.push(['Status', t('Unavailable')]);
     else {
@@ -722,6 +778,7 @@
     const control = document.getElementById('infrastructureSwitch');
     infrastructure.hidden = !state.selectedInfrastructure;
     control.hidden = true;
+    ui.srApprove.hidden = true;
     if (state.selectedInfrastructure) {
       ui.inspector.hidden = true; ui.inspectorEmpty.hidden = true; ui.inspectorBack.hidden = false;
       ui.cameraControls.hidden = true;
@@ -751,7 +808,8 @@
       : !train.graphCurrent ? 'state-error' : 'state-ok';
     ui.detailMode.textContent = ({ automatic: t('Automatic'), manual: t('Manual') })[train.mode] || '--';
     const cab = train.cab;
-    const modes = { SHADOW: t('Shadow (unprotected)'), ISOLATED: t('Isolated'), BYPASS: t('Bypass'), RECOVERING: t('Recovering') };
+    const modes = { SHADOW: t('Shadow (unprotected)'), ACTIVE: t('Enforced'),
+      ISOLATED: t('Isolated'), BYPASS: t('Bypass'), RECOVERING: t('Recovering') };
     ui.detailAtp.textContent = cab ? (modes[cab.atpMode] || cab.atpMode || '--') : '--';
     const authority = liveAuthority()?.authorities?.find(a => a.trainId === train.trainId);
     ui.detailMa.textContent = authority?.state === 'ALLOCATED_SHADOW'
@@ -1057,6 +1115,36 @@
     } catch (_error) { setSwitchResult({ key: 'Connection lost / unconfirmed' }); }
     finally { switchPending = false; }
   });
+  ui.srTrainSelect.addEventListener('change', event => {
+    state.selectedSrTrainId = event.target.value || null;
+    updateInspector();
+  });
+  ui.srClose.addEventListener('click', () => ui.srDialog.close());
+  ui.srDialog.addEventListener('close', () => { ui.srToken.value = ''; });
+  ui.srConfirm.addEventListener('click', async () => {
+    if (!srRequest || srPending) return;
+    const request = { ...srRequest }, token = ui.srToken.value;
+    ui.srToken.value = ''; ui.srConfirm.disabled = true; srPending = true;
+    ui.srResult.textContent = code('PENDING');
+    try {
+      const deadline = Date.now() + 30000;
+      while (Date.now() < deadline) {
+        const response = await fetch('/api/v6/sr', { method: 'POST', cache: 'no-store',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(request), signal: AbortSignal.timeout(6000) });
+        const result = await response.json();
+        if (response.status !== 202) {
+          ui.srResult.textContent = result.status === 'APPLIED' ? t('SR approved')
+            : `${code(result.status || 'REJECTED')}: ${code(result.reason || 'UNCONFIRMED')}`;
+          return;
+        }
+        ui.srResult.textContent = `${code(result.status)}: ${code(result.reason)}`;
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      ui.srResult.textContent = t('Unconfirmed. Check actual point position.');
+    } catch (_error) { ui.srResult.textContent = t('Connection lost / unconfirmed'); }
+    finally { srPending = false; updateInspector(); }
+  });
   setInterval(renderAuthority, 500);
 
   function setEventStatus(key) {
@@ -1076,6 +1164,7 @@
     setTheme(document.documentElement.dataset.theme || loadTheme());
     if (state.graph) { populateLines(); renderGraph(); }
     renderTrainList();
+    renderPendingSr();
     updateInspector();
     renderOperations();
     renderAuthority();

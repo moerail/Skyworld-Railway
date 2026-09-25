@@ -1,10 +1,28 @@
 # SkyRail Suite
 
-## 破坏性升级：STA v5
+**普通玩家从这里开始：[司机手册](doc/driver/README.zh.md)**。包含上车、驾驶权、热键栏、影子 MA 和停车流程。
 
-配套版本为 STF **3.0.0**、STCS **3.0.0**、STA **1.0.0**、SkyPCC **1.0.0**。旧插件与 HTTP 接口不兼容；停服备份后整体替换已安装组件，刷新 PCC。STF 仍可独立使用，轨道图与占用账本必须保留。
+## M3 实验功能：手动列车保护
 
-Message 与 Packet 独立编号：已分配影子 MA 为 **Message 1003 / Packet 1015**，遥测为 **Message 1136**；自定义列车删除、图定位、等待/未分配状态分别为 **2001 / 2002 / 2003**。删除不等于出清。这只是 SUBSET-026 概念编号的致敬，不是 ETCS 编码或标准符合性声明，也不代表 M3 完成或 FS 开放。[升级说明](doc/STA-V5-MIGRATION.md)。
+**预发布 `suite-v4.0.0`。** 自动检查已通过，最近修复尚待新一轮服务器验收。[发布说明](doc/releases/suite-v4.0.0.md)。
+
+本轮配套版本为 STF **4.0.0**、STCS **4.0.0**、STA **2.0.0**、SkyPCC **2.0.0**。停服备份轨道图和占用账本后一起替换已安装组件，不要混用旧版。STF 仍可单独运行，但 `Enforced` 需要 STA 与 STCS。旧 v5 影子服务继续只读；新 STA v6 可执行许可是另一个通道。
+
+**仅手动列车**进入 `SB/FS/SH/SR/TR/PT` 状态机。司机上车取得控制权后默认为 `SB`；`/stcs ma demand` 申请 `FS`，`/stcs ma sh` 申请有界调车许可，`/stcs ma sr` 等待 PCC 或管理员批准到指定设备的许可。申请受理不等于获得可执行 MA。越过 EoA 触发 `TR` 后须先停稳，`/stcs ma ack` 进入 `PT`，再用 `/stcs ma release` 释放后重新申请。管理员只能在停车时通过 `/stcs admin enforce true|false` 显式切换；`false` 回到 `RECOVERING` 制动保持。计分板 ATP 模式显示为“通道 | 运行模式”，例如 **`强制保护 | SR`**；通道名翻译，运行模式代号不翻译。
+
+STF 内置伪 ATO **自动列车完全不进入此状态机**，乘客输入状态机或 MA 指令也不会把它切换成 `FS/SH/SR`。`shadow-atp` 始终只读，`active-atp` 提供可配置的宽松与严格预设。此功能尚待实服验证，**不是认证 ATP、联锁或 ETCS 实现**；未知基础设施不能当作空闲。SR 批准是 SkyRail 服务调用和行车事件，不是新增 ETCS 报文；v6 MA 复用私有 Message 1003 / Packet 1015。
+
+### 当前 M3 行为
+
+`Enforced` 下，SH/SR 使用配置的模式限速，默认 40 km/h，由 STCS 的 `ma.sh.speed-kmh` / `ma.sr.speed-kmh` 设置。超出上限并超过小幅判定容差后立即投入 B7，不等待 FS 的宽松超速计时；接近 EoA 时，制动曲线仍可能要求更低速度。接近限速和超速警报同样适用于此通道。实际 ATP 介入会在计分板和司机专用 BossBar 显示 `ATP B7` 或 `ATP EB`；冒进 EoA 进入 TR，同时发送本地化司机提示并播放紧急制动音效。STF 音效配置为 `ma-sounds.atp-service` 和 `ma-sounds.atp-emergency`，可自行调整。
+
+SR 审批分别检查已保存 RailGraph 中的目标可达性与当前 MA 窗口。STCS 的 `ma.sr.max-target-distance-meters` 默认 5000 m，用于目标搜索；`ma.sr.max-distance-meters` 默认 120 m，限制每次滚动授权。获批不等于整条目标进路已经预约或允许通行。已保存的普通轨道几何可以跨未加载区块核对；缺失轨道边、未知道岔、不确定占用与资源冲突仍会限制分配或延长。SR/Trip 指令回执及 PCC 拒绝原因支持中英法日。
+
+## 上一轮破坏性升级：STA v5
+
+上一轮 v5 使用 STF **3.0.0**、STCS **3.0.0**、STA **1.0.0**、SkyPCC **1.0.0**；这些是历史版本，不是本轮安装目标。STF 仍可独立使用；升级务必保留轨道图与占用账本。
+
+Message 与 Packet 独立编号：已分配影子 MA 为 **Message 1003 / Packet 1015**，遥测为 **Message 1136**；自定义列车删除、图定位、等待/未分配状态分别为 **2001 / 2002 / 2003**。删除不等于出清。这只是 SUBSET-026 概念编号的致敬，不是 ETCS 编码或标准符合性声明。本段描述上一轮 v5 基线，不代表当前 v6 可执行许可。[升级说明](doc/STA-V5-MIGRATION.md)。
 
 ## 节点通过完整度诊断
 
@@ -14,7 +32,9 @@ Message 与 Packet 独立编号：已分配影子 MA 为 **Message 1003 / Packet
 
 影子曲线只读，不改变手柄或制动。默认 EoA 前 1 m 零速，最后 5 m 内最高 5 km/h，并连续降至零。使用 B7 参数和实际速度进行平坡模型估算；延迟补偿不再按理论最高速度扣距离。
 
-`shadow-atp` 配置曲线；`enforcement-enabled: true` 当前明确拒绝。`shadow-atp.warning` 默认距限速 2 km/h 报警、回落至限速下 5 km/h 后重新准备，低于 0.5 km/h 停止提示，最短间隔 5000 ms。`ma-sounds.near-limit` 配置音效、音量、音调、次数和间隔，默认 `minecraft:block.note_block.bell`。停车后 `/st reload`。
+`shadow-atp` 配置曲线；`enforcement-enabled: true` 当前明确拒绝。`shadow-atp.warning` 默认距限速 2 km/h 开始连续报警，回落至限速下 5 km/h 或低于 0.5 km/h 停止。超过限速时优先播放超速警报，降至限速下 1 km/h 退回普通提示。阈值均可配置，旧 `cooldown-millis` 不再生效。`ma-sounds.near-limit` 默认 `minecraft:block.note_block.flute`，`ma-sounds.overspeed` 默认更急促的 `minecraft:block.note_block.bit`，均无轮间冷却空档。停车后 `/st reload`。
+
+接近限速时每轮重复六组 Do5-Sol5，减速到滞回解除阈值后停止；MA 开始缩短播放三声短鸣。`pitch-sequence` 优先于 `pitch`，`count` 为整组重复次数，每轮最多 64 音。旧配置保留原音效，请按[音效配置说明](doc/SHADOW-ATP.md#existing-configurations--旧配置更新)合并新默认值。
 
 测试台“账本诊断”读取同一服务器的 railgraph 与 shadow-occupancy.json。它不修改文件、不证明空闲。确认整列原车及全部成员已移除后，才可在控制台执行 `stcs ma clear <完整UUID> confirm`；命令清除该车全部影子记录，保留历史 M1 账本，并备份和审计。不能因区块卸载而清除。
 
@@ -33,7 +53,7 @@ SkyRail Suite 是 SkyTrain Suite 开发线的新仓库名称；现有插件名�
 
 本文依据 **2026-09-23 当前本地源码**整理，面向服务器管理员、司机、线路建设者和扩展开发者。历史讨论中的目标不等于已实现功能；旧版安装组合和命令以本手册及当前源码为准。
 
-> **开发版安全边界：目前已能在线计算、分配和显示影子 MA/EoA，但 ATP 不根据它施加制动。申请成功、PCC 显示空闲或 RBC 在线，都不是安全开车保证。司机失能 EB、手动 EB 和 RECOVERING 制动保持是另外的实际控车功能。**
+> **开发版安全边界：影子 MA/EoA 不施加制动。另一个 `Enforced` 通道只在管理员显式启用、手动列车拿到经过校验的可执行许可后介入，仍待实服验证。申请受理、PCC 显示空闲或 RBC 在线，都不能证明安全。**
 
 ## 致谢 / Acknowledgements / Dankwoord
 
@@ -77,10 +97,10 @@ SkyTrain Suite 把 Minecraft 作为可交互的铁路运行环境：玩家建设
 
 | 组件 | 当前版本 | 主要职责 |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `3.0.0` | 矿车编组、运动与过弯、驾驶权、牵引制动、车型、牌子、实体道岔执行、HMI 和声音 |
-| STCS | `3.0.0` | 基础设施、有向 RailGraph、线路里程、定位、保留占用账本、影子 MA/EoA 和局部道岔检查 |
-| SkyworldTrainAPI / STA | `1.0.0` | 插件间带版本的服务契约、遥测、成员观测、驾驶台状态、许可和事件交换 |
-| SkyPCC | `1.0.0` | 网页线路图、车辆/设施 Inspector、占用与预约显示、事件栏、经鉴权的道岔控制 |
+| SkyTrainFolia / STF | `4.0.0` | 矿车编组、运动、驾驶权、牵引制动、道岔执行、HMI、实验性手动列车 ATP 执行 |
+| STCS | `4.0.0` | RailGraph、定位、保留占用、影子及实验性可执行 MA/EoA 分配 |
+| SkyworldTrainAPI / STA | `2.0.0` | 带版本的插件间契约、遥测、运行许可和行车事件 |
+| SkyPCC | `2.0.0` | 网页调度显示、设备详情、事件、道岔控制和 SR 审批 |
 
 ```text
 Minecraft 玩家 / 矿车 / 轨道 / 红石
@@ -104,11 +124,11 @@ Minecraft 玩家 / 矿车 / 轨道 / 红石
 | 编组、轨道坐标运动与高速显示适配 | 已实现；跨区域、高速、第三方插件组合仍需实服验收 |
 | Station 伪自动驾驶 | 已实现 MVP，使用车型 P/B 级位；不是完整 ATO |
 | 图、线路归属、里程、占用保留 | 已实现；超时或卸载不能自动证明出清 |
-| 在线 MA/EoA、空间占用与预约 | 已实现影子版本，不执行 ATP 制动 |
+| 在线 MA/EoA、空间占用与预约 | 影子服务继续只读；另有实验性的手动列车可执行许可 |
 | 网页道岔控制 | 已实现鉴权、局部检查、异步 PENDING |
-| 车载速度曲线、超速与 EoA 制动监督 | 影子速度曲线已提供只读显示；超速/EoA 自动制动仍未实现。 |
+| 车载速度曲线、超速与 EoA 制动监督 | 影子曲线只读；`Enforced` 手动列车制动已实现实验版本，尚待实服安全验证。 |
 | 完整目的地自动排路、时刻表 ATO | 尚未实现完整系统；目的地/route 字段不代表已排路 |
-| FS、SR、SH、SB、TR、PT 等 ETCS 模式 | 尚未实现，不应把现有模式当成它们的完整替代 |
+| SkyRail 手动列车 SB/FS/SH/SR/TR/PT | 实验状态机，不声称符合 ETCS 模式；内置伪 ATO 列车不适用 |
 | 独立 SIR、SkyCBI、Python RBC 服务 | 架构讨论方向，不是当前安装组件 |
 
 ## 2. 安装与升级
@@ -131,10 +151,10 @@ Minecraft 玩家 / 矿车 / 轨道 / 红石
 从仓库 Releases 获取匹配的一组 JAR；本地构建输出位于 `artifacts/`。当前文件名：
 
 ```text
-SkyTrainFolia-3.0.0.jar
-STCS-3.0.0.jar
-SkyworldTrainAPI-1.0.0.jar
-SkyPCC-1.0.0.jar
+SkyTrainFolia-4.0.0.jar
+STCS-4.0.0.jar
+SkyworldTrainAPI-2.0.0.jar
+SkyPCC-2.0.0.jar
 ```
 
 STF/STCS 对 STA 使用软依赖，但完整套件应四者一起安装。PCC 硬依赖 STCS 和 STA。STF 单独运行不具备完整套件的图、MA 与调度显示能力。
@@ -548,7 +568,7 @@ Destroy 是实际销毁动作，在备份后的独立测试线上验证。手动
 | Credit | 到 EoA 的剩余路径距离，不是空间直线距离 |
 | Occupancy | 列车成员观测推导/保留的轨道占用 |
 | Reservation | 车前影子预约，不是认证进路锁闭 |
-| RBC link | 影子信息通道状态，不证明存在实际无线 RBC 或有效 ATP |
+| RBC link | 信息/许可通道状态，不证明存在认证无线 RBC 或认证 ATP |
 
 1. 确认图、道岔、定位和实际试验线路正确。
 2. 司机上车 `/st drive`，停稳设置方向，使用允许申请的模式。
@@ -563,6 +583,7 @@ Destroy 是实际销毁动作，在备份后的独立测试线上验证。手动
 | 状态 | MA / 通道 | 实际控车 |
 | --- | --- | --- |
 | SHADOW | 允许影子申请/识别 | 不执行 MA/速度 ATP |
+| ACTIVE / Enforced | 手动列车需要 STA v6 可执行许可 | SB 保持制动；FS/SH/SR 实验性曲线与独立制动；TR/PT 恢复流程 |
 | BYPASS | 保持通道，可保持/申请影子 MA | 监督旁路，不是通信切除 |
 | ISOLATED | 拒绝新申请，车载列控切除 | 保留只读里程、STA 遥测，禁止自动牌子 |
 | RECOVERING | 不授予新的有效车载 MA | 保持制动、拒绝牵引，等待明确后续选择 |
@@ -696,10 +717,10 @@ ma-sounds:
 | granted | `minecraft:block.anvil.land` | 获得申请的许可，pitch 2，两声 |
 | changed | `minecraft:block.anvil.land` | 明显跳变，pitch 2，一声 |
 | released | `minecraft:block.iron_trapdoor.close` | MA 释放 |
-| shrinking | `minecraft:entity.experience_orb.pickup` | 运行中剩余滑动 MA 开始收缩 |
+| shrinking | `minecraft:block.note_block.bit` | 运行中剩余滑动 MA 开始收缩 |
 | low | `minecraft:block.note_block.pling` | 低余量警告 |
 
-声音 ID 使用 Java 版 `namespace:path`，省略命名空间默认为 minecraft。自定义声音需客户端资源包支持。范围：volume 0..4、pitch 0.5..2、count 1..5、interval-ticks 1..200。
+声音 ID 使用 Java 版 `namespace:path`，省略命名空间默认为 minecraft。自定义声音需客户端资源包支持。范围：volume 0..4、pitch 0.5..2、count 1..16、interval-ticks 1..200。
 
 STCS 控制触发条件：
 
@@ -823,7 +844,7 @@ v5 影子快照带 `simulationOnly=true`、`executable=false`。许可含路径�
 
 M0 模式/契约与 M1 观测/保留已有实现并经历玩家联测，M2 已进入在线影子 MA 与空间资源改进。历史“通过”不替代新版本回归，也不意味着 ATP 准入条件已满足。
 
-下一步是继续验证影子曲线、定位时效和制动模型，再开发制动执行链；当前不能用配置开关直接启用 FS。
+下一步是在受控服务器上验证新手动列车 `Enforced` 制动链、定位时效、轨道图/会话变化、制动响应与 SR 流程。FS 不能通过配置捷径启用；需要停车时管理员显式切换通道，并获得 STCS 可执行许可。
 
 真正 ATP 前仍需完整列车前后包络与一致性、可靠许可身份/确认/撤销、失联/冻结/旁路策略、线路限速与制动模型、资源释放证明、故障注入及版本回归。目前不把这些写成已完成能力。
 

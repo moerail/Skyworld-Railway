@@ -38,6 +38,11 @@ final class Train {
     volatile Reverser reverser = Reverser.FORWARD;
     volatile int powerNotch;
     volatile ProtectionMode protectionMode = ProtectionMode.SHADOW;
+    volatile OperatingMode operatingMode = OperatingMode.SB;
+    final ActiveAtpState activeAtp = new ActiveAtpState();
+    volatile Double activeAtpLimitMps;
+    volatile String activeAtpReason = "UNAVAILABLE";
+    volatile int activeAtpBrakeLevel;
     final TrainSoundState soundState = new TrainSoundState();
     final SwitchPassageMonitor switchPassages = new SwitchPassageMonitor();
     volatile int brakeNotch;

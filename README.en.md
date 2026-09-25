@@ -1,10 +1,28 @@
 # SkyRail Suite
 
-## Breaking Release: STA v5
+**Players: start with the [Driver Manual](doc/driver/README.en.md)** for boarding, driving control, hotbar, shadow MA and stopping.
 
-Use STF **3.0.0**, STCS **3.0.0**, STA **1.0.0** and SkyPCC **1.0.0** together. Stop and back up the server, replace installed components together and refresh PCC; old binaries and HTTP routes are incompatible. STF still works standalone. Keep RailGraph and occupancy ledgers.
+## Experimental M3: Manual-Train Protection
 
-Message and Packet are separate namespaces: allocated shadow MA uses **Message 1003 / Packet 1015**, telemetry **Message 1136**. Custom removal, graph report and inactive/waiting status use **2001 / 2002 / 2003** respectively. Removal is not occupancy clearance. These are conceptual SUBSET-026 numbering references, not ETCS encoding or compliance. M3 is not complete and FS remains disabled. [Migration details](doc/STA-V5-MIGRATION.md).
+**Pre-release `suite-v4.0.0`.** Automated checks passed; the latest fixes await another live-server acceptance run. [Release notes](doc/releases/suite-v4.0.0.md).
+
+Use STF **4.0.0**, STCS **4.0.0**, STA **2.0.0** and SkyPCC **2.0.0** together. Back up RailGraph and occupancy ledgers before replacing installed components; do not mix versions. STF remains useful on its own, but `Enforced` requires STA and STCS. The old v5 shadow service remains observational; the new STA v6 operational permission is a separate channel.
+
+Only **manual trains** enter `SB`, `FS`, `SH`, `SR`, `TR` and `PT`. A stopped train with a driver starts in `SB`; `/stcs ma demand` requests `FS`, `/stcs ma sh` requests a bounded shunting permission, and `/stcs ma sr` requests a dispatcher-approved permission to a selected infrastructure node. An accepted request is not yet an allocated, executable MA. After an EoA trip, stop, use `/stcs ma ack` to enter `PT`, then `/stcs ma release` before requesting anew. Admins may explicitly switch a stopped manual train between shadow and active channels using `/stcs admin enforce true|false`; `false` returns to `RECOVERING` brake hold. The sidebar displays a translated channel and stable mode code, for example **`Enforced | SR`**. `shadow-atp` remains read-only; `active-atp` has relaxed and strict configurable profiles.
+
+STF's built-in pseudo-ATO **automatic trains never enter this operating-mode state machine**. A passenger's mode or MA command cannot turn an automatic train into an `FS/SH/SR` train. This is an experimental implementation awaiting live-server validation, **not a certified ATP, interlocking or ETCS implementation**. Unknown infrastructure is never proof of clear track. SR approval is a SkyRail service call and event, not an ETCS telegram; v6 reuses private Message 1003 / Packet 1015 for MA.
+
+### Current M3 behaviour
+
+In `Enforced`, SH/SR use the configured mode ceiling (40 km/h by default, set by STCS `ma.sh.speed-kmh` / `ma.sr.speed-kmh`). Exceeding that ceiling beyond a small detection tolerance applies B7 without the relaxed FS overspeed delay; the EoA braking curve may require a lower speed. Near-limit and overspeed warnings also work in this channel. Actual ATP intervention appears as `ATP B7` or `ATP EB` in the sidebar and driver-only BossBar. EoA overrun enters TR, sends a localized driver message and plays the emergency cue. STF sound settings are `ma-sounds.atp-service` and `ma-sounds.atp-emergency`; audio remains configurable.
+
+SR approval checks target reachability on the saved RailGraph separately from the current MA window. STCS `ma.sr.max-target-distance-meters` defaults to 5000 m for target search; `ma.sr.max-distance-meters` defaults to 120 m for each rolling grant. Approval therefore does not reserve or authorize the entire route to the target. Saved plain-track geometry can be checked across unloaded chunks; missing edges, unknown points, uncertain occupancy and conflicts still restrict allocation or extension. SR/Trip command replies and PCC rejection reasons are localized in Chinese, English, French and Japanese.
+
+## Previous Breaking Release: STA v5
+
+The previous v5 set used STF **3.0.0**, STCS **3.0.0**, STA **1.0.0** and SkyPCC **1.0.0** together. These are historical versions, not the installation target for this release. STF works standalone; always keep RailGraph and occupancy ledgers when upgrading.
+
+Message and Packet are separate namespaces: allocated shadow MA uses **Message 1003 / Packet 1015**, telemetry **Message 1136**. Custom removal, graph report and inactive/waiting status use **2001 / 2002 / 2003** respectively. Removal is not occupancy clearance. These are conceptual SUBSET-026 numbering references, not ETCS encoding or compliance. This paragraph describes the previous v5 baseline, not the new v6 operational channel. [Migration details](doc/STA-V5-MIGRATION.md).
 
 ## Node-Passage Diagnostics
 
@@ -14,7 +32,9 @@ Message and Packet are separate namespaces: allocated shadow MA uses **Message 1
 
 Read-only shadow curves do not change handles or brakes. Defaults: stop 1 m before EoA; at most 5 km/h within the final 5 m, continuously decreasing to zero. This level-track estimate uses B7 parameters and measured speed, not the theoretical speed ceiling for telemetry-age compensation.
 
-Configure the model under `shadow-atp`; `enforcement-enabled: true` is explicitly rejected. `shadow-atp.warning` defaults to warning 2 km/h below the limit, re-arming 5 km/h below it, silence below 0.5 km/h and a 5000 ms cooldown. `ma-sounds.near-limit` controls sound ID, volume, pitch, count and interval; default `minecraft:block.note_block.bell`. Stop trains before `/st reload`.
+Configure the model under `shadow-atp`; `enforcement-enabled: true` is explicitly rejected. `shadow-atp.warning`: continuous near-limit warning from 2 km/h below the limit, clearing at 5 km/h below it or below 0.5 km/h. Overspeed takes priority above the limit and clears at 1 km/h below it. All thresholds are configurable; the old `cooldown-millis` is ignored. `ma-sounds.near-limit` defaults to `minecraft:block.note_block.flute`; `ma-sounds.overspeed` to faster `minecraft:block.note_block.bit` pulses. Both loop without inter-burst gaps. Stop trains before `/st reload`.
+
+Near-limit audio repeats six C5-G5 pairs per burst until speed clears the hysteresis threshold; shrinking MA sounds three short beeps. `pitch-sequence` overrides `pitch`, and `count` repeats the sequence (at most 64 notes). Existing configurations retain their sound choices; merge the new defaults from [the audio configuration guide](doc/SHADOW-ATP.md#existing-configurations--旧配置更新) to adopt them.
 
 The testbench ledger inspector reads matching railgraph and shadow-occupancy.json files without modifying them or proving clearance. Only after verifying the entire original train and all members are gone may the console operator use `stcs ma clear <full-UUID> confirm`. It clears all shadow evidence for that identity, backs up and audits the operation, and preserves historical M1 evidence. Unloaded trains must not be cleared merely because they are invisible.
 
@@ -26,7 +46,7 @@ A train-operation, railway-infrastructure, shadow train-control and dispatching-
 
 This manual describes the local source baseline documented on **23 September 2026**. English edition prepared on **14 September 2026**. It is intended for server administrators, drivers, railway builders and plugin developers. Ideas discussed for future development are not necessarily implemented.
 
-> **Development-build limitation:** the suite calculates, allocates and displays shadow MA/EoA information, but ATP does not apply brakes in response to it. An accepted request, an apparently clear track on PCC, or an online RBC indicator is not permission to assume safe movement. Driver-loss emergency braking, manual emergency braking and the RECOVERING brake hold are separate, active control functions.
+> **Development-build limitation:** shadow MA/EoA does not apply brakes. The separate `Enforced` channel can intervene on a manual train only after explicit admin enablement and a validated executable authority; this new path still requires live validation. An accepted request, apparently clear PCC track or online RBC indicator is not proof of safe movement.
 
 **For TrainCarts developers:** TrainCarts is a reference for parts of the sign interface and operating workflow. This document does not claim complete TrainCarts compatibility, equivalent physics, or compatibility with every TC extension. STF's `switch` is not TC's `switcher`. The suite does not require TC or BKCommonLib, and two controllers should not manage the same minecart simultaneously.
 
@@ -60,10 +80,10 @@ The project introduces explicit driving control, resource occupancy, conflicting
 
 | Component | Version | Responsibility |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `3.0.0` | Consists, movement and cornering, driving control, traction/braking, vehicle profiles, signs, physical turnout actuation, HMI and sounds |
-| STCS | `3.0.0` | Infrastructure, directed RailGraph, line mileage, localisation, retained occupancy ledger, shadow MA/EoA and local turnout checks |
-| SkyworldTrainAPI / STA | `1.0.0` | Versioned inter-plugin contracts, telemetry, member observations, cab state, authorities and events |
-| SkyPCC | `1.0.0` | Web track diagram, train/infrastructure inspector, occupancy/reservations, event log and authenticated turnout control |
+| SkyTrainFolia / STF | `4.0.0` | Consists, movement, driving, physical turnout actuation, HMI and experimental manual-train ATP executor |
+| STCS | `4.0.0` | Infrastructure, RailGraph, localisation, retained occupancy, shadow and operational MA/EoA allocation |
+| SkyworldTrainAPI / STA | `2.0.0` | Versioned inter-plugin contracts, telemetry, operational permissions and events |
+| SkyPCC | `2.0.0` | Web dispatch display, inspectors, events, authenticated turnout control and SR approval |
 
 ```text
 Minecraft players / minecarts / rails / redstone
@@ -87,11 +107,11 @@ This illustrates responsibilities, not a mandatory serial call chain. Browser in
 | Consists, track-coordinate movement, high-speed display adaptation | Implemented; high speed, region transfers and third-party combinations still need live-server validation |
 | Station pseudo-automatic driving | MVP using vehicle power/brake notches, not a complete ATO |
 | Graph, line attribution, mileage, retained occupancy | Implemented; timeout/unloading does not establish clearance |
-| Online MA/EoA and spatial reservations | Shadow implementation; no ATP braking |
+| Online MA/EoA and spatial reservations | Shadow service retained; separate experimental executable permissions for manual trains |
 | Web turnout control | Authentication, local checks and asynchronous PENDING implemented |
-| Onboard speed curves and ATP overspeed/EoA intervention | Read-only shadow speed curves implemented; automatic overspeed/EoA braking not implemented. |
+| Onboard speed curves and ATP overspeed/EoA intervention | Shadow curves remain read-only; experimental `Enforced` manual-train intervention is implemented but not live safety-validated |
 | Complete destination routing and timetable ATO | Not implemented as a complete system; route metadata is not an established route |
-| ETCS FS/SR/SH/SB/TR/PT modes | Not implemented; current modes are not full substitutes |
+| SkyRail manual-train SB/FS/SH/SR/TR/PT modes | Experimental operating state machine, not ETCS mode compliance; built-in pseudo-ATO is excluded |
 | Separate SIR, SkyCBI or Python RBC service | Architectural ideas, not current installable components |
 
 ## 2. Installation and Upgrades
@@ -114,10 +134,10 @@ This illustrates responsibilities, not a mandatory serial call chain. Browser in
 Current installation files:
 
 ```text
-SkyTrainFolia-3.0.0.jar
-STCS-3.0.0.jar
-SkyworldTrainAPI-1.0.0.jar
-SkyPCC-1.0.0.jar
+SkyTrainFolia-4.0.0.jar
+STCS-4.0.0.jar
+SkyworldTrainAPI-2.0.0.jar
+SkyPCC-2.0.0.jar
 ```
 
 STF/STCS declare STA as a soft dependency, but install all four for the complete suite. PCC requires STCS and STA. Standalone STF does not provide the complete graph, authority and dispatching functionality.
@@ -262,13 +282,18 @@ Property syntax also accepts `property <train> get <key>` and `property <train> 
 | `/stcs help [page] [language]`, `/stcs version [language]` | Help/version |
 | `/stcs inspect` | `stcs.use`; marker within 3 blocks |
 | `/stcs status` | `stcs.use`; graph nodes/edges/revision, not the train's ATP mode |
-| `/stcs ma demand` | `stcs.ma` and current driver; request shadow MA |
+| `/stcs ma demand` | `stcs.ma` and current manual-train driver; request FS MA (shadow or active channel) |
+| `/stcs ma sh` | Request bounded SH permission after stopping |
+| `/stcs ma sr` | Request SR after stopping; dispatcher approval is required |
+| `/stcs ma ack` | At standstill, acknowledge TR and enter PT |
 | `/stcs ma release` | `stcs.ma` and current driver; release forward reservations, not body occupancy |
 | `/stcs ma status` | `stcs.admin`; authority/blocker diagnostics |
 | `/stcs admin status` | `stcs.admin`; protection state of the train being ridden |
 | `/stcs admin isolate true\|false` | Train-control isolation |
 | `/stcs admin bypass true\|false` | Supervision bypass |
 | `/stcs admin shadow true\|false` | Shadow testing |
+| `/stcs admin enforce true\|false` | Explicit experimental active channel; `false` returns to RECOVERING |
+| `/stcs sr <train-name> <target-device-uuid>` | `stcs.admin`; approve pending SR to a reachable infrastructure node |
 | `/stcs occupancy [train-name\|uuid]` | `stcs.admin`; retained occupancy/member observations |
 | `/stcs rebuild` | `stcs.admin`; rebuild graph from registered infrastructure |
 | `/stcs export` | `stcs.admin`; export current graph, not a rescan |
@@ -514,16 +539,16 @@ destroy
 
 Destroy really removes entities. Test on a backed-up, separate track; a manually controlled train should not be destroyed. Validate station handling first, then spawn/destroy separately.
 
-## 9. Shadow MA and Protection Modes
+## 9. Shadow MA and Experimental Manual Protection
 
 | Term | Meaning here |
 | --- | --- |
-| MA / Movement Authority | Shadow allocation along a legal directed path |
+| MA / Movement Authority | Shadow allocation or separate experimental executable permission along a legal directed path |
 | EoA / End of Authority | Current authority endpoint, not necessarily the end of a line |
 | Credit | Remaining path distance to EoA, not Euclidean distance |
 | Occupancy | Track occupied according to member observations/retained evidence |
-| Reservation | Forward shadow allocation, not certified route locking |
-| RBC link | Shadow information-channel status, not proof of radio RBC or effective ATP |
+| Reservation | Forward resource allocation, not certified route locking |
+| RBC link | Information/permission-channel status, not proof of certified radio RBC or ATP |
 
 ### Driver Workflow
 
@@ -531,7 +556,7 @@ Destroy really removes entities. Test on a backed-up, separate track; a manually
 2. Board, `/st drive`, stop and select direction in a mode that permits requests.
 3. `/stcs ma demand`; inspect the allocation result/reason, not just request acceptance.
 4. The driver's BossBar shows remaining MA; HMI shows EoA line/mileage; PCC shows reserved intervals.
-5. Control speed and stopping manually. `/stcs ma release` releases forward reservations.
+5. In SHADOW, control speed and stopping manually. In experimental ACTIVE, an executable grant supervises the manual train; continue to drive responsibly. `/stcs ma release` is allowed after stopping and releases forward reservations.
 
 Driverless trains do not actively acquire new MA. A stopped train with a driver is different from a train without one. Releasing MA neither clears body occupancy nor acts as a stop command.
 
@@ -540,11 +565,12 @@ Driverless trains do not actively acquire new MA. A stopped train with a driver 
 | State | MA/channel | Active behaviour |
 | --- | --- | --- |
 | SHADOW | Shadow requests/recognition allowed | No MA/speed ATP intervention |
+| ACTIVE / Enforced | Manual-train executable v6 permission required | SB brake hold; FS/SH/SR curve and independent braking; TR/PT recovery |
 | BYPASS | Channel retained; shadow MA can be retained/requested | Supervision bypass, not communication isolation |
 | ISOLATED | New requests rejected; onboard control channel isolated | Read-only mileage and STA telemetry retained; automatic signs disabled |
 | RECOVERING | No new valid onboard MA | Brake hold, traction rejected, explicit next mode required |
 
-Modes persist with train data. Setting an applicable switch to `false` enters RECOVERING. Enabling a target with `true` requires RECOVERING, fresh complete-train observations and standstill. Modes cannot simply be changed across at speed.
+The protection channel persists with train data; the manual operating mode restarts conservatively in SB. Setting an applicable switch to `false` enters RECOVERING. Enabling a target with `true` requires RECOVERING, fresh complete-train observations and standstill. Modes cannot simply be changed across at speed. Automatic trains are excluded from the manual operating-mode state machine.
 
 Administrator seated in the target train, for example:
 
@@ -671,10 +697,10 @@ ma-sounds:
 | granted | `minecraft:block.anvil.land` | Requested authority granted; pitch 2, twice |
 | changed | `minecraft:block.anvil.land` | Significant jump; pitch 2, once |
 | released | `minecraft:block.iron_trapdoor.close` | Release |
-| shrinking | `minecraft:entity.experience_orb.pickup` | Remaining rolling MA starts shrinking while moving |
+| shrinking | `minecraft:block.note_block.bit` | Remaining rolling MA starts shrinking while moving |
 | low | `minecraft:block.note_block.pling` | Low remaining distance |
 
-Use Java Edition `namespace:path` IDs; omitted namespace defaults to minecraft. Custom IDs need a client resource pack. Ranges: volume 0..4, pitch 0.5..2, count 1..5, interval-ticks 1..200.
+Use Java Edition `namespace:path` IDs; omitted namespace defaults to minecraft. Custom IDs need a client resource pack. Ranges: volume 0..4, pitch 0.5..2, count 1..16, interval-ticks 1..200.
 
 STCS trigger settings:
 
@@ -792,7 +818,7 @@ The offline Python testbench exercises topology, direction, occupancy, reservati
 
 M0 contracts/modes and M1 observations/retention have implementations and player testing. M2 now includes online shadow MA and spatial-resource refinements. Previous acceptance does not replace regression tests or establish ATP readiness.
 
-Next: validate the shadow curve, localisation freshness and braking model before implementing brake execution. The current configuration cannot activate FS.
+Next: validate the new manual-train `Enforced` execution chain, localisation freshness, graph/session changes, braking response and SR workflow on a controlled server. FS is not activated by a configuration shortcut; it requires a stopped admin channel switch and an executable STCS permission.
 
 Before real ATP, remaining work includes full train envelopes/consistency, authority identity/acknowledgement/revocation, loss-of-contact/freeze/bypass policies, speed restrictions/braking models, justified resource release and fault-injection testing.
 

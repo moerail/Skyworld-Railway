@@ -162,10 +162,12 @@ final class DriverControlService {
     }
 
     void requireDriver(Player player, Train train) {
-        if (isDriver(player, train)) return;
-        Train old = drivingTarget(player);
-        if (old != null && !isDriver(player, old)) clearDrivingTarget(player);
-        throw new IllegalArgumentException("error.drive-declare");
+        synchronized (driverLock) {
+            if (isDriver(player, train)) return;
+            Train old = drivingTarget(player);
+            if (old != null && !isDriver(player, old)) clearDrivingTarget(player);
+            throw new IllegalArgumentException("error.drive-declare");
+        }
     }
 
     String driverName(Train train) {

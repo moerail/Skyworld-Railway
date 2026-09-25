@@ -25,41 +25,124 @@ public final class SkyTrainPlugin extends JavaPlugin {
     private volatile VehicleProfile vehicleProfile;
     private volatile boolean railInfrastructureReady;
     private volatile Map<String, MaSoundSettings.Tone> maSounds = Map.of();
-    private final java.util.concurrent.ConcurrentMap<java.util.UUID, java.util.UUID> maSoundTokens = new java.util.concurrent.ConcurrentHashMap<>();
+    private record SoundChannel(java.util.UUID driver, String kind) {
+        boolean speedWarning() { return kind.equals("SPEED"); }
+    }
+    private final java.util.concurrent.ConcurrentMap<SoundChannel, java.util.UUID> maSoundTokens = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Called asynchronously by STCS; all player access for playback runs on the owning entity scheduler. */
     public void playMaNotice(java.util.UUID driver, java.util.UUID lease, String cue) {
         Player player = getServer().getPlayer(driver);
         if (player == null) return;
         java.util.UUID token = java.util.UUID.randomUUID();
-        maSoundTokens.put(driver, token);
-        player.getScheduler().run(this, task -> {
-            if (!validMaListener(player, lease, token, cue)) { maSoundTokens.remove(driver, token); return; }
+        var channel = soundChannel(driver, cue);
+        if (channel.speedWarning()) {
+            if (maSoundTokens.putIfAbsent(channel, token) != null) return;
+            startSpeedWarning(player, lease, channel, token);
+            return;
+        } else maSoundTokens.put(channel, token);
+        var scheduled = player.getScheduler().run(this, task -> {
+            if (!validMaListener(player, lease, token, cue)) { maSoundTokens.remove(channel, token); return; }
             var cues = java.util.Set.of(cue.split("\\+"));
             var settings = maSounds;
             var tones = cues.stream().map(settings::get).filter(java.util.Objects::nonNull)
                     .filter(MaSoundSettings.Tone::enabled).toList();
             var pending = new java.util.concurrent.atomic.AtomicInteger(1);
-            Runnable finished = () -> { if (pending.decrementAndGet() == 0) maSoundTokens.remove(driver, token); };
+            Runnable finished = () -> { if (pending.decrementAndGet() == 0) maSoundTokens.remove(channel, token); };
             for (var tone : tones) {
-                player.playSound(player, tone.sound(), tone.category(), tone.volume(), tone.pitch());
-                for (int i = 1; i < tone.count(); i++) {
+                player.playSound(player, tone.sound(), tone.category(), tone.volume(), tone.pitchAt(0));
+                for (int i = 1; i < tone.notes(); i++) {
+                    float pitch = tone.pitchAt(i);
                     pending.incrementAndGet();
-                    player.getScheduler().runDelayed(this, second -> {
+                    var note = player.getScheduler().runDelayed(this, second -> {
                         try {
                             if (validMaListener(player, lease, token, cue))
-                                player.playSound(player, tone.sound(), tone.category(), tone.volume(), tone.pitch());
+                                player.playSound(player, tone.sound(), tone.category(), tone.volume(), pitch);
+                            else maSoundTokens.remove(channel, token);
                         } finally { finished.run(); }
                     }, finished, tone.interval() * i);
+                    if (note == null) finished.run();
                 }
             }
             finished.run();
-        }, () -> maSoundTokens.remove(driver, token));
+        }, () -> maSoundTokens.remove(channel, token));
+        if (scheduled == null) maSoundTokens.remove(channel, token);
     }
     private boolean validMaListener(Player player, java.util.UUID lease, java.util.UUID token, String cue) {
-        return player.isOnline() && token.equals(maSoundTokens.get(player.getUniqueId())) && driverDesks().stream()
+        boolean speedWarning = isSpeedWarning(cue);
+        return player.isOnline() && token.equals(maSoundTokens.get(soundChannel(player.getUniqueId(), cue))) && driverDesks().stream()
                 .anyMatch(d -> d.driverId().equals(player.getUniqueId()) && d.leaseId().equals(lease)
-                        && (cue.equals("RELEASED") || !java.util.Set.of("ISOLATED", "RECOVERING").contains(d.atpMode())));
+                        && (cue.equals("RELEASED") || !java.util.Set.of("ISOLATED", "RECOVERING").contains(d.atpMode()))
+                        && (!speedWarning || AtpDriverFeedback.speedWarningChannel(d.atpMode())));
+    }
+
+    private static boolean isSpeedWarning(String cue) {
+        return cue.equals("NEAR_LIMIT") || cue.equals("OVERSPEED");
+    }
+
+    private static SoundChannel soundChannel(java.util.UUID driver, String cue) {
+        return new SoundChannel(driver, AtpDriverFeedback.soundChannel(cue));
+    }
+
+    void announceAtpTrip(java.util.UUID driver, java.util.UUID lease) {
+        Player player = getServer().getPlayer(driver);
+        if (player == null) return;
+        player.getScheduler().run(this, task -> {
+            if (!player.isOnline() || driverDesks().stream().noneMatch(d -> d.driverId().equals(driver)
+                    && d.leaseId().equals(lease) && d.atpMode().equals("ACTIVE"))) return;
+            send(player, "&c" + uiMessages.text(player, "protection.tripNotice"));
+            playMaNotice(driver, lease, "ATP_EMERGENCY");
+        }, () -> {});
+    }
+
+    private void startSpeedWarning(Player player, java.util.UUID lease, SoundChannel channel, java.util.UUID token) {
+        var notice = new ShadowSpeedNotice();
+        var playback = new SpeedWarningPlayback();
+        MaSoundSettings.Tone[] playing = {null};
+        Runnable retired = () -> maSoundTokens.remove(channel, token);
+        var scheduled = player.getScheduler().runAtFixedRate(this, task -> {
+            if (!validMaListener(player, lease, token, "NEAR_LIMIT")) {
+                stopWarningSound(player, playing[0]);
+                task.cancel();
+                retired.run();
+                return;
+            }
+            String active = speedWarningCue(player, lease, notice);
+            if (active == null) {
+                stopWarningSound(player, playing[0]);
+                task.cancel();
+                retired.run();
+                return;
+            }
+            var tone = maSounds.get(active);
+            var audible = tone != null && tone.enabled() ? tone : null;
+            if (playing[0] != audible) stopWarningSound(player, playing[0]);
+            playing[0] = audible;
+            Float pitch = playback.tick(active, tone);
+            if (pitch != null) player.playSound(player, tone.sound(), tone.category(), tone.volume(), pitch);
+        }, retired, 1, 1);
+        if (scheduled == null) retired.run();
+    }
+
+    private void stopWarningSound(Player player, MaSoundSettings.Tone tone) {
+        if (tone != null && player.isOnline()) player.stopSound(tone.sound(), tone.category());
+    }
+
+    private String speedWarningCue(Player player, java.util.UUID lease, ShadowSpeedNotice notice) {
+        var desk = driverDesks().stream().filter(d -> d.driverId().equals(player.getUniqueId())
+                && d.leaseId().equals(lease)).findFirst().orElse(null);
+        Train train = desk == null ? null : manager.train(desk.trainId());
+        var sink = telemetrySink;
+        if (train == null || !manager.isDriver(player, train)) return null;
+        double scale = getConfig().getDouble("infrastructure.blocks-per-meter", 1);
+        double speed = Math.max(train.currentSpeed(), train.maxMemberSpeed()) * 20 / scale;
+        if (train.protectionMode == ProtectionMode.ACTIVE && !train.properties().conductionMode.automatic())
+            return notice.update(lease, train.activeAtpLimitMps, speed, shadowSpeedNoticeSettings);
+        if (train.protectionMode != ProtectionMode.SHADOW || sink == null) return null;
+        var input = sink.shadowCurveInput(train.id(), lease, System.currentTimeMillis(), train.reversed, train.reverser.name());
+        var curve = ShadowCurve.calculate(shadowCurveSettings, input, speed, trainSpeedLimit(train) * 20 / scale,
+                vehicleProfile.brakeAcceleration(7) * 400 / scale);
+        return notice.update(lease, curve.permittedMps(), speed, shadowSpeedNoticeSettings);
     }
 
     public boolean isRailInfrastructureReady() { return railInfrastructureReady; }
@@ -71,6 +154,8 @@ public final class SkyTrainPlugin extends JavaPlugin {
             throw new IllegalArgumentException("protection.select");
         Train train = manager.trainForCart(cart);
         if (train == null) throw new IllegalArgumentException("protection.select");
+        if (train.properties().conductionMode.automatic() && !"status".equals(action))
+            throw new IllegalArgumentException("protection.automatic");
         synchronized (train) {
             if (!"status".equals(action)) {
                 long now = System.currentTimeMillis();
@@ -84,11 +169,15 @@ public final class SkyTrainPlugin extends JavaPlugin {
                 ProtectionMode next = previous.change(action, enabled, stopped);
                 if (next != previous) {
                     train.protectionMode = next;
+                    train.operatingMode = OperatingMode.SB;
+                    train.activeAtp.clear();
+                    train.activeAtpLimitMps = null;
+                    train.activeAtpBrakeLevel = 0;
                     train.automaticRun = null;
                     train.moving = false;
                     train.powerNotch = 0;
                     train.brakeNotch = 7;
-                    train.emergencyBrake = true;
+                    train.emergencyBrake = next != ProtectionMode.ACTIVE;
                     train.manualTakeover = true;
                     train.manualReleaseConfirmed = false;
                     manager.save();
@@ -100,6 +189,51 @@ public final class SkyTrainPlugin extends JavaPlugin {
                     "controlChannel", Boolean.toString(train.protectionMode.controlChannel()),
                     "supervisionAvailable", "false", "maAvailable", "false");
         }
+    }
+
+    /** Player-region bridge for the manual-train Trip acknowledgement command. */
+    public String acknowledgeTrainTrip(Player player) {
+        if (!(player.getVehicle() instanceof org.bukkit.entity.Minecart cart)) return "NOT_ON_TRAIN";
+        Train train = manager.trainForCart(cart);
+        if (train == null || train.properties().conductionMode.automatic()) return "MANUAL_ONLY";
+        if (!manager.isDriver(player, train)) return "NOT_DRIVER";
+        synchronized (train) {
+            if (train.operatingMode != OperatingMode.TR) return "NO_TRIP";
+            if (train.currentSpeed() > .001 || train.maxMemberSpeed() > .001) return "STOP_FIRST";
+            train.operatingMode = train.operatingMode.acknowledge(true);
+            manager.save();
+            return "ACKNOWLEDGED_PT";
+        }
+    }
+
+    /** Withdraw onboard permission before STCS releases any forward reservation. */
+    public String releaseOperationalAuthority(Player player) {
+        if (!(player.getVehicle() instanceof org.bukkit.entity.Minecart cart)) return "NOT_ON_TRAIN";
+        Train train = manager.trainForCart(cart);
+        if (train == null || train.properties().conductionMode.automatic()) return "MANUAL_ONLY";
+        if (!manager.isDriver(player, train)) return "NOT_DRIVER";
+        synchronized (train) {
+            if (train.protectionMode != ProtectionMode.ACTIVE) return "SHADOW";
+            if (train.currentSpeed() > .001 || train.maxMemberSpeed() > .001) return "STOP_FIRST";
+            if (train.operatingMode == OperatingMode.TR) return "ACK_TRIP_FIRST";
+            train.operatingMode = train.operatingMode.release(true);
+            train.activeAtp.clear();
+            train.activeAtpLimitMps = null;
+            train.activeAtpBrakeLevel = 0;
+            train.powerNotch = 0;
+            train.brakeNotch = 7;
+            train.moving = false;
+            manager.save();
+            return "RELEASED";
+        }
+    }
+
+    /** Player-region guard for STCS manual-train commands, including shadow requests. */
+    public String manualDrivingEligibility(Player player) {
+        if (!(player.getVehicle() instanceof org.bukkit.entity.Minecart cart)) return "NOT_ON_TRAIN";
+        Train train = manager.trainForCart(cart);
+        if (train == null || train.properties().conductionMode.automatic()) return "MANUAL_ONLY";
+        return manager.isDriver(player, train) ? "ELIGIBLE" : "NOT_DRIVER";
     }
     private volatile double serverSpeedLimit;
 
@@ -115,11 +249,17 @@ public final class SkyTrainPlugin extends JavaPlugin {
     VehicleProfile vehicleProfile() { return vehicleProfile; }
     private volatile ShadowCurve.Settings shadowCurveSettings;
     private volatile ShadowSpeedNotice.Settings shadowSpeedNoticeSettings;
+    private volatile ActiveAtpState.Settings activeAtpSettings;
     ShadowSpeedNotice.Settings shadowSpeedNoticeSettings() { return shadowSpeedNoticeSettings; }
     ShadowCurve.Settings shadowCurveSettings() { return shadowCurveSettings; }
+    ActiveAtpState.Settings activeAtpSettings() { return activeAtpSettings; }
     double serverSpeedLimit() { return serverSpeedLimit; }
     double trainSpeedLimit(Train train) {
         return vehicleProfile.speedLimit(serverSpeedLimit, train.maxSpeed);
+    }
+
+    Runnable resetCabForReload() {
+        return cabUiManager == null ? () -> {} : cabUiManager.resetForReload();
     }
 
     void reloadVehicleConfiguration() {
@@ -130,12 +270,15 @@ public final class SkyTrainPlugin extends JavaPlugin {
             double limit = VehicleProfile.number(config, "settings.server-speed-limit-kmh", 3.6, 576) / 72;
             var curveSettings = ShadowCurveSettings.load(config);
             var noticeSettings = ShadowSpeedNotice.Settings.load(config);
+            var activeSettings = ActiveAtpSettings.load(config, candidate,
+                    config.getDouble("infrastructure.blocks-per-meter", 1));
             reloadConfig();
             maSounds = MaSoundSettings.load(getConfig(), message -> getLogger().warning(message));
             maSoundTokens.clear();
             vehicleProfile = candidate;
             shadowCurveSettings = curveSettings;
             shadowSpeedNoticeSettings = noticeSettings;
+            activeAtpSettings = activeSettings;
             serverSpeedLimit = limit;
             getLogger().info("Vehicle profile: " + candidate.id() + ", fixed mass " + candidate.mass()
                     + " t, effective cap " + Math.min(candidate.maxSpeed(), limit) * 72

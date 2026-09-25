@@ -1,10 +1,28 @@
 # SkyRail Suite
 
-## Incompatibele update: STA v5
+**Voor spelers:** de bestuurdershandleiding is beschikbaar in [Engels](doc/driver/README.en.md), [Chinees](doc/driver/README.zh.md), [Frans](doc/driver/README.fr.md) en [Japans](doc/driver/README.ja.md).
 
-Gebruik STF **3.0.0**, STCS **3.0.0**, STA **1.0.0** en SkyPCC **1.0.0** samen. Stop de server, maak een back-up, vervang alle geïnstalleerde suitecomponenten en vernieuw PCC. Oude plugins en HTTP-routes zijn niet compatibel. STF blijft zelfstandig bruikbaar; behoud RailGraph en bezettingsregisters.
+## Experimentele M3: bescherming van handbestuurde treinen
 
-Message en Packet hebben aparte nummerreeksen: toegewezen schaduw-MA gebruikt **Message 1003 / Packet 1015**, telemetrie **Message 1136**. Eigen berichten voor verwijdering, graafpositie en wachtende/inactieve autoriteit gebruiken **2001 / 2002 / 2003**. Verwijdering bewijst geen vrij spoor. De verwijzing naar SUBSET-026 is uitsluitend conceptueel, geen ETCS-codering of conformiteitsclaim. M3 is niet voltooid en FS blijft uitgeschakeld. [Migratie](doc/STA-V5-MIGRATION.md).
+**Voorlopige uitgave `suite-v4.0.0`.** Automatische controles zijn geslaagd; de laatste correcties wachten op een nieuwe acceptatietest op de server. [Uitgavenotities](doc/releases/suite-v4.0.0.md).
+
+Gebruik STF **4.0.0**, STCS **4.0.0**, STA **2.0.0** en SkyPCC **2.0.0** samen. Stop de server en maak een back-up van RailGraph en bezettingsregisters voordat u componenten vervangt; meng geen versies. STF blijft zelfstandig bruikbaar, maar `Enforced` vereist STA en STCS. De bestaande v5-schaduwservice blijft adviserend; de uitvoerbare STA v6-autoriteit is een apart kanaal.
+
+Alleen **handbestuurde treinen** volgen de toestanden `SB/FS/SH/SR/TR/PT`. Na het claimen van de bediening begint de trein in `SB`. `/stcs ma demand` vraagt `FS`, `/stcs ma sh` een begrensde rangeertoestemming en `/stcs ma sr` wacht op goedkeuring door PCC of een beheerder tot een gekozen spoorobject. Een geaccepteerd verzoek is nog geen uitvoerbare MA. Na het overschrijden van EoA (`TR`): stoppen, `/stcs ma ack` voor `PT`, daarna `/stcs ma release` voor een nieuw verzoek. Een beheerder wisselt het kanaal alleen bij stilstand met `/stcs admin enforce true|false`; `false` keert terug naar `RECOVERING` met remvasthouding. De zijbalk toont het vertaalde kanaal en de onvertaalde moduscode, bijvoorbeeld **`Enforced | SR`**.
+
+STF's ingebouwde pseudo-ATO **automatische treinen volgen deze toestandsmachine niet**; een passagier kan ze met modus- of MA-commando's niet naar `FS/SH/SR` omschakelen. `shadow-atp` blijft alleen-lezen; `active-atp` heeft instelbare soepele en strenge profielen. Dit is experimenteel en moet nog op een server worden gevalideerd: **geen gecertificeerde ATP, interlocking of ETCS-implementatie**. Onbekende infrastructuur betekent nooit vrij spoor. SR-goedkeuring is een SkyRail-serviceaanroep en gebeurtenis, geen nieuw ETCS-telegram; v6 MA hergebruikt de eigen Message 1003 / Packet 1015.
+
+### Huidig M3-gedrag
+
+In `Enforced` gebruiken SH/SR de ingestelde maximumsnelheid van de modus: standaard 40 km/h via STCS `ma.sh.speed-kmh` / `ma.sr.speed-kmh`. Overschrijding buiten een kleine detectietolerantie activeert B7 zonder de soepele FS-vertraging; de remcurve naar de EoA kan een lagere snelheid vereisen. Waarschuwingen bij het naderen en overschrijden van de snelheidslimiet werken ook in dit kanaal. Een ATP-ingreep verschijnt als `ATP B7` of `ATP EB` in de zijbalk en de BossBar van de bestuurder. EoA-overschrijding leidt tot TR, een vertaald bericht en een noodremgeluid. De STF-geluiden zijn instelbaar onder `ma-sounds.atp-service` en `ma-sounds.atp-emergency`.
+
+SR-goedkeuring beoordeelt de bereikbaarheid van het doel op de opgeslagen RailGraph los van de huidige MA-afstand. STCS `ma.sr.max-target-distance-meters` begrenst de doelzoekafstand standaard op 5000 m; `ma.sr.max-distance-meters` begrenst elke voortschrijdende autoriteit standaard op 120 m. Goedkeuring reserveert of autoriseert dus niet de hele route naar het doel. Opgeslagen geometrie van gewoon spoor kan over ongeladen chunks worden gecontroleerd; ontbrekende verbindingen, onbekende wisselstanden, onzekere bezetting en conflicten blijven toewijzing of verlenging beperken. SR/Trip-antwoorden en PCC-afwijzingen zijn beschikbaar in het Chinees, Engels, Frans en Japans.
+
+## Vorige incompatibele update: STA v5
+
+De vorige v5-set gebruikte STF **3.0.0**, STCS **3.0.0**, STA **1.0.0** en SkyPCC **1.0.0** samen. Dit zijn historische versies, niet de huidige installatiedoelen. STF blijft zelfstandig bruikbaar; behoud RailGraph en bezettingsregisters bij updates.
+
+Message en Packet hebben aparte nummerreeksen: toegewezen schaduw-MA gebruikt **Message 1003 / Packet 1015**, telemetrie **Message 1136**. Eigen berichten voor verwijdering, graafpositie en wachtende/inactieve autoriteit gebruiken **2001 / 2002 / 2003**. Verwijdering bewijst geen vrij spoor. De verwijzing naar SUBSET-026 is uitsluitend conceptueel, geen ETCS-codering of conformiteitsclaim. Deze alinea beschrijft de vorige v5-basis, niet het nieuwe v6-kanaal. [Migratie](doc/STA-V5-MIGRATION.md).
 
 ## Diagnose van knooppuntpassages
 
@@ -14,7 +32,9 @@ Message en Packet hebben aparte nummerreeksen: toegewezen schaduw-MA gebruikt **
 
 Schaduwcurves wijzigen geen rijstanden of remmen. Standaard: stilstand 1 m voor EoA en maximaal 5 km/h in de laatste 5 m, aflopend tot nul. Het model voor vlak spoor gebruikt B7-parameters en gemeten snelheid; vertraging wordt niet meer met de theoretische maximumsnelheid gecompenseerd.
 
-`shadow-atp` bevat de curve-instellingen; `enforcement-enabled: true` wordt geweigerd. `shadow-atp.warning`: waarschuwing 2 km/h onder de limiet, opnieuw gereed 5 km/h eronder, stil onder 0.5 km/h, minimaal 5000 ms tussen signalen. `ma-sounds.near-limit` configureert geluid, volume, toonhoogte, aantal en interval; standaard `minecraft:block.note_block.bell`. Stop treinen voor `/st reload`.
+De curve staat onder `shadow-atp`; `enforcement-enabled: true` wordt geweigerd. `shadow-atp.warning`: continue waarschuwing vanaf 2 km/h onder de limiet, stil bij 5 km/h eronder of onder 0.5 km/h. Boven de limiet krijgt het oversnelheidsalarm voorrang; bij 1 km/h eronder keert de gewone waarschuwing terug. Alle drempels zijn instelbaar; het oude `cooldown-millis` wordt genegeerd. `ma-sounds.near-limit` gebruikt standaard `minecraft:block.note_block.flute`; `ma-sounds.overspeed` snellere pulsen van `minecraft:block.note_block.bit`. Beide herhalen zonder pauzes tussen reeksen. Stop treinen voor `/st reload`.
+
+De waarschuwing herhaalt zes C5-G5-paren per reeks totdat de snelheid onder de hysteresegrens komt; een krimpende MA geeft drie korte pieptonen. `pitch-sequence` vervangt `pitch`; `count` herhaalt de reeks (maximaal 64 tonen). Bestaande geluidsinstellingen blijven behouden; zie de [audioconfiguratie](doc/SHADOW-ATP.md#existing-configurations--旧配置更新) voor de nieuwe standaardwaarden.
 
 De testbank leest bij elkaar horende railgraph- en shadow-occupancy.json-bestanden zonder ze te wijzigen. Alleen na controle dat de volledige oorspronkelijke trein verdwenen is: consolecommando `stcs ma clear <volledige-UUID> confirm`. Dit verwijdert alle schaduwbewijzen voor die identiteit, met back-up en audit; historische M1-gegevens blijven behouden. Een niet-geladen trein is niet automatisch verdwenen.
 
@@ -26,7 +46,7 @@ Een suite voor treinbesturing, spoorweginfrastructuur, treinbeveiliging in schad
 
 Deze handleiding beschrijft de lokale broncodebasis die op **23 september 2026** is gedocumenteerd. De Nederlandse versie is opgesteld op **14 september 2026**, voor serverbeheerders, machinisten, spoorbouwers en pluginontwikkelaars. Besproken toekomstplannen zijn niet automatisch gerealiseerde functies.
 
-> **Beperking van deze ontwikkelversie:** de suite berekent, verdeelt en toont MA/EoA in schaduwbedrijf, maar ATP grijpt op basis daarvan niet in op de remmen. Een geaccepteerde aanvraag, een ogenschijnlijk vrij spoor op PCC of een online RBC-indicator biedt geen garantie dat doorrijden veilig is. Noodremming bij verlies van de machinist, handmatige noodremming en het vasthouden van de rem in RECOVERING zijn afzonderlijke, wel actieve besturingsfuncties.
+> **Beperking van deze ontwikkelversie:** MA/EoA in schaduwbedrijf grijpt niet in op de remmen. Het aparte kanaal `Enforced` kan bij handbestuurde treinen alleen ingrijpen na expliciete activering en een gevalideerde uitvoerbare autoriteit; servertests zijn nog nodig. Een geaccepteerd verzoek, een ogenschijnlijk vrij PCC-spoor of een online RBC bewijst geen veiligheid.
 
 **Voor TrainCarts-ontwikkelaars:** TrainCarts dient als referentie voor delen van de bordinterface en de bediening. Dit document claimt geen volledige TrainCarts-compatibiliteit, gelijkwaardige fysica of ondersteuning van iedere TC-uitbreiding. STF `switch` is niet TC `switcher`. TC en BKCommonLib zijn geen vereiste; laat niet twee plugins dezelfde mijnkar tegelijk besturen.
 
@@ -60,10 +80,10 @@ Het project introduceert expliciete besturingsrechten, spoorbezetting, strijdige
 
 | Component | Versie | Verantwoordelijkheid |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `3.0.0` | Treinsamenstelling, beweging en bochten, besturingsrechten, tractie/remming, profielen, borden, fysieke wisselbediening, HMI en geluid |
-| STCS | `3.0.0` | Infrastructuur, gerichte RailGraph, lijnkilometrering, plaatsbepaling, bewaard bezettingsregister, schaduw-MA/EoA en lokale wisselcontroles |
-| SkyworldTrainAPI / STA | `1.0.0` | Versiegebonden plugincontracten, telemetrie, voertuigwaarnemingen, cabinestatus, rijtoestemmingen en gebeurtenissen |
-| SkyPCC | `1.0.0` | Webspoorschema, inspectiepaneel voor treinen/infrastructuur, bezetting/reserveringen, gebeurtenissenlog en geauthenticeerde wisselbediening |
+| SkyTrainFolia / STF | `4.0.0` | Treinsamenstelling, beweging, besturing, fysieke wissels, HMI en experimentele ATP-uitvoering voor handbestuurde treinen |
+| STCS | `4.0.0` | RailGraph, plaatsbepaling, bewaarde bezetting, schaduw- en experimentele operationele MA/EoA |
+| SkyworldTrainAPI / STA | `2.0.0` | Versiegebonden plugincontracten, telemetrie, operationele autorisaties en gebeurtenissen |
+| SkyPCC | `2.0.0` | Verkeersleidingsweergave, inspecties, gebeurtenissen, wisselbediening en SR-goedkeuring |
 
 ```text
 Minecraft spelers / mijnkarren / rails / redstone
@@ -87,11 +107,11 @@ Dit schema toont verantwoordelijkheden, geen verplichte opeenvolging van alle aa
 | Samenstelling, beweging in spoorcoördinaten, weergave bij hoge snelheid | Gerealiseerd; hoge snelheid, regiowissels en combinaties met andere plugins vereisen servertests |
 | Pseudo-automatische stationsbediening | MVP met tractie-/remstanden van het profiel, geen complete ATO |
 | Graaf, lijntoewijzing, kilometrering en bewaarde bezetting | Gerealiseerd; timeout of chunk-unload bewijst geen vrijgave |
-| Online MA/EoA en ruimtelijke reserveringen | Schaduwimplementatie, zonder ATP-remingreep |
+| Online MA/EoA en ruimtelijke reserveringen | Schaduwservice blijft adviserend; experimentele operationele autorisaties voor handbestuurde treinen |
 | Wisselbediening via het web | Authenticatie, lokale controles en asynchrone PENDING gerealiseerd |
-| Snelheidscurves aan boord en ATP-ingreep bij te hoge snelheid/EoA | Alleen-lezen schaduwsnelheidscurves beschikbaar; automatische ATP-remingrepen nog niet gerealiseerd. |
+| Snelheidscurves aan boord en ATP-ingreep bij te hoge snelheid/EoA | Schaduwcurves alleen-lezen; experimentele `Enforced`-ingreep voor handbestuurde treinen nog niet live veiligheidstechnisch gevalideerd |
 | Volledige bestemmingsroutering en dienstregeling-ATO | Niet als compleet systeem gerealiseerd; routegegevens zijn geen ingestelde rijweg |
-| ETCS-modi FS/SR/SH/SB/TR/PT | Niet gerealiseerd; huidige modi zijn geen volledige vervangers |
+| SkyRail-modi SB/FS/SH/SR/TR/PT voor handbestuurde treinen | Experimentele toestandsmachine, geen ETCS-conformiteit; ingebouwde pseudo-ATO uitgesloten |
 | Aparte SIR-, SkyCBI- of Python-RBC-service | Architectuurideeën, geen huidige installeerbare onderdelen |
 
 ## 2. Installatie en updates
@@ -114,10 +134,10 @@ Dit schema toont verantwoordelijkheden, geen verplichte opeenvolging van alle aa
 Huidige installatiebestanden:
 
 ```text
-SkyTrainFolia-3.0.0.jar
-STCS-3.0.0.jar
-SkyworldTrainAPI-1.0.0.jar
-SkyPCC-1.0.0.jar
+SkyTrainFolia-4.0.0.jar
+STCS-4.0.0.jar
+SkyworldTrainAPI-2.0.0.jar
+SkyPCC-2.0.0.jar
 ```
 
 STF/STCS declareren STA als zachte afhankelijkheid, maar installeer alle vier voor de volledige suite. PCC vereist STCS en STA. STF alleen levert niet de volledige graaf-, MA- en verkeersleidingsfunctionaliteit.
@@ -671,10 +691,10 @@ ma-sounds:
 | granted | `minecraft:block.anvil.land` | Aangevraagde MA toegekend; pitch 2, tweemaal |
 | changed | `minecraft:block.anvil.land` | Duidelijke sprong; pitch 2, eenmaal |
 | released | `minecraft:block.iron_trapdoor.close` | Vrijgave |
-| shrinking | `minecraft:entity.experience_orb.pickup` | Resterende meeschuivende MA begint tijdens rijden af te nemen |
+| shrinking | `minecraft:block.note_block.bit` | Resterende meeschuivende MA begint tijdens rijden af te nemen |
 | low | `minecraft:block.note_block.pling` | Weinig resterende afstand |
 
-Gebruik Java Edition-ID's `namespace:path`; zonder namespace geldt minecraft. Eigen ID's vereisen een resourcepack bij de client. Grenzen: volume 0..4, pitch 0.5..2, count 1..5, interval-ticks 1..200.
+Gebruik Java Edition-ID's `namespace:path`; zonder namespace geldt minecraft. Eigen ID's vereisen een resourcepack bij de client. Grenzen: volume 0..4, pitch 0.5..2, count 1..16, interval-ticks 1..200.
 
 STCS-triggerinstellingen:
 
@@ -792,7 +812,7 @@ De offline Python-testbank test topologie, richting, bezetting, reserveringen en
 
 M0-contracten/modi en M1-waarneming/behoud zijn geïmplementeerd en met spelers getest. M2 bevat nu online schaduw-MA en ruimtelijke verfijningen. Eerdere acceptatie vervangt geen regressietest en bewijst geen ATP-gereedheid.
 
-Volgende stap: de schaduwcurve, de actualiteit van lokalisatie en het remmodel valideren voordat remingrepen worden gebouwd. FS kan nog niet via de configuratie worden geactiveerd.
+Volgende stap: de nieuwe `Enforced`-keten voor handbestuurde treinen, actuele plaatsbepaling, graaf-/sessiewissels, remrespons en SR-procedure op een gecontroleerde server testen. FS vereist een expliciete kanaalwissel bij stilstand en een uitvoerbare STCS-autorisatie, geen configuratiesnelkoppeling.
 
 Voor echte ATP blijven nodig: volledige treinbegrenzing/consistentie, MA-identiteit/bevestiging/intrekking, beleid bij contactverlies/bevriezen/bypass, snelheidsbeperkingen/remmodellen, onderbouwde resourcevrijgave en foutinjectietests.
 

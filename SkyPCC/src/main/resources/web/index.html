@@ -32,6 +32,10 @@
       <select id="lineFilter"><option value="" data-i18n="All lines">All lines</option></select>
       <div class="section-title"><span data-i18n="Rolling stock">Rolling stock</span><span id="activeCount">0 active</span></div>
       <div id="trainList" class="train-list"></div>
+      <div id="srControls" class="sr-controls" hidden>
+        <label class="field-label" for="srTrainSelect" data-i18n="Pending SR">Pending SR</label>
+        <select id="srTrainSelect" aria-label="Pending SR"></select>
+      </div>
     </aside>
 
     <section class="map-shell" aria-label="Live railway map" data-i18n-aria="Live railway map">
@@ -97,6 +101,7 @@
       </dl>
       <dl id="infrastructureInspector" class="inspector" hidden></dl>
       <button id="infrastructureSwitch" type="button" hidden data-i18n="Change switch">Change switch</button>
+      <button id="srApprove" type="button" hidden data-i18n="Approve SR to this point">Approve SR to this point</button>
     </aside>
   </main>
 
@@ -117,6 +122,14 @@
     <input id="switchToken" type="password" autocomplete="off" spellcheck="false">
     <p id="switchResult" role="status"></p>
     <button id="switchConfirm" type="button" data-i18n="Change switch">Change switch</button>
+  </dialog>
+  <dialog id="srDialog" aria-labelledby="srTitle">
+    <div class="panel-heading"><h2 id="srTitle" data-i18n="SR approval">SR approval</h2><button id="srClose" type="button" title="Close" data-i18n-title="Close" aria-label="Close" data-i18n-aria="Close">×</button></div>
+    <p id="srTarget"></p>
+    <label class="field-label" for="srToken" data-i18n="Operator token">Operator token</label>
+    <input id="srToken" type="password" autocomplete="off" spellcheck="false">
+    <p id="srResult" role="status"></p>
+    <button id="srConfirm" type="button" data-i18n="Approve SR">Approve SR</button>
   </dialog>
   <script src="/assets/i18n.js"></script>
   <script src="/assets/app.js"></script>
