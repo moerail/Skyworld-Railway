@@ -2,11 +2,27 @@
 
 **Joueurs : commencez par le [manuel de conduite](doc/driver/README.fr.md)** pour la montée à bord, la prise de conduite, la barre rapide, la MA fantôme et l'arrêt.
 
+## 4.0.2 : Alertes et rétablissement du service
+
+La plage sonore dépend de la limite ATP actuelle, pas de la vitesse réelle. Pour une limite **≤40 km/h**, y compris le plafond SH par défaut, l'alerte commence **5 km/h sous la limite** et cesse à **8 km/h sous la limite** ou moins. Au-delà de 40, les nouveaux réglages par défaut sont **15 / 18 km/h** ; les réglages existants de la plage normale sont conservés. La priorité de survitesse, le silence à très basse vitesse et le freinage ATP ne changent pas.
+
+Après un arrêt du service MA dû à une erreur E/S, l'administrateur peut utiliser `/stcs admin ma restart` (`stcs.admin`, console acceptée). Le rétablissement vérifie les sources, exige des observations récentes à l'arrêt pour les autorisations exécutables restantes, sauvegarde le registre et le fichier temporaire, puis vérifie une écriture réelle. L'occupation est conservée ; les conducteurs doivent redemander une MA. Aucun frein n'est desserré. Une erreur persistante maintient le service arrêté ; les autres erreurs exigent une investigation et un redémarrage du serveur.
+
+```yaml
+shadow-atp:
+  warning:
+    enter-gap-kmh: 15.0
+    clear-gap-kmh: 18.0
+    low-speed-limit-kmh: 40.0
+    low-speed-enter-gap-kmh: 5.0
+    low-speed-clear-gap-kmh: 8.0
+```
+
 ## M3 expérimental : protection des trains manuels
 
-**Préversion `suite-v4.0.0`.** Les vérifications automatiques ont réussi ; les derniers correctifs attendent une nouvelle validation sur serveur. [Notes de version](doc/releases/suite-v4.0.0.md).
+**Préversion `suite-v4.0.2`.** Les vérifications automatiques ont réussi ; les derniers correctifs attendent une nouvelle validation sur serveur. [Notes de version](doc/releases/suite-v4.0.2.md).
 
-Utiliser ensemble STF **4.0.0**, STCS **4.0.0**, STA **2.0.0** et SkyPCC **2.0.0**. Arrêter le serveur et sauvegarder RailGraph et les registres d'occupation avant de remplacer les composants ; ne pas mélanger les versions. STF reste autonome, mais `Enforced` exige STA et STCS. Le service fantôme v5 reste consultatif ; l'autorisation opérationnelle STA v6 est un canal distinct.
+Utiliser ensemble STF **4.0.2**, STCS **4.0.2**, STA **2.0.0** et SkyPCC **2.0.0**. Arrêter le serveur et sauvegarder RailGraph et les registres d'occupation avant de remplacer les composants ; ne pas mélanger les versions. STF reste autonome, mais `Enforced` exige STA et STCS. Le service fantôme v5 reste consultatif ; l'autorisation opérationnelle STA v6 est un canal distinct.
 
 Seuls les **trains manuels** entrent dans l'automate `SB/FS/SH/SR/TR/PT`. Après prise de conduite, le train est en `SB`. `/stcs ma demand` demande `FS`, `/stcs ma sh` une autorisation limitée de manœuvre et `/stcs ma sr` attend l'approbation du PCC ou d'un administrateur jusqu'à un équipement choisi. Une demande acceptée n'est pas encore une MA exécutable. Après un dépassement de l'EoA (`TR`), arrêter le train, utiliser `/stcs ma ack` pour passer en `PT`, puis `/stcs ma release` avant une nouvelle demande. L'administrateur change explicitement de canal à l'arrêt avec `/stcs admin enforce true|false` ; `false` revient à `RECOVERING` avec frein maintenu. Le tableau de bord affiche le canal traduit et le code de mode invariant, par exemple **`Protection active | SR`**.
 
@@ -32,7 +48,7 @@ Message et Packet ont des espaces de numérotation distincts : MA fantôme attri
 
 Les courbes en mode ombre ne commandent ni traction ni freinage. Par défaut : arrêt 1 m avant EoA, au plus 5 km/h dans les derniers 5 m, puis diminution continue à zéro. Le modèle en palier utilise les paramètres B7 et les vitesses mesurées, sans compenser l’âge des données par la vitesse maximale théorique.
 
-Configuration dans `shadow-atp` ; `enforcement-enabled: true` est refusé. `shadow-atp.warning` : alerte continue dès 2 km/h sous la limite, arrêt à 5 km/h sous celle-ci ou sous 0.5 km/h. L'alarme de survitesse prend la priorité au-dessus de la limite et revient à l'alerte normale à 1 km/h sous celle-ci. Seuils configurables ; l'ancien `cooldown-millis` est ignoré. `ma-sounds.near-limit` utilise `minecraft:block.note_block.flute` et `ma-sounds.overspeed` des impulsions plus rapides de `minecraft:block.note_block.bit`, sans pause entre les salves. Arrêter les trains avant `/st reload`.
+Configuration dans `shadow-atp` ; `enforcement-enabled: true` est refusé. `shadow-atp.warning` : alerte continue selon les deux plages ci-dessus ; silence sous 0.5 km/h. L'alarme de survitesse prend la priorité au-dessus de la limite et revient à l'alerte normale à 1 km/h sous celle-ci. Seuils configurables ; l'ancien `cooldown-millis` est ignoré. `ma-sounds.near-limit` utilise `minecraft:block.note_block.flute` et `ma-sounds.overspeed` des impulsions plus rapides de `minecraft:block.note_block.bit`, sans pause entre les salves. Arrêter les trains avant `/st reload`.
 
 L'alerte répète six paires Do5-Sol5 par salve jusqu'au franchissement du seuil de désactivation ; une MA qui commence à diminuer produit trois bips courts. `pitch-sequence` remplace `pitch` et `count` répète la séquence (64 notes au maximum). Les anciens réglages sont conservés ; les nouvelles valeurs figurent dans le [guide audio](doc/SHADOW-ATP.md#existing-configurations--旧配置更新).
 
@@ -80,8 +96,8 @@ Le projet introduit la prise de conduite explicite, l’occupation des ressource
 
 | Composant | Version | Fonction principale |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `4.0.0` | Rames, mouvement, conduite, aiguilles physiques, IHM et exécution ATP expérimentale des trains manuels |
-| STCS | `4.0.0` | RailGraph, localisation, occupation conservée, MA/EoA fantômes et opérationnelles expérimentales |
+| SkyTrainFolia / STF | `4.0.2` | Rames, mouvement, conduite, aiguilles physiques, IHM et exécution ATP expérimentale des trains manuels |
+| STCS | `4.0.2` | RailGraph, localisation, occupation conservée, MA/EoA fantômes et opérationnelles expérimentales |
 | SkyworldTrainAPI / STA | `2.0.0` | Contrats inter-greffons, télémétrie, autorisations opérationnelles et événements |
 | SkyPCC | `2.0.0` | Affichage de régulation, inspections, événements, commande d'aiguilles et approbation SR |
 
@@ -134,8 +150,8 @@ Ce schéma illustre les responsabilités, et non une chaîne d’appels série o
 Fichiers d’installation actuels :
 
 ```text
-SkyTrainFolia-4.0.0.jar
-STCS-4.0.0.jar
+SkyTrainFolia-4.0.2.jar
+STCS-4.0.2.jar
 SkyworldTrainAPI-2.0.0.jar
 SkyPCC-2.0.0.jar
 ```

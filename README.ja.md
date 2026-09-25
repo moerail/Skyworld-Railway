@@ -2,11 +2,27 @@
 
 **一般プレイヤー向け：[運転士マニュアル](doc/driver/README.ja.md)**。乗車、運転権取得、ホットバー、影方式 MA、停止手順を説明します。
 
+## 4.0.2：警報とサービス復旧
+
+警報の区分は実速度ではなく現在の ATP 制限速度で選びます。制限速度が **40 km/h 以下**（SH の既定上限を含む）の場合、制限の **5 km/h 手前**で警報を開始し、**8 km/h 下以下**で解除します。40 を超える場合、新規導入時の既定値は **15 / 18 km/h** です。既存の通常域設定は変更しません。超速警報の優先順位、低速時の消音、ATP 制動は変更しません。
+
+I/O 障害で MA サービスが停止した場合、管理者は `/stcs admin ma restart`（権限 `stcs.admin`、コンソール対応）を使用できます。データ源を確認し、残存する実行可能許可について新鮮な停止観測を要求し、台帳と一時ファイルをバックアップして実際の書込みを確認します。占有は維持され、運転士は MA を再要求します。制動は自動緩解しません。書込み障害が続けば停止を維持し、その他の実行時障害は調査とサーバー再起動が必要です。
+
+```yaml
+shadow-atp:
+  warning:
+    enter-gap-kmh: 15.0
+    clear-gap-kmh: 18.0
+    low-speed-limit-kmh: 40.0
+    low-speed-enter-gap-kmh: 5.0
+    low-speed-clear-gap-kmh: 8.0
+```
+
 ## M3 実験機能：手動列車の保護
 
-**プレリリース `suite-v4.0.0`。** 自動検査は通過しましたが、最新修正の実サーバー再検証は未完了です。[リリース情報](doc/releases/suite-v4.0.0.md)。
+**プレリリース `suite-v4.0.2`。** 自動検査は通過しましたが、最新修正の実サーバー再検証は未完了です。[リリース情報](doc/releases/suite-v4.0.2.md)。
 
-STF **4.0.0**、STCS **4.0.0**、STA **2.0.0**、SkyPCC **2.0.0** を組み合わせてください。停止・RailGraph と在線台帳のバックアップ後、導入済み構成要素を一括交換し、旧版と混在させないでください。STF 単独運用は引き続き可能ですが、`Enforced` には STA と STCS が必要です。旧 v5 影方式は助言専用で、STA v6 の実行可能な許可は別の経路です。
+STF **4.0.2**、STCS **4.0.2**、STA **2.0.0**、SkyPCC **2.0.0** を組み合わせてください。停止・RailGraph と在線台帳のバックアップ後、導入済み構成要素を一括交換し、旧版と混在させないでください。STF 単独運用は引き続き可能ですが、`Enforced` には STA と STCS が必要です。旧 v5 影方式は助言専用で、STA v6 の実行可能な許可は別の経路です。
 
 **手動列車のみ** `SB/FS/SH/SR/TR/PT` 状態機に入ります。運転権を取得した列車は `SB` から始まり、`/stcs ma demand` で `FS`、`/stcs ma sh` で距離を限定した入換許可、`/stcs ma sr` で指定設備までの PCC または管理者承認を求めます。要求の受理は実行可能な MA の取得ではありません。EoA 越境で `TR` となったら停止し、`/stcs ma ack` で `PT`、続いて `/stcs ma release` を行ってから再申請します。管理者は停車中に `/stcs admin enforce true|false` で明示的に切り替え、`false` は制動保持の `RECOVERING` に戻ります。車上表示は翻訳された経路名と共通のモード記号を並べ、例えば **`保護有効 | SR`** と表示します。
 
@@ -32,7 +48,7 @@ Message と Packet は別の番号体系です。割当済み影方式 MA は **
 
 影方式曲線は手柄や制動を操作しません。既定は EoA の 1 m 手前で零速、最後の 5 m は最高 5 km/h から連続的に零速へ低下します。平坡模型として B7 諸元と実測速度を用い、遙測遅延を理論最高速度で補償しなくなりました。
 
-曲線設定は `shadow-atp`。`enforcement-enabled: true` は拒否します。`shadow-atp.warning` は制限速度の 2 km/h 手前から連続警報、5 km/h 下または 0.5 km/h 未満で停止します。制限速度を超えると超速警報を優先し、1 km/h 下まで減速すると通常警報に戻ります。閾値は設定可能で、旧 `cooldown-millis` は無効です。`ma-sounds.near-limit` は既定で `minecraft:block.note_block.flute`、`ma-sounds.overspeed` は短い間隔の `minecraft:block.note_block.bit` を使い、列の間に休止を挟まず繰り返します。停車後に `/st reload`。
+曲線設定は `shadow-atp`。`enforcement-enabled: true` は拒否します。`shadow-atp.warning` は上記の二つの区分で連続警報を行い、0.5 km/h 未満では消音します。制限速度を超えると超速警報を優先し、1 km/h 下まで減速すると通常警報に戻ります。閾値は設定可能で、旧 `cooldown-millis` は無効です。`ma-sounds.near-limit` は既定で `minecraft:block.note_block.flute`、`ma-sounds.overspeed` は短い間隔の `minecraft:block.note_block.bit` を使い、列の間に休止を挟まず繰り返します。停車後に `/st reload`。
 
 接近警報は減速してヒステリシス解除条件を満たすまで、1回につき Do5-Sol5 を6組繰り返します。MA 短縮開始時は短音3回です。`pitch-sequence` は `pitch` より優先し、`count` は列全体の反復回数です（最大64音）。既存設定は保持されます。[音声設定](doc/SHADOW-ATP.md#existing-configurations--旧配置更新)に従い新しい既定値を反映してください。
 
@@ -82,8 +98,8 @@ SkyTrain Suite は Minecraft を対話可能な鉄道運転環境として用い
 
 | 構成要素 | 現行版 | 主な責務 |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `4.0.0` | 編成、運動、運転、実体分岐器、運転台表示、実験的な手動列車 ATP 制動実行 |
-| STCS | `4.0.0` | RailGraph、位置標定、占有保持、影方式と実験的な実行可能 MA/EoA |
+| SkyTrainFolia / STF | `4.0.2` | 編成、運動、運転、実体分岐器、運転台表示、実験的な手動列車 ATP 制動実行 |
+| STCS | `4.0.2` | RailGraph、位置標定、占有保持、影方式と実験的な実行可能 MA/EoA |
 | SkyworldTrainAPI / STA | `2.0.0` | 版付き契約、遠隔測定、運転許可、行車事象 |
 | SkyPCC | `2.0.0` | 指令表示、設備検査、事象、分岐器制御、SR 承認 |
 
@@ -136,8 +152,8 @@ Minecraft 利用者 / トロッコ / 線路 / 赤石回路
 現行の導入ファイル：
 
 ```text
-SkyTrainFolia-4.0.0.jar
-STCS-4.0.0.jar
+SkyTrainFolia-4.0.2.jar
+STCS-4.0.2.jar
 SkyworldTrainAPI-2.0.0.jar
 SkyPCC-2.0.0.jar
 ```

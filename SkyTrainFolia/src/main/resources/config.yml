@@ -13,11 +13,17 @@ shadow-atp:
   warning:
     # Continuous driver-only warning: enter at limit - enter-gap (km/h).
     # Stop at/below limit - clear-gap, or below minimum-speed. No burst cooldown.
-    enter-gap-kmh: 2.0
-    clear-gap-kmh: 5.0
+    enter-gap-kmh: 15.0
+    clear-gap-kmh: 18.0
+    # At ATP limits <= 40 km/h (including SH), use the smaller gaps below.
+    # Example: limit 40 -> warn at 35, stop at/below 32 km/h.
+    # These are audio thresholds only; ATP braking/intervention is unchanged.
+    low-speed-limit-kmh: 40.0
+    low-speed-enter-gap-kmh: 5.0
+    low-speed-clear-gap-kmh: 8.0
     minimum-speed-kmh: 0.5
     # Overspeed takes priority. Enter ABOVE limit + margin; return to near-limit
-    # at/below limit - overspeed-clear-gap. Clear gap must be below clear-gap-kmh.
+    # at/below limit - overspeed-clear-gap. Must be below BOTH warning clear gaps.
     overspeed-enter-margin-kmh: 0.0
     overspeed-clear-gap-kmh: 1.0
     # Legacy cooldown-millis is ignored; warning melodies loop without gaps.

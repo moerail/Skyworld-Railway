@@ -40,15 +40,15 @@ Minecraft is both the live operating environment and an interactive railway-syst
 
 ## 破坏性协议升级 / Breaking Protocol Upgrade
 
-**当前为预发布 / Current pre-release: [`suite-v4.0.0`](https://github.com/moerail/Skyworld-Railway/releases/tag/suite-v4.0.0)。** 自动检查已通过，最近修复尚待服务器复测。Automated checks passed; the latest fixes still await live-server retesting.
+**当前为预发布 / Current pre-release: [`suite-v4.0.2`](https://github.com/moerail/Skyworld-Railway/releases/tag/suite-v4.0.2)。** 自动检查已通过，最近修复尚待服务器复测。Automated checks passed; the latest fixes still await live-server retesting.
 
-**本地修复 / Local patch: STCS 4.0.2（未发布 / unpublished）**：包含 Windows 账本替换重试，以及 `/stcs admin ma restart`（权限 `stcs.admin`，支持控制台）。仅恢复 I/O 故障导致的 MA 停用；保留占用、备份账本，旧可执行许可对应列车需有新鲜停稳报告。恢复后司机重新申请 MA，不自动缓解制动；持续写入失败则继续停用。与上述发布的其他组件兼容，仅需替换 STCS。
+**4.0.2 更新 / Changes:** 低速预警在 ATP 限速 ≤40 km/h 时提前 5 km/h 触发、低于限速 8 km/h 时解除；普通档新默认 15 / 18 km/h，已有设置保留。新增管理员 MA 服务恢复指令，保留占用，不自动缓解制动。详见 [更新说明](doc/releases/suite-v4.0.2.md)。
 
-STCS 4.0.2 retries transient Windows ledger replacement failures and adds `/stcs admin ma restart` (`stcs.admin`, console supported). Recovery is limited to I/O faults, backs up the ledger, retains occupancy and requires fresh stationary reports for outstanding executable authorities. Drivers must demand MA again; brakes are not released. Persistent write failures remain fail-closed. Only STCS needs replacing; the other released components remain compatible.
+Low-speed warnings use 5 / 8 km/h gaps at ATP limits <=40 km/h; normal-band defaults are 15 / 18, preserving existing settings. Administrator MA recovery retains occupancy and does not release brakes. See the [release notes](doc/releases/suite-v4.0.2.md).
 
-本批版本为 **STF 4.0.0 / STCS 4.0.0 / STA 2.0.0 / SkyPCC 2.0.0**。新增 STA v6 可执行授权与 PCC `/api/v6/operational-ma`、SR 审批接口；原有 v5 影子信息继续保留。不要混用旧版二进制：停服、备份后一起替换所安装的组件并强制刷新网页。STF 仍可独立安装。保留 RailGraph 与占用账本，不应删除数据来升级。
+本批版本为 **STF 4.0.2 / STCS 4.0.2 / STA 2.0.0 / SkyPCC 2.0.0**。新增 STA v6 可执行授权与 PCC `/api/v6/operational-ma`、SR 审批接口；原有 v5 影子信息继续保留。不要混用旧版二进制：停服、备份后一起替换所安装的组件并强制刷新网页。STF 仍可独立安装。保留 RailGraph 与占用账本，不应删除数据来升级。
 
-This release uses **STF 4.0.0 / STCS 4.0.0 / STA 2.0.0 / SkyPCC 2.0.0**. It adds executable STA v6 permissions and PCC `/api/v6/operational-ma` and SR approval, while preserving v5 shadow information. Do not mix old and new binaries: stop and back up the server, replace installed components together, then hard-refresh the browser. STF remains standalone-capable. Keep RailGraph and occupancy ledgers.
+This release uses **STF 4.0.2 / STCS 4.0.2 / STA 2.0.0 / SkyPCC 2.0.0**. It adds executable STA v6 permissions and PCC `/api/v6/operational-ma` and SR approval, while preserving v5 shadow information. Do not mix old and new binaries: stop and back up the server, replace installed components together, then hard-refresh the browser. STF remains standalone-capable. Keep RailGraph and occupancy ledgers.
 
 编号彩蛋区分 Message 与 Packet：v5 影子 MA 与 v6 实验性可执行 MA 均使用私有 **Message 1003 / Packet 1015**，列车遥测为 **Message 1136**。自定义列车删除为 **Message 2001**，不代表占用出清；图定位与等待/未分配状态分别为 **Message 2002 / 2003**。SR 审批是 SkyRail 服务调用和行车事件，不是新增的 ETCS 报文。仅借用 SUBSET-026 部分编号加 1000 的概念，不是 ETCS 报文编码或标准符合性声明。
 
@@ -76,8 +76,8 @@ This update corrects SH/SR mode-speed braking, TR overrun feedback and distant S
 
 | 插件 / Plugin | 版本 / Version | 职责 / Responsibility |
 | --- | --- | --- |
-| [SkyTrainFolia (STF)](SkyTrainFolia/) | 4.0.0 | 列车运动、编组、驾驶控制、车型、牌子、实体道岔执行与驾驶室 HMI。<br>Train motion, consists, driving control, vehicle profiles, signs, physical point actuation and cab HMI. |
-| [Skyworld Train Control System (STCS)](STCS/) | 4.0.0 | RailGraph、线路归属、定位、保留占用与实验性 MA/EoA 分配。<br>RailGraph, line attribution, localisation, retained occupancy and experimental MA/EoA allocation. |
+| [SkyTrainFolia (STF)](SkyTrainFolia/) | 4.0.2 | 列车运动、编组、驾驶控制、车型、牌子、实体道岔执行与驾驶室 HMI。<br>Train motion, consists, driving control, vehicle profiles, signs, physical point actuation and cab HMI. |
+| [Skyworld Train Control System (STCS)](STCS/) | 4.0.2 | RailGraph、线路归属、定位、保留占用与实验性 MA/EoA 分配。<br>RailGraph, line attribution, localisation, retained occupancy and experimental MA/EoA allocation. |
 | [SkyworldTrainAPI (STA)](STA/) | 2.0.0 | 插件之间的版本化进程内服务契约、遥测与行车事件。<br>Versioned in-process service contracts, telemetry and railway events between plugins. |
 | [SkyPCC](SkyPCC/) | 2.0.0 | HTTP/SSE 调度显示、基础设施详情、事件日志与经过身份验证的道岔操作、SR 审批。<br>HTTP/SSE dispatch display, inspectors, event log, authenticated turnout control and SR approval. |
 

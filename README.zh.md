@@ -2,11 +2,27 @@
 
 **普通玩家从这里开始：[司机手册](doc/driver/README.zh.md)**。包含上车、驾驶权、热键栏、影子 MA 和停车流程。
 
+## 4.0.2：预警与服务恢复
+
+预警档位由当前 ATP 限速决定，不是由实际车速决定。限速 **≤40 km/h**（包含 SH 默认限速）时，提前 **5 km/h** 开始报警，降至限速下 **8 km/h** 及以下解除。限速高于 40 时，新安装默认提前 **15 / 18 km/h** 触发／解除；已有普通阈值配置保持不变。超速优先级、低速静音和 ATP 制动逻辑不变。
+
+MA 服务因 I/O 故障停用后，管理员可用 `/stcs admin ma restart`（权限 `stcs.admin`，支持控制台）。恢复检查数据源，要求旧可执行许可对应列车有新鲜停稳报告，备份账本及待写快照并验证实际写入。占用保留，司机重新申请 MA，不自动缓解制动。持续写入失败继续停用；其他运行时故障需排查并重启服务器。
+
+```yaml
+shadow-atp:
+  warning:
+    enter-gap-kmh: 15.0
+    clear-gap-kmh: 18.0
+    low-speed-limit-kmh: 40.0
+    low-speed-enter-gap-kmh: 5.0
+    low-speed-clear-gap-kmh: 8.0
+```
+
 ## M3 实验功能：手动列车保护
 
-**预发布 `suite-v4.0.0`。** 自动检查已通过，最近修复尚待新一轮服务器验收。[发布说明](doc/releases/suite-v4.0.0.md)。
+**预发布 `suite-v4.0.2`。** 自动检查已通过，最近修复尚待新一轮服务器验收。[发布说明](doc/releases/suite-v4.0.2.md)。
 
-本轮配套版本为 STF **4.0.0**、STCS **4.0.0**、STA **2.0.0**、SkyPCC **2.0.0**。停服备份轨道图和占用账本后一起替换已安装组件，不要混用旧版。STF 仍可单独运行，但 `Enforced` 需要 STA 与 STCS。旧 v5 影子服务继续只读；新 STA v6 可执行许可是另一个通道。
+本轮配套版本为 STF **4.0.2**、STCS **4.0.2**、STA **2.0.0**、SkyPCC **2.0.0**。停服备份轨道图和占用账本后一起替换已安装组件，不要混用旧版。STF 仍可单独运行，但 `Enforced` 需要 STA 与 STCS。旧 v5 影子服务继续只读；新 STA v6 可执行许可是另一个通道。
 
 **仅手动列车**进入 `SB/FS/SH/SR/TR/PT` 状态机。司机上车取得控制权后默认为 `SB`；`/stcs ma demand` 申请 `FS`，`/stcs ma sh` 申请有界调车许可，`/stcs ma sr` 等待 PCC 或管理员批准到指定设备的许可。申请受理不等于获得可执行 MA。越过 EoA 触发 `TR` 后须先停稳，`/stcs ma ack` 进入 `PT`，再用 `/stcs ma release` 释放后重新申请。管理员只能在停车时通过 `/stcs admin enforce true|false` 显式切换；`false` 回到 `RECOVERING` 制动保持。计分板 ATP 模式显示为“通道 | 运行模式”，例如 **`强制保护 | SR`**；通道名翻译，运行模式代号不翻译。
 
@@ -32,7 +48,7 @@ Message 与 Packet 独立编号：已分配影子 MA 为 **Message 1003 / Packet
 
 影子曲线只读，不改变手柄或制动。默认 EoA 前 1 m 零速，最后 5 m 内最高 5 km/h，并连续降至零。使用 B7 参数和实际速度进行平坡模型估算；延迟补偿不再按理论最高速度扣距离。
 
-`shadow-atp` 配置曲线；`enforcement-enabled: true` 当前明确拒绝。`shadow-atp.warning` 默认距限速 2 km/h 开始连续报警，回落至限速下 5 km/h 或低于 0.5 km/h 停止。超过限速时优先播放超速警报，降至限速下 1 km/h 退回普通提示。阈值均可配置，旧 `cooldown-millis` 不再生效。`ma-sounds.near-limit` 默认 `minecraft:block.note_block.flute`，`ma-sounds.overspeed` 默认更急促的 `minecraft:block.note_block.bit`，均无轮间冷却空档。停车后 `/st reload`。
+`shadow-atp` 配置曲线；`enforcement-enabled: true` 当前明确拒绝。`shadow-atp.warning` 使用上文的两档阈值连续报警，低于 0.5 km/h 时静音。超过限速时优先播放超速警报，降至限速下 1 km/h 退回普通提示。阈值均可配置，旧 `cooldown-millis` 不再生效。`ma-sounds.near-limit` 默认 `minecraft:block.note_block.flute`，`ma-sounds.overspeed` 默认更急促的 `minecraft:block.note_block.bit`，均无轮间冷却空档。停车后 `/st reload`。
 
 接近限速时每轮重复六组 Do5-Sol5，减速到滞回解除阈值后停止；MA 开始缩短播放三声短鸣。`pitch-sequence` 优先于 `pitch`，`count` 为整组重复次数，每轮最多 64 音。旧配置保留原音效，请按[音效配置说明](doc/SHADOW-ATP.md#existing-configurations--旧配置更新)合并新默认值。
 
@@ -97,8 +113,8 @@ SkyTrain Suite 把 Minecraft 作为可交互的铁路运行环境：玩家建设
 
 | 组件 | 当前版本 | 主要职责 |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `4.0.0` | 矿车编组、运动、驾驶权、牵引制动、道岔执行、HMI、实验性手动列车 ATP 执行 |
-| STCS | `4.0.0` | RailGraph、定位、保留占用、影子及实验性可执行 MA/EoA 分配 |
+| SkyTrainFolia / STF | `4.0.2` | 矿车编组、运动、驾驶权、牵引制动、道岔执行、HMI、实验性手动列车 ATP 执行 |
+| STCS | `4.0.2` | RailGraph、定位、保留占用、影子及实验性可执行 MA/EoA 分配 |
 | SkyworldTrainAPI / STA | `2.0.0` | 带版本的插件间契约、遥测、运行许可和行车事件 |
 | SkyPCC | `2.0.0` | 网页调度显示、设备详情、事件、道岔控制和 SR 审批 |
 
@@ -151,8 +167,8 @@ Minecraft 玩家 / 矿车 / 轨道 / 红石
 从仓库 Releases 获取匹配的一组 JAR；本地构建输出位于 `artifacts/`。当前文件名：
 
 ```text
-SkyTrainFolia-4.0.0.jar
-STCS-4.0.0.jar
+SkyTrainFolia-4.0.2.jar
+STCS-4.0.2.jar
 SkyworldTrainAPI-2.0.0.jar
 SkyPCC-2.0.0.jar
 ```

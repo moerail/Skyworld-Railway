@@ -2,7 +2,7 @@
 
 [中文](README.zh.md) | [English](README.en.md) | [Français](README.fr.md) | [日本語](README.ja.md) · [Accueil du projet](../../README.md)
 
-Pour les joueurs à bord d'un train manuel. Versions : STF/STCS 4.0.0, STA/SkyPCC 2.0.0. La création des trains, les voies et la configuration relèvent des administrateurs.
+Pour les joueurs à bord d'un train manuel. Versions : STF/STCS 4.0.2, STA/SkyPCC 2.0.0. La création des trains, les voies et la configuration relèvent des administrateurs.
 
 > **En cas de danger : `/st eb`.** La MA fantôme et sa limite restent consultatives. Le canal expérimental distinct `Enforced` ne peut freiner un train manuel qu'après activation explicite par un administrateur et émission d'une MA exécutable par STCS. Ne supposez ni son activation ni une validation sur serveur. Ce guide concerne un jeu, pas l'exploitation ferroviaire réelle.
 
@@ -31,6 +31,12 @@ La ligne ATP du tableau de bord comporte **canal | mode d'exploitation**, par ex
 Dans le canal actif, SH/SR sont limités par défaut à **40 km/h**, réglables par l'administrateur. Un dépassement au-delà d'une faible tolérance applique B7 sans le délai de survitesse assoupli de FS. Près de l'EoA, respectez la limite ATP inférieure ; 40 km/h n'est pas une vitesse garantie sur toute l'autorisation.
 
 La cible SR approuvée peut être plus éloignée que la MA actuelle. Chaque autorisation glissante est limitée par défaut à 120 m, évolue selon la situation en avant et ne permet pas de dépasser la cible approuvée. **Respectez uniquement la MA actuellement valide.** L'accord ne signifie pas que toutes les aiguilles et sections sont ouvertes. Une géométrie sauvegardée peut couvrir des chunks déchargés, mais des aiguilles inconnues, une occupation incertaine ou des lacunes du graphe peuvent empêcher la prolongation.
+
+## 4.0.2 : Alertes et rétablissement du service
+
+La plage sonore dépend de la limite ATP actuelle, pas de la vitesse réelle. Pour une limite **≤40 km/h**, y compris le plafond SH par défaut, l'alerte commence **5 km/h sous la limite** et cesse à **8 km/h sous la limite** ou moins. Au-delà de 40, les nouveaux réglages par défaut sont **15 / 18 km/h** ; les réglages existants de la plage normale sont conservés. La priorité de survitesse, le silence à très basse vitesse et le freinage ATP ne changent pas.
+
+Après un arrêt du service MA dû à une erreur E/S, l'administrateur peut utiliser `/stcs admin ma restart` (`stcs.admin`, console acceptée). Le rétablissement vérifie les sources, exige des observations récentes à l'arrêt pour les autorisations exécutables restantes, sauvegarde le registre et le fichier temporaire, puis vérifie une écriture réelle. L'occupation est conservée ; les conducteurs doivent redemander une MA. Aucun frein n'est desserré. Une erreur persistante maintient le service arrêté ; les autres erreurs exigent une investigation et un redémarrage du serveur.
 
 ## 1. Monter et prendre la conduite
 

@@ -1,10 +1,12 @@
 # SkyRail Suite 鐵道運轉試驗規程
 
+第四・〇・二版附記：制限速度四十粁毎時以下ニ於テハ、五粁手前ニ警報ヲ發シ、八粁下ニ解除ス。超速警報及ビ制動規則ハ變更セズ。臺帳入出力障害ノ後、管理者ハ `/stcs admin ma restart` ニテ復舊ヲ試ミ得ルモ、占有ヲ消去セズ、制動ヲ緩解セズ。運轉士ハ MA ヲ再要求スベシ。
+
 ## M3 手動列車保護　追補告示
 
-**豫備公開 `suite-v4.0.0`。** 自動檢査ハ通過セリ。最新修正ノ實サーバー再檢證ハ未了トス。[公開要領](doc/releases/suite-v4.0.0.md)。
+**豫備公開 `suite-v4.0.2`。** 自動檢査ハ通過セリ。最新修正ノ實サーバー再檢證ハ未了トス。[公開要領](doc/releases/suite-v4.0.2.md)。
 
-現行ハ STF 四・〇・〇、STCS 四・〇・〇、STA 二・〇・〇、SkyPCC 二・〇・〇ヲ一組トス。管理者ハ停車中ニ `/stcs admin enforce true|false` ヲ用ヒ、實驗的制動監視ノ通道ヲ明示ス。false ハ RECOVERING ノ制動保持ニ歸ス。手動列車ノミ SB/FS/SH/SR/TR/PT ヲ用ヒ、標識式擬似 ATO 自動列車ニハ適用セズ。影方式ハ依然トシテ制動ヲ執行セズ。
+現行ハ STF 四・〇・二、STCS 四・〇・二、STA 二・〇・〇、SkyPCC 二・〇・〇ヲ一組トス。管理者ハ停車中ニ `/stcs admin enforce true|false` ヲ用ヒ、實驗的制動監視ノ通道ヲ明示ス。false ハ RECOVERING ノ制動保持ニ歸ス。手動列車ノミ SB/FS/SH/SR/TR/PT ヲ用ヒ、標識式擬似 ATO 自動列車ニハ適用セズ。影方式ハ依然トシテ制動ヲ執行セズ。
 
 SH/SR ノ既定上限ハ每時四十粁トシ、小許容幅ヲ超エタル速度超過ニハ FS ノ緩和待機時間ヲ置カズ B7 ヲ施ス。EoA 接近曲線ハ更ニ低速ヲ求ムル場合アリ。側欄及ビ運轉士ノ BossBar ニ ATP B7/EB ヲ揭示ス。冒進 TR ニハ案内及ビ非常制動音ヲ發ス。停車後 `/stcs ma ack` ニテ PT、次ニ `/stcs ma release` ニテ SB トシ、再申請スベシ。
 
@@ -50,8 +52,8 @@ STF 三・〇・〇、STCS 三・〇・〇、STA 一・〇・〇、SkyPCC 一・
 
 | 部名 | 現行版 | 分掌 |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `4.0.0` | 編成、軌道運動、力行制動、運轉權、標識、運轉臺及ビ手動列車ノ實驗的 ATP 制動 |
-| STCS | `4.0.0` | 有向 RailGraph、里程、位置標定、占有保持並ニ影方式及ビ實行用 MA/EoA |
+| SkyTrainFolia / STF | `4.0.2` | 編成、軌道運動、力行制動、運轉權、標識、運轉臺及ビ手動列車ノ實驗的 ATP 制動 |
+| STCS | `4.0.2` | 有向 RailGraph、里程、位置標定、占有保持並ニ影方式及ビ實行用 MA/EoA |
 | SkyworldTrainAPI / STA | `2.0.0` | 同一 JVM 內ノ版付き契約、遙測、實行用許可及ビ行車事象 |
 | SkyPCC | `2.0.0` | 配線略圖、施設照會、事象記錄、認證付き分岐器操作及ビ SR 承認 |
 
@@ -71,8 +73,8 @@ STA ハ自動的ニ公開サルル Python 用通信線ニ非ズ。同一サー�
 4. 設定變更ハ停止中ニ行ヒ、再ビ完全起動スベシ。動的差替ニ依存スベカラズ。
 
 ```text
-SkyTrainFolia-4.0.0.jar
-STCS-4.0.0.jar
+SkyTrainFolia-4.0.2.jar
+STCS-4.0.2.jar
 SkyworldTrainAPI-2.0.0.jar
 SkyPCC-2.0.0.jar
 ```

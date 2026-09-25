@@ -2,11 +2,27 @@
 
 **Players: start with the [Driver Manual](doc/driver/README.en.md)** for boarding, driving control, hotbar, shadow MA and stopping.
 
+## 4.0.2: Warnings and Service Recovery
+
+Near-limit audio uses the current ATP limit, not actual speed, to select its band. At limits **<= 40 km/h**, including SH's default ceiling, warning starts **5 km/h below** and clears **8 km/h below**. Above 40, new-install defaults are **15 / 18 km/h**; existing normal-band settings remain unchanged. Overspeed priority, minimum-speed silence and ATP braking are unchanged.
+
+Administrators can use `/stcs admin ma restart` (`stcs.admin`, console supported) after an MA-service I/O failure. Recovery checks source availability, requires fresh stationary reports for outstanding executable authorities, backs up the ledger and pending snapshot, and verifies a real write. Occupancy is retained; drivers must demand MA again. It does not release brakes. Persistent I/O faults remain fail-closed; other runtime faults require investigation/server restart.
+
+```yaml
+shadow-atp:
+  warning:
+    enter-gap-kmh: 15.0
+    clear-gap-kmh: 18.0
+    low-speed-limit-kmh: 40.0
+    low-speed-enter-gap-kmh: 5.0
+    low-speed-clear-gap-kmh: 8.0
+```
+
 ## Experimental M3: Manual-Train Protection
 
-**Pre-release `suite-v4.0.0`.** Automated checks passed; the latest fixes await another live-server acceptance run. [Release notes](doc/releases/suite-v4.0.0.md).
+**Pre-release `suite-v4.0.2`.** Automated checks passed; the latest fixes await another live-server acceptance run. [Release notes](doc/releases/suite-v4.0.2.md).
 
-Use STF **4.0.0**, STCS **4.0.0**, STA **2.0.0** and SkyPCC **2.0.0** together. Back up RailGraph and occupancy ledgers before replacing installed components; do not mix versions. STF remains useful on its own, but `Enforced` requires STA and STCS. The old v5 shadow service remains observational; the new STA v6 operational permission is a separate channel.
+Use STF **4.0.2**, STCS **4.0.2**, STA **2.0.0** and SkyPCC **2.0.0** together. Back up RailGraph and occupancy ledgers before replacing installed components; do not mix versions. STF remains useful on its own, but `Enforced` requires STA and STCS. The old v5 shadow service remains observational; the new STA v6 operational permission is a separate channel.
 
 Only **manual trains** enter `SB`, `FS`, `SH`, `SR`, `TR` and `PT`. A stopped train with a driver starts in `SB`; `/stcs ma demand` requests `FS`, `/stcs ma sh` requests a bounded shunting permission, and `/stcs ma sr` requests a dispatcher-approved permission to a selected infrastructure node. An accepted request is not yet an allocated, executable MA. After an EoA trip, stop, use `/stcs ma ack` to enter `PT`, then `/stcs ma release` before requesting anew. Admins may explicitly switch a stopped manual train between shadow and active channels using `/stcs admin enforce true|false`; `false` returns to `RECOVERING` brake hold. The sidebar displays a translated channel and stable mode code, for example **`Enforced | SR`**. `shadow-atp` remains read-only; `active-atp` has relaxed and strict configurable profiles.
 
@@ -32,7 +48,7 @@ Message and Packet are separate namespaces: allocated shadow MA uses **Message 1
 
 Read-only shadow curves do not change handles or brakes. Defaults: stop 1 m before EoA; at most 5 km/h within the final 5 m, continuously decreasing to zero. This level-track estimate uses B7 parameters and measured speed, not the theoretical speed ceiling for telemetry-age compensation.
 
-Configure the model under `shadow-atp`; `enforcement-enabled: true` is explicitly rejected. `shadow-atp.warning`: continuous near-limit warning from 2 km/h below the limit, clearing at 5 km/h below it or below 0.5 km/h. Overspeed takes priority above the limit and clears at 1 km/h below it. All thresholds are configurable; the old `cooldown-millis` is ignored. `ma-sounds.near-limit` defaults to `minecraft:block.note_block.flute`; `ma-sounds.overspeed` to faster `minecraft:block.note_block.bit` pulses. Both loop without inter-burst gaps. Stop trains before `/st reload`.
+Configure the model under `shadow-atp`; `enforcement-enabled: true` is explicitly rejected. `shadow-atp.warning`: continuous near-limit warning using the two bands described above, or silence below 0.5 km/h. Overspeed takes priority above the limit and clears at 1 km/h below it. All thresholds are configurable; the old `cooldown-millis` is ignored. `ma-sounds.near-limit` defaults to `minecraft:block.note_block.flute`; `ma-sounds.overspeed` to faster `minecraft:block.note_block.bit` pulses. Both loop without inter-burst gaps. Stop trains before `/st reload`.
 
 Near-limit audio repeats six C5-G5 pairs per burst until speed clears the hysteresis threshold; shrinking MA sounds three short beeps. `pitch-sequence` overrides `pitch`, and `count` repeats the sequence (at most 64 notes). Existing configurations retain their sound choices; merge the new defaults from [the audio configuration guide](doc/SHADOW-ATP.md#existing-configurations--旧配置更新) to adopt them.
 
@@ -80,8 +96,8 @@ The project introduces explicit driving control, resource occupancy, conflicting
 
 | Component | Version | Responsibility |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `4.0.0` | Consists, movement, driving, physical turnout actuation, HMI and experimental manual-train ATP executor |
-| STCS | `4.0.0` | Infrastructure, RailGraph, localisation, retained occupancy, shadow and operational MA/EoA allocation |
+| SkyTrainFolia / STF | `4.0.2` | Consists, movement, driving, physical turnout actuation, HMI and experimental manual-train ATP executor |
+| STCS | `4.0.2` | Infrastructure, RailGraph, localisation, retained occupancy, shadow and operational MA/EoA allocation |
 | SkyworldTrainAPI / STA | `2.0.0` | Versioned inter-plugin contracts, telemetry, operational permissions and events |
 | SkyPCC | `2.0.0` | Web dispatch display, inspectors, events, authenticated turnout control and SR approval |
 
@@ -134,8 +150,8 @@ This illustrates responsibilities, not a mandatory serial call chain. Browser in
 Current installation files:
 
 ```text
-SkyTrainFolia-4.0.0.jar
-STCS-4.0.0.jar
+SkyTrainFolia-4.0.2.jar
+STCS-4.0.2.jar
 SkyworldTrainAPI-2.0.0.jar
 SkyPCC-2.0.0.jar
 ```

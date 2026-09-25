@@ -1,13 +1,22 @@
 # Updates / 更新说明
 
-## STCS 4.0.2 local patch / 本地修复（未发布）
+## Suite v4.0.2 pre-release / 预发布
+
+STF/STCS 4.0.2, STA/SkyPCC 2.0.0. [Release notes / 发布说明](doc/releases/suite-v4.0.2.md). Live-server acceptance pending / 尚待服务器验收。
+
+### STF low-speed warning adjustment / STF 低速预警调整
+
+- Near-limit audio uses a configurable low-speed band: at ATP limits <= 40 km/h, enter at limit minus 5 km/h and clear at/below limit minus 8 km/h. Above that band, existing `enter-gap-kmh` / `clear-gap-kmh` settings still apply; new-install defaults are 15 / 18 km/h. Overspeed priority and ATP brake thresholds are unchanged.
+- 低速音效阈值新增 `shadow-atp.warning.low-speed-limit-kmh`、`low-speed-enter-gap-kmh`、`low-speed-clear-gap-kmh`，默认 40 / 5 / 8。SH 的 40 km/h 限速包含在低速档中；35 km/h 开始提醒，降至 32 km/h 及以下解除，避免反复响停。已有普通阈值配置不覆盖；仅调整音效，不改变 ATP 制动。
+
+### STCS 4.0.2 MA recovery / MA 服务恢复
 
 - Add administrator/console command `/stcs admin ma restart` (`stcs.admin`) for a stopped MA service after an I/O failure. Back up the ledger and pending snapshot, force a real write, retain occupancy, reset demands and revalidate current inputs. Drivers must request MA again; recovery never releases brakes or changes ATP channels.
 - Require fresh stationary reports for outstanding executable authorities. Reject unavailable sources, persistent write failures and non-I/O runtime faults; those faults still require investigation/server restart. Running service returns `ALREADY_RUNNING` without disruption.
 - 新增管理员/控制台恢复指令，保留占用并备份账本；恢复后司机重新申请 MA，不自动缓解制动。旧有效许可对应列车必须有新鲜的停稳报告；数据源不可用、持续写入失败时拒绝恢复。其他运行时错误不允许用此指令绕过。
 - Includes the 4.0.1 Windows file-replacement retry fix. Compatible with STF 4.0.0 / STA 2.0.0 / SkyPCC 2.0.0; no protocol change. / 包含 4.0.1 文件替换重试；仅替换 STCS，无协议变更。
 
-## STCS 4.0.1 local patch / 本地修复（未发布）
+### Included STCS 4.0.1 fix / 包含的修复（未单独发布）
 
 - Retry an access-denied occupancy-ledger replacement up to five attempts, with 185 ms of total backoff. This covers temporary Windows file sharing conflicts; persistent permission failures and other I/O failures still stop MA allocation.
 - Preserve the committed ledger and pending `.tmp` snapshot on failed replacement. Do not delete or truncate the live ledger to bypass a lock. Correct the failure message for the experimental Enforced channel.

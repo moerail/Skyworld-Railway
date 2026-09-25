@@ -2,11 +2,27 @@
 
 **Voor spelers:** de bestuurdershandleiding is beschikbaar in [Engels](doc/driver/README.en.md), [Chinees](doc/driver/README.zh.md), [Frans](doc/driver/README.fr.md) en [Japans](doc/driver/README.ja.md).
 
+## 4.0.2: Waarschuwingen en serviceherstel
+
+De actuele ATP-limiet bepaalt de waarschuwingsband, niet de werkelijke snelheid. Bij een limiet **≤40 km/h**, inclusief de standaard SH-limiet, begint de waarschuwing **5 km/h eronder** en stopt deze bij **8 km/h eronder** of lager. Boven 40 zijn de standaardwaarden voor nieuwe installaties **15 / 18 km/h**; bestaande instellingen voor de normale band blijven behouden. Oversnelheidsprioriteit, stilte bij zeer lage snelheid en ATP-remingrepen veranderen niet.
+
+Na een MA-servicestop door een I/O-fout kan een beheerder `/stcs admin ma restart` gebruiken (`stcs.admin`, ook via de console). Het herstel controleert de bronnen, vereist recente stilstandmeldingen voor resterende uitvoerbare toestemmingen, maakt back-ups van het register en tijdelijke bestand en controleert een echte schrijfactie. Bezetting blijft behouden; bestuurders moeten opnieuw MA aanvragen. Remmen worden niet gelost. Blijvende I/O-fouten houden de service gestopt; andere runtimefouten vereisen onderzoek en een serverherstart.
+
+```yaml
+shadow-atp:
+  warning:
+    enter-gap-kmh: 15.0
+    clear-gap-kmh: 18.0
+    low-speed-limit-kmh: 40.0
+    low-speed-enter-gap-kmh: 5.0
+    low-speed-clear-gap-kmh: 8.0
+```
+
 ## Experimentele M3: bescherming van handbestuurde treinen
 
-**Voorlopige uitgave `suite-v4.0.0`.** Automatische controles zijn geslaagd; de laatste correcties wachten op een nieuwe acceptatietest op de server. [Uitgavenotities](doc/releases/suite-v4.0.0.md).
+**Voorlopige uitgave `suite-v4.0.2`.** Automatische controles zijn geslaagd; de laatste correcties wachten op een nieuwe acceptatietest op de server. [Uitgavenotities](doc/releases/suite-v4.0.2.md).
 
-Gebruik STF **4.0.0**, STCS **4.0.0**, STA **2.0.0** en SkyPCC **2.0.0** samen. Stop de server en maak een back-up van RailGraph en bezettingsregisters voordat u componenten vervangt; meng geen versies. STF blijft zelfstandig bruikbaar, maar `Enforced` vereist STA en STCS. De bestaande v5-schaduwservice blijft adviserend; de uitvoerbare STA v6-autoriteit is een apart kanaal.
+Gebruik STF **4.0.2**, STCS **4.0.2**, STA **2.0.0** en SkyPCC **2.0.0** samen. Stop de server en maak een back-up van RailGraph en bezettingsregisters voordat u componenten vervangt; meng geen versies. STF blijft zelfstandig bruikbaar, maar `Enforced` vereist STA en STCS. De bestaande v5-schaduwservice blijft adviserend; de uitvoerbare STA v6-autoriteit is een apart kanaal.
 
 Alleen **handbestuurde treinen** volgen de toestanden `SB/FS/SH/SR/TR/PT`. Na het claimen van de bediening begint de trein in `SB`. `/stcs ma demand` vraagt `FS`, `/stcs ma sh` een begrensde rangeertoestemming en `/stcs ma sr` wacht op goedkeuring door PCC of een beheerder tot een gekozen spoorobject. Een geaccepteerd verzoek is nog geen uitvoerbare MA. Na het overschrijden van EoA (`TR`): stoppen, `/stcs ma ack` voor `PT`, daarna `/stcs ma release` voor een nieuw verzoek. Een beheerder wisselt het kanaal alleen bij stilstand met `/stcs admin enforce true|false`; `false` keert terug naar `RECOVERING` met remvasthouding. De zijbalk toont het vertaalde kanaal en de onvertaalde moduscode, bijvoorbeeld **`Enforced | SR`**.
 
@@ -32,7 +48,7 @@ Message en Packet hebben aparte nummerreeksen: toegewezen schaduw-MA gebruikt **
 
 Schaduwcurves wijzigen geen rijstanden of remmen. Standaard: stilstand 1 m voor EoA en maximaal 5 km/h in de laatste 5 m, aflopend tot nul. Het model voor vlak spoor gebruikt B7-parameters en gemeten snelheid; vertraging wordt niet meer met de theoretische maximumsnelheid gecompenseerd.
 
-De curve staat onder `shadow-atp`; `enforcement-enabled: true` wordt geweigerd. `shadow-atp.warning`: continue waarschuwing vanaf 2 km/h onder de limiet, stil bij 5 km/h eronder of onder 0.5 km/h. Boven de limiet krijgt het oversnelheidsalarm voorrang; bij 1 km/h eronder keert de gewone waarschuwing terug. Alle drempels zijn instelbaar; het oude `cooldown-millis` wordt genegeerd. `ma-sounds.near-limit` gebruikt standaard `minecraft:block.note_block.flute`; `ma-sounds.overspeed` snellere pulsen van `minecraft:block.note_block.bit`. Beide herhalen zonder pauzes tussen reeksen. Stop treinen voor `/st reload`.
+De curve staat onder `shadow-atp`; `enforcement-enabled: true` wordt geweigerd. `shadow-atp.warning`: continue waarschuwing volgens de twee bovenstaande banden; stil onder 0.5 km/h. Boven de limiet krijgt het oversnelheidsalarm voorrang; bij 1 km/h eronder keert de gewone waarschuwing terug. Alle drempels zijn instelbaar; het oude `cooldown-millis` wordt genegeerd. `ma-sounds.near-limit` gebruikt standaard `minecraft:block.note_block.flute`; `ma-sounds.overspeed` snellere pulsen van `minecraft:block.note_block.bit`. Beide herhalen zonder pauzes tussen reeksen. Stop treinen voor `/st reload`.
 
 De waarschuwing herhaalt zes C5-G5-paren per reeks totdat de snelheid onder de hysteresegrens komt; een krimpende MA geeft drie korte pieptonen. `pitch-sequence` vervangt `pitch`; `count` herhaalt de reeks (maximaal 64 tonen). Bestaande geluidsinstellingen blijven behouden; zie de [audioconfiguratie](doc/SHADOW-ATP.md#existing-configurations--旧配置更新) voor de nieuwe standaardwaarden.
 
@@ -80,8 +96,8 @@ Het project introduceert expliciete besturingsrechten, spoorbezetting, strijdige
 
 | Component | Versie | Verantwoordelijkheid |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `4.0.0` | Treinsamenstelling, beweging, besturing, fysieke wissels, HMI en experimentele ATP-uitvoering voor handbestuurde treinen |
-| STCS | `4.0.0` | RailGraph, plaatsbepaling, bewaarde bezetting, schaduw- en experimentele operationele MA/EoA |
+| SkyTrainFolia / STF | `4.0.2` | Treinsamenstelling, beweging, besturing, fysieke wissels, HMI en experimentele ATP-uitvoering voor handbestuurde treinen |
+| STCS | `4.0.2` | RailGraph, plaatsbepaling, bewaarde bezetting, schaduw- en experimentele operationele MA/EoA |
 | SkyworldTrainAPI / STA | `2.0.0` | Versiegebonden plugincontracten, telemetrie, operationele autorisaties en gebeurtenissen |
 | SkyPCC | `2.0.0` | Verkeersleidingsweergave, inspecties, gebeurtenissen, wisselbediening en SR-goedkeuring |
 
@@ -134,8 +150,8 @@ Dit schema toont verantwoordelijkheden, geen verplichte opeenvolging van alle aa
 Huidige installatiebestanden:
 
 ```text
-SkyTrainFolia-4.0.0.jar
-STCS-4.0.0.jar
+SkyTrainFolia-4.0.2.jar
+STCS-4.0.2.jar
 SkyworldTrainAPI-2.0.0.jar
 SkyPCC-2.0.0.jar
 ```

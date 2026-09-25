@@ -2,7 +2,7 @@
 
 [中文](README.zh.md) | [English](README.en.md) | [Français](README.fr.md) | [日本語](README.ja.md) · [Project home](../../README.md)
 
-For ordinary players aboard a manual train. Baseline: STF/STCS 4.0.0, STA/SkyPCC 2.0.0. Administrators handle train creation, track construction and plugin configuration.
+For ordinary players aboard a manual train. Baseline: STF/STCS 4.0.2, STA/SkyPCC 2.0.0. Administrators handle train creation, track construction and plugin configuration.
 
 > **In an emergency, use `/st eb`.** Shadow MA and ATP limits remain advisory. The separate experimental `Enforced` channel can brake a manual train only after an administrator explicitly enables it and STCS issues an executable MA. Do not assume it is enabled or live-validated. This is a game guide, not a real railway rulebook.
 
@@ -31,6 +31,12 @@ The sidebar's ATP mode is two fields: **channel | operating mode**, for example 
 In the enforced channel, SH/SR default to **40 km/h**, configurable by the administrator. Exceeding the ceiling beyond a small detection tolerance applies B7 without the relaxed FS overspeed delay. Near EoA, follow the lower ATP limit; 40 km/h is not a guaranteed speed throughout the authority.
 
 An approved SR target may be farther away than the current MA. Each rolling grant is capped at 120 m by default, updates with conditions ahead and cannot authorize travel beyond the approved target. **Drive only within the currently valid MA.** Target approval does not mean every point and section along the route is open. Saved geometry may cover unloaded chunks, but unknown points, uncertain occupancy or graph gaps can prevent extension.
+
+## 4.0.2: Warnings and Service Recovery
+
+Near-limit audio uses the current ATP limit, not actual speed, to select its band. At limits **<= 40 km/h**, including SH's default ceiling, warning starts **5 km/h below** and clears **8 km/h below**. Above 40, new-install defaults are **15 / 18 km/h**; existing normal-band settings remain unchanged. Overspeed priority, minimum-speed silence and ATP braking are unchanged.
+
+Administrators can use `/stcs admin ma restart` (`stcs.admin`, console supported) after an MA-service I/O failure. Recovery checks source availability, requires fresh stationary reports for outstanding executable authorities, backs up the ledger and pending snapshot, and verifies a real write. Occupancy is retained; drivers must demand MA again. It does not release brakes. Persistent I/O faults remain fail-closed; other runtime faults require investigation/server restart.
 
 ## 1. Board and Claim Control
 
