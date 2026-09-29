@@ -86,6 +86,10 @@ final class TrainPersistence {
                             train.reverser = Reverser.fromStorage(
                                     section.getString("reverser", null),
                                     train.reversed);
+                            train.rememberDirection(new Vector(
+                                    section.getDouble("direction.x", 0.0),
+                                    section.getDouble("direction.y", 0.0),
+                                    section.getDouble("direction.z", 0.0)));
                             train.powerNotch = Math.max(0, Math.min(4, section.getInt("power-notch", 0)));
                             train.brakeNotch = Math.max(0, Math.min(7, section.getInt("brake-notch", 0)));
                             train.emergencyBrake = section.getBoolean("emergency-brake", false);
@@ -158,6 +162,10 @@ final class TrainPersistence {
                 config.set(path + ".manual-release-confirmed", train.manualReleaseConfirmed);
                 config.set(path + ".last-manual-driver", train.lastManualDriver == null ? "" : train.lastManualDriver.toString());
                 config.set(path + ".reverser", train.reverser.name().toLowerCase(Locale.ROOT));
+                Vector rememberedDirection = train.rememberedDirection();
+                config.set(path + ".direction.x", rememberedDirection.getX());
+                config.set(path + ".direction.y", rememberedDirection.getY());
+                config.set(path + ".direction.z", rememberedDirection.getZ());
                 config.set(path + ".power-notch", train.powerNotch);
                 config.set(path + ".brake-notch", train.brakeNotch);
                 config.set(path + ".emergency-brake", train.emergencyBrake);

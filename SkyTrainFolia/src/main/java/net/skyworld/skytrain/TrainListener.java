@@ -181,10 +181,13 @@ final class TrainListener implements Listener {
         if (train == null) {
             return;
         }
-        if (!(event.getEntered() instanceof Player)) {
+        if (!(event.getEntered() instanceof Player player)) {
             event.setCancelled(true);
             return;
         }
+        // A parked consist may already be loaded when plugin data becomes ready,
+        // so it never receives an EntitiesLoadEvent. Restore nearby members too.
+        manager.scanNearby(player, 32.0);
         if (train.properties().playersEnter) {
             return;
         }

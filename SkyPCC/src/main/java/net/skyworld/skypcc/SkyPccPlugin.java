@@ -189,9 +189,9 @@ public final class SkyPccPlugin extends JavaPlugin {
     }
     private void control(HttpExchange x) throws IOException {
         var h = x.getRequestHeaders();
-        if (!ControlAccess.permitted(controlEnabled, controlToken, server.getAddress().getPort(), x.getRemoteAddress().getAddress(),
-                x.getRequestMethod(), h.getFirst("Host"), h.getFirst("Origin"), h.getFirst("Authorization"), h.getFirst("Content-Type"))) {
-            reply(x, 403, "application/json", bytes("{\"status\":\"REJECTED\",\"reason\":\"LOCAL_AUTH_REQUIRED\"}")); return;
+        if (!ControlAccess.permitted(controlEnabled, controlToken,
+                x.getRequestMethod(), h.getFirst("Authorization"), h.getFirst("Content-Type"))) {
+            reply(x, 403, "application/json", bytes("{\"status\":\"REJECTED\",\"reason\":\"CONTROL_AUTH_REQUIRED\"}")); return;
         }
         byte[] body = x.getRequestBody().readNBytes(4097);
         if (body.length > 4096) { reply(x, 413, "application/json", bytes("{}")); return; }
@@ -214,10 +214,9 @@ public final class SkyPccPlugin extends JavaPlugin {
     }
     private void srControl(HttpExchange x) throws IOException {
         var h = x.getRequestHeaders();
-        if (!ControlAccess.permitted(controlEnabled, controlToken, server.getAddress().getPort(),
-                x.getRemoteAddress().getAddress(), x.getRequestMethod(), h.getFirst("Host"),
-                h.getFirst("Origin"), h.getFirst("Authorization"), h.getFirst("Content-Type"))) {
-            reply(x, 403, "application/json", bytes("{\"status\":\"REJECTED\",\"reason\":\"LOCAL_AUTH_REQUIRED\"}"));
+        if (!ControlAccess.permitted(controlEnabled, controlToken,
+                x.getRequestMethod(), h.getFirst("Authorization"), h.getFirst("Content-Type"))) {
+            reply(x, 403, "application/json", bytes("{\"status\":\"REJECTED\",\"reason\":\"CONTROL_AUTH_REQUIRED\"}"));
             return;
         }
         byte[] body = x.getRequestBody().readNBytes(4097);

@@ -624,6 +624,12 @@
     "遠隔操作無効"
   ],
   [
+    "Remote control requires HTTPS. Open SkyPCC through a secure connection.",
+    "远程操作需要 HTTPS。请通过安全连接打开 SkyPCC。",
+    "La commande à distance nécessite HTTPS. Ouvrez SkyPCC avec une connexion sécurisée.",
+    "遠隔操作には HTTPS が必要です。安全な接続で SkyPCC を開いてください。"
+  ],
+  [
     "Conversion confirmed",
     "道岔转换已确认",
     "Manœuvre confirmée",
@@ -1128,6 +1134,13 @@
     "需要操作授权",
     "Autorisation opérateur requise",
     "操作認証が必要"
+  ],
+  [
+    "CONTROL_AUTH_REQUIRED",
+    "Operator token required or incorrect",
+    "需要正确的操作令牌",
+    "Jeton opérateur requis ou incorrect",
+    "正しい操作トークンが必要です"
   ],
   [
     "INVALID_REQUEST",

@@ -130,6 +130,19 @@ final class TrainMotionController {
         if (preference.lengthSquared() < 0.0001) {
             preference = train.rememberedDirection();
         }
+        if (preference.lengthSquared() < 0.0001 && index == activeLeaderIndex(train)
+                && train.memberCount() > 1) {
+            preference = parkedFormationDirection(train, entityId, location, now);
+            if (preference.lengthSquared() < 0.0001) {
+                // Do not guess the parked leader's orientation from minecart yaw.
+                // Another member's fresh position will resolve it on a later tick.
+                cart.setVelocity(new Vector());
+                train.memberSpeed(entityId, 0.0);
+                train.snapshot(entityId, new MemberSnapshot(entityId, location, new Vector(), now));
+                return;
+            }
+            train.rememberDirection(preference);
+        }
         if (preference.lengthSquared() < 0.0001) {
             preference = RailMath.yawDirection(location.getYaw());
             if (train.reversed) {
@@ -210,6 +223,19 @@ final class TrainMotionController {
                 ? frontMinecartSpeedLimit(train, cart, location, direction, desiredTrainSpeed)
                 : new SpeedLimit(desiredTrainSpeed, false);
         VehicleProfile vehicle = plugin.vehicleProfile();
+        double effectiveGrade = direction.getY();
+        if (index == activeLeaderIndex(train) && vehicle.forceMode()) {
+            double consistLength = Math.max(0.0, train.spacing * (train.memberCount() - 1));
+            TrainRailPath gradePath = train.trackPath();
+            if (gradePath == null || !gradePath.isCompatible(location, train.reversed, consistLength)) {
+                gradePath = TrainRailPath.create(location, direction, train.reversed, consistLength);
+                if (gradePath != null) train.trackPath(gradePath);
+            }
+            double cap = settings.maxEffectiveGrade();
+            effectiveGrade = gradePath == null
+                    ? RailMath.clamp(direction.getY(), -cap, cap)
+                    : gradePath.effectiveGrade(train.memberCount(), train.spacing, train.reversed, cap);
+        }
         boolean speedController = index == activeLeaderIndex(train) && !train.speedControlledRecently(now);
         double speed;
         if (speedController && stationMoving && !controlledStop
@@ -240,7 +266,7 @@ final class TrainMotionController {
                         vehicle.rollingForce(),
                         vehicle.airForceFactor(),
                         vehicle.grade(),
-                        direction.getY(),
+                        effectiveGrade,
                         vehicle.baseSpeed(),
                         vehicle.weakeningSpeed(),
                         vehicle.minimumRatio(),
@@ -303,6 +329,19 @@ final class TrainMotionController {
         }
 
         actuator.applyTrainTarget(train, cart, entityId, target, location, now);
+    }
+
+    static Vector parkedFormationDirection(Train train, UUID leaderId, Location leaderLocation, long now) {
+        List<UUID> members = train.members();
+        int leader = train.reversed ? members.size() - 1 : 0;
+        if (members.size() < 2 || !members.get(leader).equals(leaderId)
+                || leaderLocation.getWorld() == null) return new Vector();
+        MemberSnapshot adjacent = train.snapshot(members.get(train.reversed ? leader - 1 : leader + 1));
+        if (adjacent == null || !adjacent.worldName.equals(leaderLocation.getWorld().getName())
+                || adjacent.timeMillis > now || now - adjacent.timeMillis > 2000) return new Vector();
+        Vector direction = leaderLocation.toVector().subtract(adjacent.toVector());
+        double lengthSquared = direction.lengthSquared();
+        return lengthSquared >= 0.01 && lengthSquared <= 144.0 ? direction.normalize() : new Vector();
     }
 
     void layoutTrainTargets(Train train, Location leaderLocation, Vector direction, double speed,

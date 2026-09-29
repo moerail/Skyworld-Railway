@@ -43,6 +43,10 @@
   let srRequest = null;
   let srPending = false;
 
+  function canSendControlRequest() {
+    return window.isSecureContext === true && typeof window.crypto?.randomUUID === 'function';
+  }
+
   const ui = Object.fromEntries([
     'railMap', 'edgeLayer', 'switchLayer', 'nodeLayer', 'labelLayer', 'trainLayer', 'lineFilter',
     'fitButton', 'zoomIn', 'zoomOut', 'fontDecrease', 'fontSizeValue', 'fontIncrease',
@@ -711,12 +715,14 @@
       ui.srApprove.disabled = srPending;
       ui.srApprove.onclick = () => {
         if (srPending || !liveOperational()) return;
-        srRequest = { requestId: crypto.randomUUID(), trainId: pending.trainId,
-          targetNodeId: id, graphRevision: state.graph.revision };
+        const secure = canSendControlRequest();
+        srRequest = secure ? { requestId: crypto.randomUUID(), trainId: pending.trainId,
+          targetNodeId: id, graphRevision: state.graph.revision } : null;
         ui.srTarget.textContent = `${pending.trainName || pending.trainId} → ${item.name || id}`;
         ui.srToken.value = '';
-        ui.srResult.textContent = t('Ready');
-        ui.srConfirm.disabled = false;
+        ui.srToken.disabled = !secure;
+        ui.srResult.textContent = t(secure ? 'Ready' : 'Remote control requires HTTPS. Open SkyPCC through a secure connection.');
+        ui.srConfirm.disabled = !secure;
         ui.srDialog.showModal();
       };
     }
@@ -1076,14 +1082,17 @@
       if (!control) { selectInfrastructure('node', id); return; }
       const node = state.nodes.get(id); if (!node || switchPending) return;
       const expected = String(node.state).toLowerCase();
-      switchRequest = { requestId: crypto.randomUUID(), switchId: id, graphRevision: state.graph.revision,
+      const secure = canSendControlRequest();
+      switchRequest = secure ? { requestId: crypto.randomUUID(), switchId: id, graphRevision: state.graph.revision,
         expectedState: expected, targetState: expected === 'straight' ? 'diverging' : 'straight',
-        position: node.rail ? { world: node.rail.world, x: node.rail.x, y: node.rail.y, z: node.rail.z } : null };
+        position: node.rail ? { world: node.rail.world, x: node.rail.x, y: node.rail.y, z: node.rail.z } : null } : null;
       ui.switchTitle.textContent = t('Switch {name}', { name: node.name || id });
-      ui.switchTransition.textContent = `${code(expected)} → ${code(switchRequest.targetState)} | ${node.rail?.world || '?'} ${node.rail?.x}, ${node.rail?.y}, ${node.rail?.z}`;
+      ui.switchTransition.textContent = `${code(expected)} → ${code(expected === 'straight' ? 'diverging' : 'straight')} | ${node.rail?.world || '?'} ${node.rail?.x}, ${node.rail?.y}, ${node.rail?.z}`;
       ui.switchToken.value = '';
-      setSwitchResult({ key: state.controlEnabled ? 'Ready' : 'Remote control disabled' });
-      ui.switchConfirm.disabled = !state.controlEnabled || !switchRequest.position || !['straight', 'diverging'].includes(expected);
+      ui.switchToken.disabled = !secure;
+      setSwitchResult({ key: !secure ? 'Remote control requires HTTPS. Open SkyPCC through a secure connection.'
+        : state.controlEnabled ? 'Ready' : 'Remote control disabled' });
+      ui.switchConfirm.disabled = !secure || !state.controlEnabled || !switchRequest?.position || !['straight', 'diverging'].includes(expected);
       ui.switchDialog.showModal();
     };
     element.addEventListener('click', open);

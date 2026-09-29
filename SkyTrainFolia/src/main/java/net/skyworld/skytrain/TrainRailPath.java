@@ -207,6 +207,17 @@ final class TrainRailPath {
         return placements;
     }
 
+    /** Average the grade borne by each member, since vehicle profiles describe a whole train. */
+    synchronized double effectiveGrade(int memberCount, double spacing, boolean reversed, double cap) {
+        if (memberCount <= 0) return 0.0;
+        double maximum = Math.max(0.0, cap);
+        double total = 0.0;
+        for (MemberPlacement placement : placements(memberCount, spacing, reversed)) {
+            total += RailMath.clamp(placement.direction().getY(), -maximum, maximum);
+        }
+        return total / memberCount;
+    }
+
     private boolean ensureLeaderWalker(boolean reversed) {
         if (leaderWalker != null && leaderReversed == reversed) {
             return true;

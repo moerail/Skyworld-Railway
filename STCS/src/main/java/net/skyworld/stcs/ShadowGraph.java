@@ -12,6 +12,7 @@ final class ShadowGraph {
     final Map<String,Set<String>> footprints = new HashMap<>();
     final Map<String,Set<String>> cellResources = new HashMap<>();
     final Set<String> unresolved = new HashSet<>();
+    final Map<String,Set<String>> unresolvedPorts = new HashMap<>();
     final double guard;
     ShadowGraph(RailGraph graph) {
         this.graph=graph;
@@ -19,9 +20,18 @@ final class ShadowGraph {
         guard=1/graph.blocksPerMeter;
         graph.nodes.forEach(n->nodes.put(n.id(),n));
         if(nodes.size()!=graph.nodes.size())throw new IllegalArgumentException("Duplicate node ID");
-        graph.unresolved.forEach(i->unresolved.add(i.source()));
+        graph.unresolved.forEach(i->{
+            unresolved.add(i.source());
+            unresolvedPorts.computeIfAbsent(i.source(),key->new HashSet<>())
+                    .add(i.sourcePort()==null?"none":i.sourcePort().toLowerCase(Locale.ROOT));
+        });
         for(var e:graph.edges) {
-            if(!valid(e)) { unresolved.add(e.from()); unresolved.add(e.to()); continue; }
+            if(!valid(e)) {
+                unresolved.add(e.from()); unresolved.add(e.to());
+                unresolvedPorts.computeIfAbsent(e.from(),key->new HashSet<>()).add("none");
+                unresolvedPorts.computeIfAbsent(e.to(),key->new HashSet<>()).add("none");
+                continue;
+            }
             if(edges.put(e.id(),e)!=null)throw new IllegalArgumentException("Duplicate edge ID");
         }
         // Same restricted Origin reverse completion as offline testbench 0.1.3.
@@ -68,6 +78,10 @@ final class ShadowGraph {
     }
     static double distance(RailGraph.Point a,RailGraph.Point b) {
         return Math.sqrt(Math.pow(a.x()-b.x(),2)+Math.pow(a.y()-b.y(),2)+Math.pow(a.z()-b.z(),2));
+    }
+    boolean unresolvedAt(String nodeId,String port) {
+        Set<String> ports=unresolvedPorts.get(nodeId);
+        return ports!=null&&(ports.contains("none")||ports.contains(port.toLowerCase(Locale.ROOT)));
     }
     static String cell(String world,long x,long y,long z) { return world+":"+x+":"+y+":"+z; }
     boolean conflict(String a,String b) {

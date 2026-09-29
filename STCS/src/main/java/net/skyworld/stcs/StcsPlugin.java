@@ -9,6 +9,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.bukkit.configuration.file.YamlConfiguration;
 
 import com.google.gson.Gson;
 
@@ -27,7 +30,8 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
     private TrainPositionRegistry trainPositions;
     private StaIntegration sta;
     private OccupancyMonitor occupancy;
-    private ShadowRuntime shadow;
+    private volatile ShadowRuntime shadow;
+    private final AtomicBoolean ledgerResetQueued = new AtomicBoolean();
     private final CopyOnWriteArrayList<Runnable> pccUpdateListeners = new CopyOnWriteArrayList<>();
     private final AtomicBoolean pccUpdateQueued = new AtomicBoolean();
 
@@ -204,6 +208,58 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
                 return true;
             }
             case "ma" -> {
+                if (args.length >= 2 && args[1].equalsIgnoreCase("reset-ledger")) {
+                    if (!(sender instanceof org.bukkit.command.ConsoleCommandSender)
+                            && !(sender instanceof Player && hasAdminPermission(sender))) {
+                        send(sender, "&cAdministrator permission required: stcs.admin");
+                        return true;
+                    }
+                    if (args.length != 4 || !args[2].matches("[0-9]{6}") || !args[3].equals("confirm")) {
+                        send(sender, "&c/stcs ma reset-ledger <6-digit-code> confirm: obtain a fresh code from /st list, then physically patrol all track and relevant unloaded chunks. Only the shadow MA ledger is reset.");
+                        return true;
+                    }
+                    if (shadow != null || !getConfig().getBoolean("ma.enabled", true)) {
+                        send(sender, "&cRefused: shadow MA is running or disabled by configuration. Use per-train clear for a running service.");
+                        return true;
+                    }
+                    if (!ledgerResetQueued.compareAndSet(false, true)) {
+                        send(sender, "&cLedger reset is already running.");
+                        return true;
+                    }
+                    send(sender, "&eChecking saved trains and live telemetry before ledger reset...");
+                    String code = args[2];
+                    String operator = sender instanceof Player player ? player.getUniqueId().toString() : "console";
+                    String actor = sender instanceof Player player
+                            ? player.getName() + " (" + player.getUniqueId() + ")" : sender.getName();
+                    getServer().getAsyncScheduler().runNow(this, task -> {
+                        try {
+                            String refusal = ledgerResetRefusal();
+                            if (refusal != null) {
+                                getLogger().warning("Shadow ledger reset refused: " + refusal);
+                                replyOperator(sender, "&cLedger reset refused: " + refusal);
+                                return;
+                            }
+                            if (!consumeLedgerResetChallenge(operator, code)) {
+                                replyOperator(sender, "&cCode invalid, expired, already used, or the train list changed. Run /st list again; no ledger was changed.");
+                                return;
+                            }
+                            Path file = getDataFolder().toPath().resolve("shadow-occupancy.json");
+                            Path backup = ShadowLedgerReset.reset(file, actor);
+                            getLogger().warning("Shadow ledger replaced with empty v2 document; actor=" + actor
+                                    + " backup=" + (backup == null ? "NONE_FILE_ABSENT" : backup)
+                                    + "; full server restart required. Historical M1 ledger retained.");
+                            replyOperator(sender, "&aEmpty shadow ledger written. Backup: "
+                                    + (backup == null ? "none (source file absent)" : backup.getFileName())
+                                    + ". Fully restart the server; verify STCS startup, /st list and MA status before traffic.");
+                        } catch (Exception ex) {
+                            getLogger().log(Level.SEVERE, "Shadow ledger reset failed; no MA service was started", ex);
+                            replyOperator(sender, "&cLedger reset failed. Check STCS log and original/backup files; MA remains unavailable.");
+                        } finally {
+                            ledgerResetQueued.set(false);
+                        }
+                    });
+                    return true;
+                }
                 if (args.length >= 2 && args[1].equalsIgnoreCase("clear")) {
                     if (!(sender instanceof org.bukkit.command.ConsoleCommandSender)) {
                         send(sender, "&cConsole only: stcs ma clear <train-uuid> confirm. Verify all carts are gone first.");
@@ -425,9 +481,16 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length >= 2 && ("help".equalsIgnoreCase(args[0]) || "version".equalsIgnoreCase(args[0]))) return SuiteCommandUi.complete("stcs", args);
-        if (args.length == 2 && args[0].equalsIgnoreCase("ma")) return (hasAdminPermission(sender)
-                ? List.of("demand", "sh", "sr", "ack", "release", "status") : List.of("demand", "sh", "sr", "ack", "release")).stream()
+        if (args.length == 2 && args[0].equalsIgnoreCase("ma")) return (sender instanceof org.bukkit.command.ConsoleCommandSender
+                ? List.of("status", "clear", "reset-ledger")
+                : sender instanceof Player && hasAdminPermission(sender)
+                ? List.of("demand", "sh", "sr", "ack", "release", "status", "reset-ledger")
+                : List.of("demand", "sh", "sr", "ack", "release")).stream()
                 .filter(s -> s.startsWith(args[1].toLowerCase(java.util.Locale.ROOT))).toList();
+        if (args.length == 4 && args[0].equalsIgnoreCase("ma") && args[1].equalsIgnoreCase("reset-ledger")
+                && (sender instanceof org.bukkit.command.ConsoleCommandSender
+                        || sender instanceof Player && hasAdminPermission(sender)))
+            return "confirm".startsWith(args[3].toLowerCase(java.util.Locale.ROOT)) ? List.of("confirm") : List.of();
         if (args.length >= 2 && args[0].equalsIgnoreCase("admin") && hasAdminPermission(sender)) {
             List<String> options = args.length == 2 ? java.util.stream.Stream.concat(ProtectionCommand.actions().stream(),java.util.stream.Stream.of("ma")).toList()
                     : args.length == 3 ? (args[1].equalsIgnoreCase("ma")?List.of("restart"):ProtectionCommand.values(args[1])) : List.of();
@@ -450,6 +513,58 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
         String prefix = args[0].toLowerCase(java.util.Locale.ROOT);
         return List.of("help", "version", "inspect", "status", "rebuild", "export", "switch", "admin", "occupancy", "ma", "sr", "integrity").stream()
                 .filter(value -> value.startsWith(prefix)).toList();
+    }
+
+    private String ledgerResetRefusal() {
+        if (shadow != null) return "shadow MA became active";
+        var stf = getServer().getPluginManager().getPlugin("SkyTrainFolia");
+        if (stf == null || !stf.isEnabled()) return "SkyTrainFolia is not enabled";
+        var services = getServer().getServicesManager();
+        var roster = services.load(net.skyworld.sta.api.v3.ConsistObservationService.class);
+        var desks = services.load(net.skyworld.sta.api.v5.DriverDeskService.class);
+        var tracking = services.load(net.skyworld.sta.api.v5.TrackingService.class);
+        if (roster == null || desks == null || tracking == null || !tracking.sourceAvailable()
+                || roster.sessionId() == null || !roster.sessionId().equals(desks.sessionId()))
+            return "train telemetry unavailable or sessions disagree";
+        if (roster.consistObservations().stream().anyMatch(entry -> !entry.removed()))
+            return "a train remains in the live roster";
+        if (!desks.driverDesks().isEmpty()) return "a driver still controls a train";
+        if (tracking.snapshots().stream().anyMatch(message ->
+                message.header().kind() == net.skyworld.sta.api.v5.StaMessage.Kind.TRACK_REPORT))
+            return "a live train track report remains";
+        Path trainsFile = stf.getDataFolder().toPath().resolve("trains.yml");
+        if (!Files.isRegularFile(trainsFile)) return "SkyTrainFolia/trains.yml is missing";
+        try {
+            var saved = new YamlConfiguration();
+            saved.load(trainsFile.toFile());
+            var trains = saved.getConfigurationSection("trains");
+            if (saved.contains("trains") && trains == null)
+                return "SkyTrainFolia/trains.yml has a malformed trains section";
+            if (trains != null && !trains.getKeys(false).isEmpty())
+                return "SkyTrainFolia/trains.yml still contains train records";
+        } catch (Exception ex) {
+            getLogger().log(Level.WARNING, "Cannot verify saved train roster", ex);
+            return "SkyTrainFolia/trains.yml cannot be read";
+        }
+        return null;
+    }
+
+    private boolean consumeLedgerResetChallenge(String operator, String code) {
+        var stf = getServer().getPluginManager().getPlugin("SkyTrainFolia");
+        if (stf == null || !stf.isEnabled()) return false;
+        try {
+            return Boolean.TRUE.equals(stf.getClass().getMethod("consumeShadowLedgerResetChallenge",
+                    String.class, String.class).invoke(stf, operator, code));
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            getLogger().log(Level.WARNING, "SkyTrainFolia cannot validate the ledger reset challenge", ex);
+            return false;
+        }
+    }
+
+    private void replyOperator(CommandSender sender, String message) {
+        if (sender instanceof Player player) {
+            player.getScheduler().run(this, task -> { if (player.isOnline()) send(player, message); }, null);
+        } else getServer().getGlobalRegionScheduler().run(this, task -> send(sender, message));
     }
 
     private void handleProtection(CommandSender sender, String[] args) {

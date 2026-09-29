@@ -63,6 +63,7 @@ public final class TrainManagerRefactorTest {
             train.properties().setTrainNumber("0012");
             train.loadMileage("test_down", true, 123.5, -1,
                     new org.bukkit.util.Vector(-1, 0, 0), "0018", 12, true);
+            train.rememberDirection(new org.bukkit.util.Vector(0, 0, -1));
             trains.put(train.id(), train);
         }
         Train manual = trains.values().iterator().next();
@@ -89,6 +90,7 @@ public final class TrainManagerRefactorTest {
             assert train.members().stream().allMatch(id -> train.id().equals(carts.get(id)));
             assert train.mileagePersistence().lineName().equals("test_down");
             near(train.mileagePersistence().meters(), 123.5);
+            assert train.rememberedDirection().equals(new org.bukkit.util.Vector(0, 0, -1));
         }
         Train restoredManual = trains.get(manualId);
         assert restoredManual.emergencyBrake && restoredManual.powerNotch == 0;

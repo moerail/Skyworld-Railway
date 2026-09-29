@@ -20,9 +20,9 @@ public final class CabReloadTest {
         Class<?> sessionType = Class.forName(CabUiManager.class.getName() + "$CabSession");
         var constructor = sessionType.getDeclaredConstructors()[0];
         constructor.setAccessible(true);
-        Object oldSession = constructor.newInstance(driver, UUID.randomUUID(), null, null, null, null, null);
+        Object oldSession = constructor.newInstance(driver, UUID.randomUUID(), null, null, null, null, null, new DriverGuide());
         sessions.put(driver, oldSession);
-        sessions.put(passenger, constructor.newInstance(passenger, UUID.randomUUID(), null, null, null, null, null));
+        sessions.put(passenger, constructor.newInstance(passenger, UUID.randomUUID(), null, null, null, null, null, new DriverGuide()));
         hotbar.add(driver);
         hotbar.add(hotbarOnly);
         swings.put(driver, 123L);
@@ -33,7 +33,7 @@ public final class CabReloadTest {
         assert reset.drivers().equals(Set.of(driver, hotbarOnly)) : "Notify control holders, not passengers";
         assert sessions.isEmpty() && hotbar.isEmpty() && swings.isEmpty() && pending.isEmpty();
         assert (long) field(cab, "sessionGeneration") != before : "Queued activations must be invalidated";
-        Object fresh = constructor.newInstance(driver, UUID.randomUUID(), null, null, null, null, null);
+        Object fresh = constructor.newInstance(driver, UUID.randomUUID(), null, null, null, null, null, new DriverGuide());
         sessions.put(driver, fresh);
         assert !sessions.remove(driver, oldSession) : "Old retirement must not remove a new session";
         assert sessions.get(driver) == fresh;

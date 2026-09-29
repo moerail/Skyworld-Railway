@@ -20,7 +20,8 @@ public final class TrainDisplayConnectionTest {
         Bootstrap.bootStrap();
         var sync = new TrainDisplaySync(500_000_000L, 8);
         var channel = new EmbeddedChannel();
-        var connection = new TrainDisplayConnection(sync, channel);
+        var connection = new TrainDisplayConnection(sync, channel,
+                TrainDisplayPacketAdapterFactory.forServer("26.2"));
         channel.pipeline().addLast(connection);
         UUID train = UUID.randomUUID(), world = UUID.randomUUID();
         UUID a = UUID.randomUUID(), b = UUID.randomUUID();
@@ -31,6 +32,10 @@ public final class TrainDisplayConnectionTest {
         drain(channel);
         var first = frame(train, world, a, b, now, 0.4, false);
         sync.frames.put(train, first);
+        var visual = sync.visualPose(a).orElseThrow();
+        check(visual.memberId().equals(a) && visual.worldId().equals(world)
+                && Math.abs(visual.x() - first.carts().getFirst().x()) < 1e-9,
+                "public member pose must match the client display frame");
         connection.pulse(now);
         List<Object> out = drain(channel);
         check(out.size() == 1 && out.getFirst() instanceof ClientboundBundlePacket, "whole train must use one bundle");
@@ -102,7 +107,8 @@ public final class TrainDisplayConnectionTest {
     static void lateAttachAndPrecision() {
         var sync = new TrainDisplaySync(500_000_000L, 8);
         var channel = new EmbeddedChannel();
-        var connection = new TrainDisplayConnection(sync,channel);
+        var connection = new TrainDisplayConnection(sync, channel,
+                TrainDisplayPacketAdapterFactory.forServer("26.2"));
         channel.pipeline().addLast(connection);
         UUID train=UUID.randomUUID(), world=UUID.randomUUID(), uuid=UUID.randomUUID();
         long now=System.nanoTime();

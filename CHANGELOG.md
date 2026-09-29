@@ -1,5 +1,28 @@
 # Updates / 更新说明
 
+## SkyTrainFolia v4.0.6 candidate / Shiroha 26.2 + 26.3
+
+- Package the 26.2 and 26.3 train display packet adapters in one JAR. Select the matching adapter from the server Minecraft version at runtime; unsupported versions retain vanilla display sync.
+- Preserve the tested 26.2 packet stream, and encode 26.3 entity position and movement with `PositionPath` and `VecDelta`.
+- Enable owned-region movement on both versions. Compile and run isolated Java tests against both server cores. Live-server acceptance is pending.
+- [Adaptation report / 双版本适配说明](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
+
+## SkyTrainFolia v4.0.5 candidate / 多语言司机引导词库
+
+- Move Kuri-chan's driver guidance into editable `plugins/SkyTrainFolia/driver-guide.yml`. Each scenario and language has a list; one phrase is selected randomly when shown. Add localization/service wait, MA wait, SR approval wait, reclaimed driver control, and held emergency brake hints. Commands stay fixed in Java and retain state checks.
+- [Release notes / 更新说明](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md).
+
+## SkyTrainFolia v4.0.4 candidate / 库莉酱司机引导
+
+- Add four-language, clickable driver hints for cab claim, neutral reverser, fresh SB MA request, stopped Trip acknowledgement, and PT release. Hints are state-gated and throttled; they never operate the train automatically.
+- [Release notes / 更新说明](doc/releases/skytrainfolia-v4.0.4-driver-guide.md).
+
+## SkyPCC v2.0.1 candidate / 小版本候选
+
+- Accept remote switch-control and SR-approval POST requests when `web.control-enabled` is true and the request has the configured Bearer token. The old loopback and localhost Origin/Host checks are removed; POST and JSON requirements remain. No STA/STCS protocol change.
+- 默认仍监听 `127.0.0.1`。远程访问可使用 HTTPS 反向代理，或由管理员显式配置监听地址与传输层保护。错误令牌继续拒绝，返回 `CONTROL_AUTH_REQUIRED`。
+- [Release notes / 更新说明](doc/releases/skypcc-v2.0.1.md). Production validation pending / 尚待生产服验证。
+
 ## Suite v4.0.2 pre-release / 预发布
 
 STF/STCS 4.0.2, STA/SkyPCC 2.0.0. [Release notes / 发布说明](doc/releases/suite-v4.0.2.md). Live-server acceptance pending / 尚待服务器验收。

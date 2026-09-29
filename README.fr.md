@@ -2,7 +2,11 @@
 
 **Joueurs : commencez par le [manuel de conduite](doc/driver/README.fr.md)** pour la montée à bord, la prise de conduite, la barre rapide, la MA fantôme et l'arrêt.
 
-## 4.0.2 : Alertes et rétablissement du service
+## Version candidate actuelle : Shiroha 26.2 / 26.3
+
+SkyTrainFolia **4.0.6** contient les deux adaptateurs de paquets d'affichage dans un seul JAR et choisit celui du serveur au démarrage. L'ensemble actuel comprend STCS **4.0.4**, STA **2.1.1** et SkyPCC **2.0.1**. La compilation et les essais Java isolés réussissent avec les deux versions ; la validation sur serveur réel reste à faire. [Rapport d'adaptation](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
+
+## Ancienne mise à jour 4.0.2 : alertes et rétablissement du service
 
 La plage sonore dépend de la limite ATP actuelle, pas de la vitesse réelle. Pour une limite **≤40 km/h**, y compris le plafond SH par défaut, l'alerte commence **5 km/h sous la limite** et cesse à **8 km/h sous la limite** ou moins. Au-delà de 40, les nouveaux réglages par défaut sont **15 / 18 km/h** ; les réglages existants de la plage normale sont conservés. La priorité de survitesse, le silence à très basse vitesse et le freinage ATP ne changent pas.
 
@@ -20,9 +24,9 @@ shadow-atp:
 
 ## M3 expérimental : protection des trains manuels
 
-**Préversion `suite-v4.0.2`.** Les vérifications automatiques ont réussi ; les derniers correctifs attendent une nouvelle validation sur serveur. [Notes de version](doc/releases/suite-v4.0.2.md).
+L'ancienne préversion `suite-v4.0.2` est décrite dans ses [notes de version](doc/releases/suite-v4.0.2.md).
 
-Utiliser ensemble STF **4.0.2**, STCS **4.0.2**, STA **2.0.0** et SkyPCC **2.0.0**. Arrêter le serveur et sauvegarder RailGraph et les registres d'occupation avant de remplacer les composants ; ne pas mélanger les versions. STF reste autonome, mais `Enforced` exige STA et STCS. Le service fantôme v5 reste consultatif ; l'autorisation opérationnelle STA v6 est un canal distinct.
+Utiliser ensemble STF **4.0.6**, STCS **4.0.4**, STA **2.1.1** et SkyPCC **2.0.1**. Arrêter le serveur et sauvegarder RailGraph et les registres d'occupation avant de remplacer les composants ; ne pas mélanger les versions. STF reste autonome, mais `Enforced` exige STA et STCS. Le service fantôme v5 reste consultatif ; l'autorisation opérationnelle STA v6 est un canal distinct.
 
 Seuls les **trains manuels** entrent dans l'automate `SB/FS/SH/SR/TR/PT`. Après prise de conduite, le train est en `SB`. `/stcs ma demand` demande `FS`, `/stcs ma sh` une autorisation limitée de manœuvre et `/stcs ma sr` attend l'approbation du PCC ou d'un administrateur jusqu'à un équipement choisi. Une demande acceptée n'est pas encore une MA exécutable. Après un dépassement de l'EoA (`TR`), arrêter le train, utiliser `/stcs ma ack` pour passer en `PT`, puis `/stcs ma release` avant une nouvelle demande. L'administrateur change explicitement de canal à l'arrêt avec `/stcs admin enforce true|false` ; `false` revient à `RECOVERING` avec frein maintenu. Le tableau de bord affiche le canal traduit et le code de mode invariant, par exemple **`Protection active | SR`**.
 
@@ -60,7 +64,7 @@ L’inspecteur du banc lit railgraph et shadow-occupancy.json correspondants san
 
 Suite d’exploitation ferroviaire, d’infrastructure, de contrôle-commande ferroviaire fantôme et d’affichage de régulation pour Minecraft / Folia. SkyRail Suite est le nouveau nom du dépôt de la branche de développement SkyTrain Suite ; les noms des greffons exécutables, les commandes et les répertoires de données restent inchangés.
 
-Ce manuel décrit l’état du code source local au **23 septembre 2026**. Édition française préparée le **14 septembre 2026**. Il s’adresse aux administrateurs de serveur, conducteurs, constructeurs de lignes et développeurs de greffons. Les idées évoquées pour des développements futurs ne sont pas nécessairement mises en œuvre.
+Ce manuel décrit l’état du code source local au **29 septembre 2026**. Édition française préparée le **14 septembre 2026**. Il s’adresse aux administrateurs de serveur, conducteurs, constructeurs de lignes et développeurs de greffons. Les idées évoquées pour des développements futurs ne sont pas nécessairement mises en œuvre.
 
 > **Limite de la version de développement :** les MA/EoA fantômes ne commandent aucun freinage. Le canal distinct `Enforced` peut intervenir sur un train manuel uniquement après activation explicite et validation d'une autorisation exécutable ; il reste à valider sur serveur. Une demande acceptée, une voie apparemment libre sur le PCC ou un RBC en ligne ne prouvent pas la sécurité.
 
@@ -96,10 +100,10 @@ Le projet introduit la prise de conduite explicite, l’occupation des ressource
 
 | Composant | Version | Fonction principale |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `4.0.2` | Rames, mouvement, conduite, aiguilles physiques, IHM et exécution ATP expérimentale des trains manuels |
-| STCS | `4.0.2` | RailGraph, localisation, occupation conservée, MA/EoA fantômes et opérationnelles expérimentales |
-| SkyworldTrainAPI / STA | `2.0.0` | Contrats inter-greffons, télémétrie, autorisations opérationnelles et événements |
-| SkyPCC | `2.0.0` | Affichage de régulation, inspections, événements, commande d'aiguilles et approbation SR |
+| SkyTrainFolia / STF | `4.0.6` | Rames, mouvement, conduite, aiguilles physiques, IHM et exécution ATP expérimentale des trains manuels |
+| STCS | `4.0.4` | RailGraph, localisation, occupation conservée, MA/EoA fantômes et opérationnelles expérimentales |
+| SkyworldTrainAPI / STA | `2.1.1` | Contrats inter-greffons, télémétrie, autorisations opérationnelles et événements |
+| SkyPCC | `2.0.1` | Affichage de régulation, inspections, événements, commande d'aiguilles et approbation SR |
 
 ```text
 Joueurs Minecraft / wagonnets / rails / redstone
@@ -134,7 +138,7 @@ Ce schéma illustre les responsabilités, et non une chaîne d’appels série o
 
 ### Prérequis
 
-- La base d’adaptation actuelle est **Shiroha / Folia 26.2 avec Java 25**. Utilisez une version serveur testée avec cette suite.
+- L'adaptation actuelle cible **Shiroha / Folia 26.2 et 26.3 avec Java 25**. Les essais Java isolés réussissent pour les deux versions ; validez l'ensemble sur serveur réel avant la production.
 - STF comprend une intégration du mouvement et de l’affichage dépendante de la version. `folia-supported: true` ne garantit pas toutes les versions de Folia ; `api-version: 1.13` ne promet pas que ce binaire fonctionne sous Minecraft 1.13.
 - PCC fonctionne dans un navigateur ordinaire. Aucun mod client n’est requis.
 - TC/BKCommonLib ne sont pas requis. Évitez que différents greffons commandent le même wagonnet.
@@ -150,10 +154,10 @@ Ce schéma illustre les responsabilités, et non une chaîne d’appels série o
 Fichiers d’installation actuels :
 
 ```text
-SkyTrainFolia-4.0.2.jar
-STCS-4.0.2.jar
-SkyworldTrainAPI-2.0.0.jar
-SkyPCC-2.0.0.jar
+SkyTrainFolia-4.0.6.jar
+STCS-4.0.4.jar
+SkyworldTrainAPI-2.1.1.jar
+SkyPCC-2.0.1.jar
 ```
 
 STF/STCS déclarent STA comme dépendance facultative, mais installez les quatre éléments pour disposer de la suite complète. PCC requiert STCS et STA. STF seul ne fournit pas toutes les fonctions de graphe, d’autorisation et de régulation.
@@ -854,7 +858,7 @@ Les mises à niveau de Minecraft peuvent affecter les composants internes des en
 
 ### Périmètre de compilation et de validation
 
-Le code source possède un point d’entrée PowerShell de compilation/non-régression nommé `build.ps1`. Fournissez `-ServerRoot /path/to/prepared-server` et `-JavaHome /path/to/jdk-25` (ou définissez `JAVA_HOME`). Il lit comme dépendances le fichier serveur `versions/26.2/shiroha-26.2.jar` et `libraries/`, compile STA en premier, puis les autres modules, et exécute les essais Java. Il ne démarre, ne déploie ni ne modifie le serveur. Les dépendances ne sont pas incluses. L’installation des JAR empaquetés ne nécessite pas de compiler le code source. Les sorties vont dans les répertoires ignorés `artifacts/` et `target/`. `package-source.ps1` crée une archive ZIP contenant uniquement les sources sous `dist/`.
+Le point d'entrée PowerShell `build.ps1` exige les deux arborescences serveur préparées et JDK 25 : `./build.ps1 -ServerRoot /path/to/26.2-server -ServerRoot26_3 /path/to/26.3-server -JavaHome /path/to/jdk-25` (ou définissez `JAVA_HOME`). Il lit les deux cœurs serveur et leurs `libraries/`, place les deux adaptateurs STF dans un même JAR, puis compile et exécute les essais Java avec chaque version. Il ne démarre, ne déploie ni ne modifie aucun serveur. Les dépendances ne sont pas incluses. Les sorties vont dans les répertoires ignorés `artifacts/` et `target/`. `package-source.ps1` crée une archive ZIP de sources sous `dist/`.
 
 Les contrôles automatisés couvrent les contrats, transitions de mode, conflits spatiaux/conservation et rendu dans le navigateur. Des essais sur serveur réel restent nécessaires pour l’embarquement/le cycle de vie du conducteur, la propriété Folia, la redstone physique, le chargement des chunks et le mouvement. Traduire la documentation n’est ni une nouvelle validation d’exécution ni une nouvelle version.
 

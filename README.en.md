@@ -2,7 +2,11 @@
 
 **Players: start with the [Driver Manual](doc/driver/README.en.md)** for boarding, driving control, hotbar, shadow MA and stopping.
 
-## 4.0.2: Warnings and Service Recovery
+## Current Candidate: Shiroha 26.2 / 26.3
+
+SkyTrainFolia **4.0.6** packages both display packet adapters in one JAR and selects the matching one at startup. The current suite is STCS **4.0.4**, STA **2.1.1** and SkyPCC **2.0.1**. Isolated compilation and Java tests pass on both server versions; live-server acceptance is pending. [Adaptation report](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
+
+## Earlier 4.0.2 Update: Warnings and Service Recovery
 
 Near-limit audio uses the current ATP limit, not actual speed, to select its band. At limits **<= 40 km/h**, including SH's default ceiling, warning starts **5 km/h below** and clears **8 km/h below**. Above 40, new-install defaults are **15 / 18 km/h**; existing normal-band settings remain unchanged. Overspeed priority, minimum-speed silence and ATP braking are unchanged.
 
@@ -20,9 +24,9 @@ shadow-atp:
 
 ## Experimental M3: Manual-Train Protection
 
-**Pre-release `suite-v4.0.2`.** Automated checks passed; the latest fixes await another live-server acceptance run. [Release notes](doc/releases/suite-v4.0.2.md).
+The earlier `suite-v4.0.2` pre-release is documented in its [release notes](doc/releases/suite-v4.0.2.md).
 
-Use STF **4.0.2**, STCS **4.0.2**, STA **2.0.0** and SkyPCC **2.0.0** together. Back up RailGraph and occupancy ledgers before replacing installed components; do not mix versions. STF remains useful on its own, but `Enforced` requires STA and STCS. The old v5 shadow service remains observational; the new STA v6 operational permission is a separate channel.
+Use STF **4.0.6**, STCS **4.0.4**, STA **2.1.1** and SkyPCC **2.0.1** together. Back up RailGraph and occupancy ledgers before replacing installed components; do not mix versions. STF remains useful on its own, but `Enforced` requires STA and STCS. The v5 shadow service remains observational; STA v6 operational permission is a separate channel.
 
 Only **manual trains** enter `SB`, `FS`, `SH`, `SR`, `TR` and `PT`. A stopped train with a driver starts in `SB`; `/stcs ma demand` requests `FS`, `/stcs ma sh` requests a bounded shunting permission, and `/stcs ma sr` requests a dispatcher-approved permission to a selected infrastructure node. An accepted request is not yet an allocated, executable MA. After an EoA trip, stop, use `/stcs ma ack` to enter `PT`, then `/stcs ma release` before requesting anew. Admins may explicitly switch a stopped manual train between shadow and active channels using `/stcs admin enforce true|false`; `false` returns to `RECOVERING` brake hold. The sidebar displays a translated channel and stable mode code, for example **`Enforced | SR`**. `shadow-atp` remains read-only; `active-atp` has relaxed and strict configurable profiles.
 
@@ -60,7 +64,7 @@ The testbench ledger inspector reads matching railgraph and shadow-occupancy.jso
 
 A train-operation, railway-infrastructure, shadow train-control and dispatching-display suite for Minecraft / Folia. SkyRail Suite is the new repository name for the SkyTrain Suite development line; existing runtime plugin names, commands and data directories remain unchanged.
 
-This manual describes the local source baseline documented on **23 September 2026**. English edition prepared on **14 September 2026**. It is intended for server administrators, drivers, railway builders and plugin developers. Ideas discussed for future development are not necessarily implemented.
+This manual describes the local source baseline documented on **29 September 2026**. English edition prepared on **14 September 2026**. It is intended for server administrators, drivers, railway builders and plugin developers. Ideas discussed for future development are not necessarily implemented.
 
 > **Development-build limitation:** shadow MA/EoA does not apply brakes. The separate `Enforced` channel can intervene on a manual train only after explicit admin enablement and a validated executable authority; this new path still requires live validation. An accepted request, apparently clear PCC track or online RBC indicator is not proof of safe movement.
 
@@ -96,10 +100,10 @@ The project introduces explicit driving control, resource occupancy, conflicting
 
 | Component | Version | Responsibility |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `4.0.2` | Consists, movement, driving, physical turnout actuation, HMI and experimental manual-train ATP executor |
-| STCS | `4.0.2` | Infrastructure, RailGraph, localisation, retained occupancy, shadow and operational MA/EoA allocation |
-| SkyworldTrainAPI / STA | `2.0.0` | Versioned inter-plugin contracts, telemetry, operational permissions and events |
-| SkyPCC | `2.0.0` | Web dispatch display, inspectors, events, authenticated turnout control and SR approval |
+| SkyTrainFolia / STF | `4.0.6` | Consists, movement, driving, physical turnout actuation, HMI and experimental manual-train ATP executor |
+| STCS | `4.0.4` | Infrastructure, RailGraph, localisation, retained occupancy, shadow and operational MA/EoA allocation |
+| SkyworldTrainAPI / STA | `2.1.1` | Versioned inter-plugin contracts, telemetry, operational permissions and events |
+| SkyPCC | `2.0.1` | Web dispatch display, inspectors, events, authenticated turnout control and SR approval |
 
 ```text
 Minecraft players / minecarts / rails / redstone
@@ -134,7 +138,7 @@ This illustrates responsibilities, not a mandatory serial call chain. Browser in
 
 ### Requirements
 
-- The current adaptation baseline is **Shiroha / Folia 26.2 with Java 25**. Use a server build that has been tested with this suite.
+- The current adaptation targets **Shiroha / Folia 26.2 and 26.3 with Java 25**. Both versions pass isolated Java tests; complete live-server acceptance before production use.
 - STF contains version-dependent movement/display integration. `folia-supported: true` does not guarantee all Folia versions; `api-version: 1.13` is not a promise that this binary runs on Minecraft 1.13.
 - PCC runs in a normal browser. It does not require a client mod.
 - TC/BKCommonLib are not required. Avoid overlapping control of the same minecart by different plugins.
@@ -150,10 +154,10 @@ This illustrates responsibilities, not a mandatory serial call chain. Browser in
 Current installation files:
 
 ```text
-SkyTrainFolia-4.0.2.jar
-STCS-4.0.2.jar
-SkyworldTrainAPI-2.0.0.jar
-SkyPCC-2.0.0.jar
+SkyTrainFolia-4.0.6.jar
+STCS-4.0.4.jar
+SkyworldTrainAPI-2.1.1.jar
+SkyPCC-2.0.1.jar
 ```
 
 STF/STCS declare STA as a soft dependency, but install all four for the complete suite. PCC requires STCS and STA. Standalone STF does not provide the complete graph, authority and dispatching functionality.
@@ -860,7 +864,7 @@ Minecraft upgrades can affect entity internals, packet/display integration and s
 
 ### Build and Validation Scope
 
-The source tree has a PowerShell build/regression entry named `build.ps1`. Supply `-ServerRoot /path/to/prepared-server` and `-JavaHome /path/to/jdk-25` (or set JAVA_HOME). It reads the server's `versions/26.2/shiroha-26.2.jar` and `libraries/` as dependencies, builds STA first, then the other modules, and runs Java tests. It does not start, deploy to or modify the server. Dependencies are not bundled. Installing packaged JARs does not require compiling the source. Output goes to ignored `artifacts/` and `target/` directories. `package-source.ps1` creates a source-only ZIP under `dist/`.
+The PowerShell build/regression entry `build.ps1` requires both prepared server trees and JDK 25: `./build.ps1 -ServerRoot /path/to/26.2-server -ServerRoot26_3 /path/to/26.3-server -JavaHome /path/to/jdk-25` (or set `JAVA_HOME`). It reads both server cores and their `libraries/`, packages both STF packet adapters into one JAR, and compiles and runs Java tests against each version. It does not start, deploy to or modify either server. Dependencies are not bundled. Output goes to ignored `artifacts/` and `target/` directories. `package-source.ps1` creates a source-only ZIP under `dist/`.
 
 Automated checks exercise contracts, mode transitions, spatial conflicts/retention and browser rendering. Live-server tests remain necessary for mount/driver lifecycle, Folia ownership, physical redstone, chunk loading and motion. Documentation translation is not a new runtime validation or release.
 

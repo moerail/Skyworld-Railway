@@ -2,7 +2,11 @@
 
 **Voor spelers:** de bestuurdershandleiding is beschikbaar in [Engels](doc/driver/README.en.md), [Chinees](doc/driver/README.zh.md), [Frans](doc/driver/README.fr.md) en [Japans](doc/driver/README.ja.md).
 
-## 4.0.2: Waarschuwingen en serviceherstel
+## Huidige kandidaatversie: Shiroha 26.2 / 26.3
+
+SkyTrainFolia **4.0.6** bevat beide displaypakketadapters in één JAR en kiest bij het starten de adapter voor de serverversie. De huidige suite bestaat uit STCS **4.0.4**, STA **2.1.1** en SkyPCC **2.0.1**. Geïsoleerde compilatie en Java-tests slagen op beide versies; acceptatie op een draaiende server staat nog open. [Aanpassingsrapport](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
+
+## Eerdere update 4.0.2: waarschuwingen en serviceherstel
 
 De actuele ATP-limiet bepaalt de waarschuwingsband, niet de werkelijke snelheid. Bij een limiet **≤40 km/h**, inclusief de standaard SH-limiet, begint de waarschuwing **5 km/h eronder** en stopt deze bij **8 km/h eronder** of lager. Boven 40 zijn de standaardwaarden voor nieuwe installaties **15 / 18 km/h**; bestaande instellingen voor de normale band blijven behouden. Oversnelheidsprioriteit, stilte bij zeer lage snelheid en ATP-remingrepen veranderen niet.
 
@@ -20,9 +24,9 @@ shadow-atp:
 
 ## Experimentele M3: bescherming van handbestuurde treinen
 
-**Voorlopige uitgave `suite-v4.0.2`.** Automatische controles zijn geslaagd; de laatste correcties wachten op een nieuwe acceptatietest op de server. [Uitgavenotities](doc/releases/suite-v4.0.2.md).
+De eerdere voorlopige uitgave `suite-v4.0.2` staat in de [uitgavenotities](doc/releases/suite-v4.0.2.md).
 
-Gebruik STF **4.0.2**, STCS **4.0.2**, STA **2.0.0** en SkyPCC **2.0.0** samen. Stop de server en maak een back-up van RailGraph en bezettingsregisters voordat u componenten vervangt; meng geen versies. STF blijft zelfstandig bruikbaar, maar `Enforced` vereist STA en STCS. De bestaande v5-schaduwservice blijft adviserend; de uitvoerbare STA v6-autoriteit is een apart kanaal.
+Gebruik STF **4.0.6**, STCS **4.0.4**, STA **2.1.1** en SkyPCC **2.0.1** samen. Stop de server en maak een back-up van RailGraph en bezettingsregisters voordat u componenten vervangt; meng geen versies. STF blijft zelfstandig bruikbaar, maar `Enforced` vereist STA en STCS. De bestaande v5-schaduwservice blijft adviserend; de uitvoerbare STA v6-autoriteit is een apart kanaal.
 
 Alleen **handbestuurde treinen** volgen de toestanden `SB/FS/SH/SR/TR/PT`. Na het claimen van de bediening begint de trein in `SB`. `/stcs ma demand` vraagt `FS`, `/stcs ma sh` een begrensde rangeertoestemming en `/stcs ma sr` wacht op goedkeuring door PCC of een beheerder tot een gekozen spoorobject. Een geaccepteerd verzoek is nog geen uitvoerbare MA. Na het overschrijden van EoA (`TR`): stoppen, `/stcs ma ack` voor `PT`, daarna `/stcs ma release` voor een nieuw verzoek. Een beheerder wisselt het kanaal alleen bij stilstand met `/stcs admin enforce true|false`; `false` keert terug naar `RECOVERING` met remvasthouding. De zijbalk toont het vertaalde kanaal en de onvertaalde moduscode, bijvoorbeeld **`Enforced | SR`**.
 
@@ -60,7 +64,7 @@ De testbank leest bij elkaar horende railgraph- en shadow-occupancy.json-bestand
 
 Een suite voor treinbesturing, spoorweginfrastructuur, treinbeveiliging in schaduwbedrijf en verkeersleidingsweergave in Minecraft / Folia. SkyRail Suite is de nieuwe repositorynaam voor de SkyTrain Suite-ontwikkellijn; bestaande pluginnamen, commando's en gegevensmappen blijven gelijk.
 
-Deze handleiding beschrijft de lokale broncodebasis die op **23 september 2026** is gedocumenteerd. De Nederlandse versie is opgesteld op **14 september 2026**, voor serverbeheerders, machinisten, spoorbouwers en pluginontwikkelaars. Besproken toekomstplannen zijn niet automatisch gerealiseerde functies.
+Deze handleiding beschrijft de lokale broncodebasis die op **29 september 2026** is gedocumenteerd. De Nederlandse versie is opgesteld op **14 september 2026**, voor serverbeheerders, machinisten, spoorbouwers en pluginontwikkelaars. Besproken toekomstplannen zijn niet automatisch gerealiseerde functies.
 
 > **Beperking van deze ontwikkelversie:** MA/EoA in schaduwbedrijf grijpt niet in op de remmen. Het aparte kanaal `Enforced` kan bij handbestuurde treinen alleen ingrijpen na expliciete activering en een gevalideerde uitvoerbare autoriteit; servertests zijn nog nodig. Een geaccepteerd verzoek, een ogenschijnlijk vrij PCC-spoor of een online RBC bewijst geen veiligheid.
 
@@ -96,10 +100,10 @@ Het project introduceert expliciete besturingsrechten, spoorbezetting, strijdige
 
 | Component | Versie | Verantwoordelijkheid |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `4.0.2` | Treinsamenstelling, beweging, besturing, fysieke wissels, HMI en experimentele ATP-uitvoering voor handbestuurde treinen |
-| STCS | `4.0.2` | RailGraph, plaatsbepaling, bewaarde bezetting, schaduw- en experimentele operationele MA/EoA |
-| SkyworldTrainAPI / STA | `2.0.0` | Versiegebonden plugincontracten, telemetrie, operationele autorisaties en gebeurtenissen |
-| SkyPCC | `2.0.0` | Verkeersleidingsweergave, inspecties, gebeurtenissen, wisselbediening en SR-goedkeuring |
+| SkyTrainFolia / STF | `4.0.6` | Treinsamenstelling, beweging, besturing, fysieke wissels, HMI en experimentele ATP-uitvoering voor handbestuurde treinen |
+| STCS | `4.0.4` | RailGraph, plaatsbepaling, bewaarde bezetting, schaduw- en experimentele operationele MA/EoA |
+| SkyworldTrainAPI / STA | `2.1.1` | Versiegebonden plugincontracten, telemetrie, operationele autorisaties en gebeurtenissen |
+| SkyPCC | `2.0.1` | Verkeersleidingsweergave, inspecties, gebeurtenissen, wisselbediening en SR-goedkeuring |
 
 ```text
 Minecraft spelers / mijnkarren / rails / redstone
@@ -134,7 +138,7 @@ Dit schema toont verantwoordelijkheden, geen verplichte opeenvolging van alle aa
 
 ### Vereisten
 
-- De huidige aanpassingsbasis is **Shiroha / Folia 26.2 met Java 25**. Gebruik een serverbuild die met deze suite is getest.
+- De huidige aanpassing richt zich op **Shiroha / Folia 26.2 en 26.3 met Java 25**. Geïsoleerde Java-tests slagen op beide versies; controleer de werking op een server vóór productiegebruik.
 - STF bevat versieafhankelijke bewegings-/weergavekoppelingen. `folia-supported: true` garandeert niet alle Folia-versies; `api-version: 1.13` betekent niet dat deze binary op Minecraft 1.13 draait.
 - PCC werkt in een gewone browser, zonder verplichte clientmod.
 - TC/BKCommonLib zijn niet vereist. Voorkom dat meerdere plugins dezelfde mijnkar besturen.
@@ -150,10 +154,10 @@ Dit schema toont verantwoordelijkheden, geen verplichte opeenvolging van alle aa
 Huidige installatiebestanden:
 
 ```text
-SkyTrainFolia-4.0.2.jar
-STCS-4.0.2.jar
-SkyworldTrainAPI-2.0.0.jar
-SkyPCC-2.0.0.jar
+SkyTrainFolia-4.0.6.jar
+STCS-4.0.4.jar
+SkyworldTrainAPI-2.1.1.jar
+SkyPCC-2.0.1.jar
 ```
 
 STF/STCS declareren STA als zachte afhankelijkheid, maar installeer alle vier voor de volledige suite. PCC vereist STCS en STA. STF alleen levert niet de volledige graaf-, MA- en verkeersleidingsfunctionaliteit.
@@ -854,7 +858,7 @@ Minecraft-updates kunnen entiteitsinternals, pakket-/weergavekoppelingen en plan
 
 ### Build- en validatieomvang
 
-De bronboom bevat `build.ps1` voor build en regressie. Geef `-ServerRoot /path/to/prepared-server` en `-JavaHome /path/to/jdk-25` op, of stel JAVA_HOME in. Het script leest `versions/26.2/shiroha-26.2.jar` en `libraries/` van de server als afhankelijkheden, bouwt eerst STA en daarna de andere modules, en voert Java-tests uit. Het start of wijzigt de server niet en installeert niets op de server. Afhankelijkheden zijn niet meegeleverd. Voor installatie van JAR-bestanden hoeft de broncode niet gecompileerd te worden. Uitvoer gaat naar genegeerde mappen `artifacts/` en `target/`. `package-source.ps1` maakt een broncode-ZIP onder `dist/`.
+De PowerShell-build en regressie-ingang `build.ps1` vereist beide voorbereide servermappen en JDK 25: `./build.ps1 -ServerRoot /path/to/26.2-server -ServerRoot26_3 /path/to/26.3-server -JavaHome /path/to/jdk-25` (of stel `JAVA_HOME` in). Het script leest beide serverkernen en hun `libraries/`, verpakt beide STF-pakketadapters in één JAR, en compileert en test met elke versie. Het start, installeert of wijzigt geen server. Afhankelijkheden zijn niet meegeleverd. Uitvoer gaat naar genegeerde mappen `artifacts/` en `target/`. `package-source.ps1` maakt een broncode-ZIP onder `dist/`.
 
 Automatische controles testen contracten, modusovergangen, ruimtelijke conflicten/behoud en browserweergave. Servertests blijven noodzakelijk voor instappen/machinistlevenscyclus, Folia-regioverantwoordelijkheid, redstone, chunkladen en beweging. Een documentvertaling is geen nieuwe runtimevalidatie of release.
 

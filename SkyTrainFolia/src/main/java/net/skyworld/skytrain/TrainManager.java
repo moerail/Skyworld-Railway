@@ -621,16 +621,23 @@ final class TrainManager implements TrainMotionController.Host {
         if (!plugin.isRailInfrastructureReady()) return false;
         UUID trainId = readTrainId(cart);
         if (trainId == null) {
-            return false;
+            // A crash can leave trains.yml ahead of the entity's persistent tag.
+            // The saved member UUID is sufficient to rebind this exact cart, but
+            // never adopt an unrelated cart or override a different train tag.
+            trainId = cartIndex.get(cart.getUniqueId());
+            if (trainId == null) return false;
         }
 
         Train train = trains.get(trainId);
         if (train == null || !train.contains(cart.getUniqueId())) {
-            clearCartMark(cart);
-            cartIndex.remove(cart.getUniqueId());
+            if (readTrainId(cart) != null) {
+                clearCartMark(cart);
+                cartIndex.remove(cart.getUniqueId());
+            }
             return false;
         }
 
+        if (readTrainId(cart) == null) markCart(cart, train, train.indexOf(cart.getUniqueId()));
         cartIndex.put(cart.getUniqueId(), train.id());
         ensureTask(cart, train);
         return true;

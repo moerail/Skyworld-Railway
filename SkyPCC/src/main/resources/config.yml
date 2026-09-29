@@ -1,10 +1,11 @@
 web:
   enabled: true
-  # Local-only by default. Use a reverse proxy for authenticated remote access.
+  # Local bind by default. For remote access use an HTTPS reverse proxy, or
+  # explicitly change this address if you manage TLS outside SkyPCC.
   bind-address: 127.0.0.1
   port: 8765
-  # Mutations require a loopback HTTP connection, same Origin/Host and a Bearer token.
-  # Remote operators: use an SSH localhost tunnel. Never publish this token in a URL.
+  # Remote mutations require control-enabled and a matching Bearer token.
+  # Use a private token of at least 32 characters; never put it in a URL.
   control-enabled: false
   control-token: ''
   # auto: prefer SSE and fall back to polling; sse: SSE only; poll: polling only.

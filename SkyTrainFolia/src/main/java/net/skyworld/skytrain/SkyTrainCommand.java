@@ -117,7 +117,7 @@ final class SkyTrainCommand implements TabExecutor {
                         plugin.send(sender, manager.motionSyncStatus());
                     }
                 }
-                case "list" -> list(sender);
+                case "list" -> list(sender, args);
                 case "info" -> info(sender, args);
                 case "scan" -> scan(sender, args);
                 case "connect" -> connect(sender, args);
@@ -246,12 +246,22 @@ final class SkyTrainCommand implements TabExecutor {
 
 
 
-    private void list(CommandSender sender) {
+    private void list(CommandSender sender, String[] args) {
         requireUse(sender);
+        boolean resetAdmin = sender instanceof org.bukkit.command.ConsoleCommandSender
+                || sender instanceof Player && sender.hasPermission("stcs.admin");
         if (manager.trainCount() == 0) {
             plugin.send(sender, "&7目前还没有创建列车。");
+            if (resetAdmin && args.length == 1) {
+                String code = plugin.issueShadowLedgerResetChallenge(sender, true);
+                if (code != null) plugin.send(sender, "&e影子账本重置验证码：&f" + code
+                        + "&e（60 秒有效、仅本人可用、使用一次即失效）。完成全线和未加载区块的实体巡查后执行 /stcs ma reset-ledger "
+                        + code + " confirm；此码不证明轨道已清空。");
+                else plugin.send(sender, "&c列车数据尚未加载完毕，无法发放账本重置验证码。");
+            } else if (resetAdmin) plugin.revokeShadowLedgerResetChallenge(sender);
             return;
         }
+        if (resetAdmin) plugin.revokeShadowLedgerResetChallenge(sender);
         for (Train train : manager.trains()) {
             plugin.send(sender, ui.trainSummary(sender, train));
         }

@@ -14,7 +14,13 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SkyTrainPlugin extends JavaPlugin {
+    /** Thread-safe immutable member pose from the same frame used by the client display synchronizer. */
+    public java.util.Optional<MemberVisualPose> visualMemberPose(java.util.UUID memberId) {
+        TrainDisplaySync sync = displaySync;
+        return sync == null ? java.util.Optional.empty() : sync.visualPose(memberId);
+    }
     private TrainManager manager;
+    private final LedgerResetChallenge ledgerResetChallenge = new LedgerResetChallenge();
     private SwitchManager switchManager;
     private LineInfrastructureManager infrastructureManager;
     private StationManager stationManager;
@@ -250,6 +256,8 @@ public final class SkyTrainPlugin extends JavaPlugin {
     private volatile ShadowCurve.Settings shadowCurveSettings;
     private volatile ShadowSpeedNotice.Settings shadowSpeedNoticeSettings;
     private volatile ActiveAtpState.Settings activeAtpSettings;
+    private volatile DriverGuideLexicon driverGuideLexicon;
+    DriverGuideLexicon driverGuideLexicon() { return driverGuideLexicon; }
     ShadowSpeedNotice.Settings shadowSpeedNoticeSettings() { return shadowSpeedNoticeSettings; }
     ShadowCurve.Settings shadowCurveSettings() { return shadowCurveSettings; }
     ActiveAtpState.Settings activeAtpSettings() { return activeAtpSettings; }
@@ -272,6 +280,7 @@ public final class SkyTrainPlugin extends JavaPlugin {
             var noticeSettings = ShadowSpeedNotice.Settings.load(config);
             var activeSettings = ActiveAtpSettings.load(config, candidate,
                     config.getDouble("infrastructure.blocks-per-meter", 1));
+            var guideLexicon = DriverGuideLexicon.load(this);
             reloadConfig();
             maSounds = MaSoundSettings.load(getConfig(), message -> getLogger().warning(message));
             maSoundTokens.clear();
@@ -279,6 +288,7 @@ public final class SkyTrainPlugin extends JavaPlugin {
             shadowCurveSettings = curveSettings;
             shadowSpeedNoticeSettings = noticeSettings;
             activeAtpSettings = activeSettings;
+            driverGuideLexicon = guideLexicon;
             serverSpeedLimit = limit;
             getLogger().info("Vehicle profile: " + candidate.id() + ", fixed mass " + candidate.mass()
                     + " t, effective cap " + Math.min(candidate.maxSpeed(), limit) * 72
@@ -431,6 +441,7 @@ public final class SkyTrainPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         railInfrastructureReady = false;
+        ledgerResetChallenge.clear();
         if (displaySync != null) displaySync.close();
         if (cabUiManager != null) {
             cabUiManager.shutdown();
@@ -466,6 +477,25 @@ public final class SkyTrainPlugin extends JavaPlugin {
 
     void send(CommandSender sender, String message) {
         sender.sendMessage(prefix() + color(message));
+    }
+
+    static String ledgerResetOperatorKey(CommandSender sender) {
+        return sender instanceof Player player ? player.getUniqueId().toString() : "console";
+    }
+
+    String issueShadowLedgerResetChallenge(CommandSender sender, boolean emptyList) {
+        return ledgerResetChallenge.issue(ledgerResetOperatorKey(sender),
+                isRailInfrastructureReady() && manager != null && manager.trainCount() == 0 && emptyList);
+    }
+
+    void revokeShadowLedgerResetChallenge(CommandSender sender) {
+        ledgerResetChallenge.issue(ledgerResetOperatorKey(sender), false);
+    }
+
+    /** Called by STCS after its own administrator and live-roster checks. Consumes the code on any attempt. */
+    public boolean consumeShadowLedgerResetChallenge(String operator, String code) {
+        return ledgerResetChallenge.consume(operator, code,
+                isEnabled() && isRailInfrastructureReady() && manager != null && manager.trainCount() == 0);
     }
 
     String color(String text) {

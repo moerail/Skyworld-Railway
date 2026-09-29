@@ -36,24 +36,22 @@ public final class OptionalStaClasspathTest {
         catch(ClassNotFoundException expected) { }
         Path root=Path.of(Train.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         int scanned=0;
-        try(var files=Files.walk(root.resolve("net/skyworld/skytrain"))) {
-            for(Path file:files.filter(p->p.toString().endsWith(".class")).toList()) {
-                String name=root.relativize(file).toString().replace(File.separatorChar,'.').replaceAll("\\.class$","");
-                if(name.startsWith("net.skyworld.skytrain.StaTelemetryPublisher")
-                        || name.startsWith("net.skyworld.skytrain.StaCabIntegration")
-                        || name.startsWith("net.skyworld.skytrain.StaOperationalIntegration")) continue;
-                String bytes=new String(Files.readAllBytes(file),StandardCharsets.ISO_8859_1);
-                assert !bytes.contains("net/skyworld/sta/") && !bytes.contains("net.skyworld.sta.") : name;
-                Class<?> type=Class.forName(name,false,OptionalStaClasspathTest.class.getClassLoader());
-                type.getGenericSuperclass(); type.getGenericInterfaces(); type.getDeclaredAnnotations();
-                for(var field:type.getDeclaredFields()) field.getGenericType();
-                for(var method:type.getDeclaredMethods()) {
-                    method.getGenericReturnType(); method.getGenericParameterTypes(); method.getGenericExceptionTypes();
-                    method.getDeclaredAnnotations();
+        if (Files.isDirectory(root)) {
+            try(var files=Files.walk(root.resolve("net/skyworld/skytrain"))) {
+                for(Path file:files.filter(p->p.toString().endsWith(".class")).toList()) {
+                    String name=root.relativize(file).toString().replace(File.separatorChar,'.').replaceAll("\\.class$","");
+                    scanned += inspect(name, Files.readAllBytes(file));
                 }
-                type.getMethods();
-                for(var constructor:type.getDeclaredConstructors()) constructor.getGenericParameterTypes();
-                scanned++;
+            }
+        } else {
+            try (var jar = new JarFile(root.toFile())) {
+                for (var entry : jar.stream().filter(e -> e.getName().startsWith("net/skyworld/skytrain/")
+                        && e.getName().endsWith(".class")).toList()) {
+                    String name = entry.getName().replace('/', '.').replaceAll("\\.class$", "");
+                    try (var input = jar.getInputStream(entry)) {
+                        scanned += inspect(name, input.readAllBytes());
+                    }
+                }
             }
         }
         assert TelemetrySink.create(null,()->{throw new AssertionError("Missing STA invoked factory");})==null;
@@ -67,5 +65,23 @@ public final class OptionalStaClasspathTest {
         fallback.close();
         assert scanned>50;
         System.out.println("PASS without STA: "+scanned+" core classes/signatures/annotations, listener reflection and lazy/no-op integration");
+    }
+
+    private static int inspect(String name, byte[] data) throws ReflectiveOperationException {
+        if(name.startsWith("net.skyworld.skytrain.StaTelemetryPublisher")
+                || name.startsWith("net.skyworld.skytrain.StaCabIntegration")
+                || name.startsWith("net.skyworld.skytrain.StaOperationalIntegration")) return 0;
+        String bytes=new String(data,StandardCharsets.ISO_8859_1);
+        assert !bytes.contains("net/skyworld/sta/") && !bytes.contains("net.skyworld.sta.") : name;
+        Class<?> type=Class.forName(name,false,OptionalStaClasspathTest.class.getClassLoader());
+        type.getGenericSuperclass(); type.getGenericInterfaces(); type.getDeclaredAnnotations();
+        for(var field:type.getDeclaredFields()) field.getGenericType();
+        for(var method:type.getDeclaredMethods()) {
+            method.getGenericReturnType(); method.getGenericParameterTypes(); method.getGenericExceptionTypes();
+            method.getDeclaredAnnotations();
+        }
+        type.getMethods();
+        for(var constructor:type.getDeclaredConstructors()) constructor.getGenericParameterTypes();
+        return 1;
     }
 }

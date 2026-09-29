@@ -27,6 +27,7 @@ final class TrainDisplaySync implements Listener, AutoCloseable {
     final Map<UUID, Member> members = new ConcurrentHashMap<>();
     private final Map<UUID, TrainDisplayConnection> connections = new ConcurrentHashMap<>();
     private final SkyTrainPlugin plugin;
+    private final TrainDisplayPacketAdapter packetAdapter;
     private volatile boolean enabled;
     private volatile boolean closed;
     final long staleNanos;
@@ -39,6 +40,7 @@ final class TrainDisplaySync implements Listener, AutoCloseable {
     /** Protocol harness constructor; no Bukkit server, entity, or scheduler access. */
     TrainDisplaySync(long staleNanos, double maxDeviation) {
         plugin = null;
+        packetAdapter = null;
         this.staleNanos = staleNanos;
         this.maxDeviation = maxDeviation;
         enabled = true;
@@ -51,18 +53,25 @@ final class TrainDisplaySync implements Listener, AutoCloseable {
         maxDeviation = Math.max(1.0, Math.min(16.0,
                 plugin.getConfig().getDouble("settings.display-sync-max-deviation", 8.0)));
         enabled = plugin.getConfig().getBoolean("settings.display-sync-enabled", true);
-        if (enabled && !Bukkit.getMinecraftVersion().equals("26.2")) {
-            enabled = false;
-            plugin.getLogger().warning("Train display sync requires the tested 26.2 protocol; using vanilla sync.");
-        }
+        TrainDisplayPacketAdapter selected = null;
         if (enabled) {
-            TrainDisplayConnection.checkCompatibility();
+            try {
+                selected = TrainDisplayPacketAdapterFactory.forServer(Bukkit.getMinecraftVersion());
+            } catch (RuntimeException | LinkageError ex) {
+                enabled = false;
+                plugin.getLogger().log(Level.WARNING,
+                        "No compatible train display packet adapter; using vanilla sync.", ex);
+            }
+        }
+        packetAdapter = selected;
+        if (enabled) {
             Bukkit.getPluginManager().registerEvents(this, plugin);
             // Existing players are accessed on their own entity scheduler, not on the global thread.
             for (Player player : Bukkit.getOnlinePlayers()) {
                 player.getScheduler().run(plugin, task -> attach(player), null);
             }
-            plugin.getLogger().info("Whole-train display sync active (26.2); existing Folia train tasks unchanged.");
+            plugin.getLogger().info("Whole-train display sync active (" + Bukkit.getMinecraftVersion()
+                    + "); existing Folia train tasks unchanged.");
         }
     }
 
@@ -79,7 +88,7 @@ final class TrainDisplaySync implements Listener, AutoCloseable {
         if (!enabled || closed) return;
         try {
             Channel channel = ((CraftPlayer) player).getHandle().connection.connection.channel;
-            TrainDisplayConnection connection = new TrainDisplayConnection(this, channel);
+            TrainDisplayConnection connection = new TrainDisplayConnection(this, channel, packetAdapter);
             TrainDisplayConnection previous = connections.put(player.getUniqueId(), connection);
             if (previous != null) previous.detach();
             connection.attach();
@@ -124,6 +133,20 @@ final class TrainDisplaySync implements Listener, AutoCloseable {
                     || !member.world.equals(cart.world()) || now - member.observedNanos > staleNanos) return false;
         }
         return true;
+    }
+
+    java.util.Optional<MemberVisualPose> visualPose(UUID memberId) {
+        Member member = members.get(memberId);
+        if (member == null) return java.util.Optional.empty();
+        TrainDisplayFrame frame = frames.get(member.train());
+        if (!isFresh(frame, System.nanoTime())) return java.util.Optional.empty();
+        for (TrainDisplayFrame.Cart cart : frame.carts()) {
+            if (cart.uuid().equals(memberId)) {
+                return java.util.Optional.of(new MemberVisualPose(memberId, cart.world(), cart.x(), cart.y(), cart.z(),
+                        cart.yaw(), cart.pitch(), frame.createdNanos()));
+            }
+        }
+        return java.util.Optional.empty();
     }
 
     void forget(UUID uuid) {
