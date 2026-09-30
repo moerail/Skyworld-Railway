@@ -2,6 +2,9 @@
   'use strict';
   const languages = ['zh', 'en', 'fr', 'ja'];
   const rows = [
+  ['Revoke MA → TR','撤销 MA → TR','Révoquer MA → TR','MA 取消 → TR'],
+  ['Moving or stopped, the selected train will enter TR and brake.','所选列车无论运行或停车，都会进入 TR 并制动。','En marche ou à l’arrêt, le train sélectionné passe en TR et freine.','選択列車は走行中も停車中も TR に移行し制動します。'],
+  ['MA revoke unconfirmed. Check train state.','MA 撤销未确认，请核实列车状态。','Révocation MA non confirmée. Vérifiez le train.','MA 取消未確認。列車状態を確認してください。'],
   ['Pending SR','待批准 SR','SR en attente','承認待ち SR'],
   ['Enforced','强制保护','Protection active','保護有効'],
   ['{driver} requested {mode} MA. Result: {state} ({reason}); executable: {executable}.',
@@ -1177,6 +1180,13 @@
   const catalog = Object.fromEntries(rows.map(([en, zh, fr, ja]) => [en, {en, zh, fr, ja}]));
   catalog['Poste de commande centralisée'].en = 'Centralized traffic control centre';
   const codeKeys = {};
+  codes.push(
+    ['WAITING_TR','Waiting for onboard Trip','等待车端确认 TR','Attente du Trip embarqué','車上 TR 確認待ち'],
+    ['REVOKED_TR','MA revoked; onboard TR confirmed','MA 已撤销，车端已确认 TR','MA révoquée ; TR confirmé','MA 取消・車上 TR 確認済み'],
+    ['DISPATCHER_REVOKED','Dispatcher revoked MA; Trip','调度员撤销 MA，进入 TR','MA révoquée par le régulateur ; TR','指令員による MA 取消・TR'],
+    ['DISPATCHER_HOLD','Dispatcher brake hold','调度停车保持','Maintien à l’arrêt par le régulateur','指令による停止保持'],
+    ['WITHDRAWING_MA','Withdrawing MA before switch change','转岔前正在收回 MA','Retrait de MA avant manœuvre','転換前の MA 撤回中']
+  );
   for (const [code, en, zh, fr, ja] of codes) {
     codeKeys[code] = 'code:' + code;
     catalog['code:' + code] = {en, zh, fr, ja};

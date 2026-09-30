@@ -72,6 +72,23 @@ final class TrainMotionController {
         applyForcedSpacing(train);
         int index = train.indexOf(entityId);
         if (index == activeLeaderIndex(train)) {
+            boolean stopped = train.currentSpeed() <= .001 && train.maxMemberSpeed() <= .001
+                    && !train.members().isEmpty() && train.members().stream().allMatch(id -> {
+                        var sample=train.snapshot(id);
+                        return sample!=null && now>=sample.timeMillis && now-sample.timeMillis<=1000
+                                && sample.velocity.lengthSquared()<=.000001;
+                    });
+            train.dispatcherBrake.apply(!train.properties().conductionMode.automatic(), stopped,
+                    train.operatingMode==OperatingMode.TR || train.operatingMode==OperatingMode.PT, now, trip -> {
+                train.activeAtp.clear();
+                train.operatingMode=trip ? OperatingMode.TR : OperatingMode.SB;
+                train.powerNotch=0; train.brakeNotch=7; train.moving=false;
+                train.activeAtpReason=trip ? "DISPATCHER_REVOKED" : "DISPATCHER_REROUTE";
+                if (trip && plugin.telemetrySink()!=null)
+                    plugin.telemetrySink().driverEvent(train,null,"","EMERGENCY_BRAKE_APPLIED","DISPATCHER_REVOKED");
+            });
+        }
+        if (index == activeLeaderIndex(train)) {
             if (settings.chunkLoadingEnabled()) {
                 chunkLoader.update(train, cart.getLocation(), settings.chunkLoadingRadius());
             } else {
@@ -152,7 +169,7 @@ final class TrainMotionController {
         Vector direction = RailMath.direction(rail.rail.getShape(), preference);
 
         ActiveAtpState.Decision atp = null;
-        if (index == activeLeaderIndex(train) && train.protectionMode == ProtectionMode.ACTIVE
+        if (index == activeLeaderIndex(train) && !train.dispatcherBrake.held() && train.protectionMode == ProtectionMode.ACTIVE
                 && !train.properties().conductionMode.automatic()) {
             var desk = plugin.driverDesks().stream().filter(d -> d.trainId().equals(train.id()))
                     .findFirst().orElse(null);
@@ -185,6 +202,12 @@ final class TrainMotionController {
             }
         }
 
+        if (train.dispatcherBrake.held()) {
+            atp = ActiveAtpState.Decision.hold(train.operatingMode,
+                    train.dispatcherBrake.trip() ? "DISPATCHER_REVOKED" : "DISPATCHER_REROUTE");
+            train.activeAtpBrakeLevel=8; train.activeAtpLimitMps=0.0;
+            train.activeAtpReason=atp.reason(); train.powerNotch=0;
+        }
         if (index == activeLeaderIndex(train)) {
             signActions.refreshStationLatches(train);
             if (atp == null || (atp.minimumBrakeNotch() == 0 && atp.tractionAllowed())) {
@@ -204,7 +227,7 @@ final class TrainMotionController {
         boolean settlingReverse = reverseBraking(train, now);
         boolean controlledStop = (!train.driveControlEnabled && !train.moving) || waiting || settlingReverse
                 || train.emergencyBrake || (atp != null && atp.emergency());
-        boolean playerPushCoasting = controlledStop && train.playerPushActive;
+        boolean playerPushCoasting = controlledStop && train.playerPushActive && !train.dispatcherBrake.held();
         boolean automaticHandle = train.automaticRun != null && host.automaticEligible(train);
         double desiredTrainSpeed = controlledStop ? 0.0
                 : stationMoving ? stationMotion.commandedSpeed(signActions.stationMotionMinimumSpeed(stationMotion))

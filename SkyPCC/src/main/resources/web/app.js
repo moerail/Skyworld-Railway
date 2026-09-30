@@ -42,6 +42,8 @@
   let switchPending = false;
   let srRequest = null;
   let srPending = false;
+  let revokePending = false;
+  let revokeRequest = null;
 
   function canSendControlRequest() {
     return window.isSecureContext === true && typeof window.crypto?.randomUUID === 'function';
@@ -59,7 +61,8 @@
     'eventPanel', 'eventCount', 'eventStatus', 'eventFilter', 'eventRetention', 'eventList',
     'authorityLayer', 'detailMa', 'detailEoa', 'detailMaReason', 'maStatus',
     'switchDialog', 'switchTitle', 'switchTransition', 'switchToken', 'switchResult', 'switchConfirm', 'switchClose',
-    'srControls', 'srTrainSelect', 'srApprove', 'srDialog', 'srTitle', 'srTarget', 'srToken', 'srResult', 'srConfirm', 'srClose'
+    'srControls', 'srTrainSelect', 'srApprove', 'srDialog', 'srTitle', 'srTarget', 'srToken', 'srResult', 'srConfirm', 'srClose',
+    'revokeMa', 'revokeDialog', 'revokeTarget', 'revokeToken', 'revokeResult', 'revokeConfirm', 'revokeClose'
   ].map(id => [id, document.getElementById(id)]));
 
   function setTheme(theme) {
@@ -539,6 +542,7 @@
         driver, mode: code(event.details?.mode || '--'), state: code(event.details?.state || 'UNKNOWN'),
         reason, executable: code(event.details?.executable || 'false') });
       else if (event.type === 'MA_RELEASED') message.textContent = t('{driver} released forward MA reservation. Train occupancy retained.', { driver });
+      else if (event.type === 'MA_UNAVAILABLE' && event.reason === 'DISPATCHER_REVOKED') message.textContent = code('DISPATCHER_REVOKED');
       else if (event.type === 'MA_UNAVAILABLE') message.textContent = t('Executable MA unavailable for {train} ({reason}). Stop at the last confirmed EoA.', {
         train: event.trainName || event.trainId, reason });
       else if (event.type === 'SR_GRANTED') message.textContent = t('{operator} approved SR for {train} to {node}.', {
@@ -780,6 +784,8 @@
   }
 
   function updateInspector() {
+    ui.revokeMa.hidden = !state.controlEnabled || !state.selectedTrainId || !!state.selectedInfrastructure;
+    ui.revokeMa.disabled = revokePending;
     const infrastructure = document.getElementById('infrastructureInspector');
     const control = document.getElementById('infrastructureSwitch');
     infrastructure.hidden = !state.selectedInfrastructure;
@@ -1123,6 +1129,34 @@
       setSwitchResult({ key: 'Unconfirmed. Check actual point position.' });
     } catch (_error) { setSwitchResult({ key: 'Connection lost / unconfirmed' }); }
     finally { switchPending = false; }
+  });
+  ui.revokeMa.addEventListener('click', () => {
+    if (revokePending || !state.selectedTrainId || !canSendControlRequest()) return;
+    revokeRequest = { requestId: crypto.randomUUID(), trainId: state.selectedTrainId };
+    ui.revokeTarget.textContent = state.trains.get(state.selectedTrainId)?.name || state.selectedTrainId;
+    ui.revokeToken.value = ''; ui.revokeResult.textContent = ''; ui.revokeConfirm.disabled = false;
+    ui.revokeDialog.showModal();
+  });
+  ui.revokeClose.addEventListener('click', () => ui.revokeDialog.close());
+  ui.revokeDialog.addEventListener('close', () => { ui.revokeToken.value = ''; });
+  ui.revokeConfirm.addEventListener('click', async () => {
+    if (!revokeRequest || revokePending) return;
+    const request = { ...revokeRequest }, token = ui.revokeToken.value;
+    ui.revokeToken.value = ''; revokePending = true; ui.revokeConfirm.disabled = true;
+    try {
+      const deadline = Date.now() + 15000;
+      while (Date.now() < deadline) {
+        const response = await fetch('/api/v6/ma/revoke', { method: 'POST', cache: 'no-store',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(request), signal: AbortSignal.timeout(6000) });
+        const result = await response.json();
+        ui.revokeResult.textContent = `${code(result.status)}: ${code(result.reason)}`;
+        if (response.status !== 202) return;
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      ui.revokeResult.textContent = t('MA revoke unconfirmed. Check train state.');
+    } catch (_) { ui.revokeResult.textContent = t('MA revoke unconfirmed. Check train state.'); }
+    finally { revokePending = false; updateInspector(); }
   });
   ui.srTrainSelect.addEventListener('change', event => {
     state.selectedSrTrainId = event.target.value || null;

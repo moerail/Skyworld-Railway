@@ -40,6 +40,7 @@ final class Train {
     volatile ProtectionMode protectionMode = ProtectionMode.SHADOW;
     volatile OperatingMode operatingMode = OperatingMode.SB;
     final ActiveAtpState activeAtp = new ActiveAtpState();
+    final DispatcherBrake dispatcherBrake = new DispatcherBrake();
     volatile Double activeAtpLimitMps;
     volatile String activeAtpReason = "UNAVAILABLE";
     volatile int activeAtpBrakeLevel;

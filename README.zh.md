@@ -1,10 +1,12 @@
 # SkyRail Suite
 
+本次小版本为 **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**。停车后，调度转岔会先取得车端停车保持确认，再释放相关 MA 预约、转岔并重算 MA，司机无需先 release。网页 PCC 新增“撤销所选列车 MA → TR”：手动列车运行或停车都进入 TR 并制动；运行中的旧预约保留到全列确认停稳，车身占用始终保留。影子通道也执行此项主动调度停车命令。司机停稳后执行 `/stcs ma ack`、`/stcs ma release`，再重新申请 MA。失败／超时不代表撤销完成。需配套更新已安装插件并刷新客户端，保留原证书和令牌；实服验收待完成。 [4.0.7 release notes](doc/releases/suite-v4.0.7.md)
+
 **普通玩家从这里开始：[司机手册](doc/driver/README.zh.md)**。包含上车、驾驶权、热键栏、影子 MA 和停车流程。
 
 ## 当前候选版本：Shiroha 26.2 / 26.3
 
-SkyTrainFolia **4.0.6** 将 26.2 与 26.3 的显示包适配器装入同一个 JAR，在启动时自动选择。当前配套版本为 STCS **4.0.4**、STA **2.1.1**、SkyPCC **2.0.1**。两版隔离编译与 Java 测试已通过；实服验收仍待完成。[适配报告](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。
+SkyTrainFolia **4.0.7** 将 26.2 与 26.3 的显示包适配器装入同一个 JAR，在启动时自动选择。当前配套版本为 STCS **4.0.5**、STA **2.1.3**、SkyPCC **2.0.2**。两版隔离编译与 Java 测试已通过；实服验收仍待完成。[适配报告](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。
 
 ## 历史更新 4.0.2：预警与服务恢复
 
@@ -26,7 +28,7 @@ shadow-atp:
 
 历史预发布 `suite-v4.0.2` 的说明见[发布说明](doc/releases/suite-v4.0.2.md)。
 
-当前配套版本为 STF **4.0.6**、STCS **4.0.4**、STA **2.1.1**、SkyPCC **2.0.1**。停服备份轨道图和占用账本后一起替换已安装组件，不要混用旧版。STF 仍可单独运行，但 `Enforced` 需要 STA 与 STCS。旧 v5 影子服务继续只读；STA v6 可执行许可是另一个通道。
+当前配套版本为 STF **4.0.7**、STCS **4.0.5**、STA **2.1.3**、SkyPCC **2.0.2**。停服备份轨道图和占用账本后一起替换已安装组件，不要混用旧版。STF 仍可单独运行，但 `Enforced` 需要 STA 与 STCS。旧 v5 影子服务继续只读；STA v6 可执行许可是另一个通道。
 
 **仅手动列车**进入 `SB/FS/SH/SR/TR/PT` 状态机。司机上车取得控制权后默认为 `SB`；`/stcs ma demand` 申请 `FS`，`/stcs ma sh` 申请有界调车许可，`/stcs ma sr` 等待 PCC 或管理员批准到指定设备的许可。申请受理不等于获得可执行 MA。越过 EoA 触发 `TR` 后须先停稳，`/stcs ma ack` 进入 `PT`，再用 `/stcs ma release` 释放后重新申请。管理员只能在停车时通过 `/stcs admin enforce true|false` 显式切换；`false` 回到 `RECOVERING` 制动保持。计分板 ATP 模式显示为“通道 | 运行模式”，例如 **`强制保护 | SR`**；通道名翻译，运行模式代号不翻译。
 
@@ -155,7 +157,7 @@ Minecraft 玩家 / 矿车 / 轨道 / 红石
 
 ### 环境
 
-- 当前双版本适配目标是 **Shiroha / Folia 26.2、26.3 与 Java 25**。SkyTrainFolia 4.0.6 的双版本协议测试已纳入构建；实机验收前请仅在测试服使用。
+- 当前双版本适配目标是 **Shiroha / Folia 26.2、26.3 与 Java 25**。SkyTrainFolia 4.0.7 的双版本协议测试已纳入构建；实机验收前请仅在测试服使用。
 - STF 有版本相关的实体运动/显示适配。`folia-supported: true` 不代表所有 Folia 版本都兼容；`api-version: 1.13` 也不是最低可运行游戏版本的承诺。
 - PCC 使用普通浏览器，不要求安装客户端模组。
 - TC / BKCommonLib 不是本套件的必需依赖。不要让两个控车插件同时接管同一辆矿车。
@@ -171,10 +173,10 @@ Minecraft 玩家 / 矿车 / 轨道 / 红石
 本地构建输出位于 `artifacts/`。当前文件名：
 
 ```text
-SkyTrainFolia-4.0.6.jar
-STCS-4.0.4.jar
-SkyworldTrainAPI-2.1.1.jar
-SkyPCC-2.0.1.jar
+SkyTrainFolia-4.0.7.jar
+STCS-4.0.5.jar
+SkyworldTrainAPI-2.1.3.jar
+SkyPCC-2.0.2.jar
 ```
 
 STF/STCS 对 STA 使用软依赖，但完整套件应四者一起安装。PCC 硬依赖 STCS 和 STA。STF 单独运行不具备完整套件的图、MA 与调度显示能力。

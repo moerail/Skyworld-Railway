@@ -165,7 +165,7 @@ final class StaRemoteServer implements AutoCloseable {
                 try {
                     id = UUID.fromString(StaRemoteProtocol.required(request, "id")).toString();
                     String type = StaRemoteProtocol.required(request, "type");
-                    if (Set.of("switch.set", "sr.approve").contains(type)) {
+                    if (Set.of("switch.set", "sr.approve", "ma.revoke").contains(type)) {
                         long now = System.nanoTime();
                         if (now - lastWrite < TimeUnit.SECONDS.toNanos(1)) {
                             send(output, result(id, "REJECTED", "RATE_LIMIT", null)); continue;
@@ -174,7 +174,7 @@ final class StaRemoteServer implements AutoCloseable {
                     }
                     JsonObject response = process(id, type, request, admin);
                     send(output, response);
-                    if (Set.of("switch.set", "sr.approve").contains(type)) {
+                    if (Set.of("switch.set", "sr.approve", "ma.revoke").contains(type)) {
                         String target = type.equals("switch.set") ? StaRemoteProtocol.required(request, "switchId")
                                 : StaRemoteProtocol.required(request, "trainId");
                         plugin.getLogger().info("STA Remote actor=" + admin + " operation=" + type + " request=" + id
@@ -196,6 +196,22 @@ final class StaRemoteServer implements AutoCloseable {
     private JsonObject process(String id, String type, JsonObject req, String admin) throws Exception {
         var services = plugin.getServer().getServicesManager();
         return switch (type) {
+            case "ma.revoke" -> {
+                StaRemoteProtocol.keys(req,"id","type","requestId","trainId");
+                var service=services.load(OperationalAuthorityService.class);
+                if(service==null)throw new IllegalArgumentException("SERVICE_UNAVAILABLE");
+                String reason=service.revokeMa(UUID.fromString(StaRemoteProtocol.required(req,"requestId")),
+                        UUID.fromString(StaRemoteProtocol.required(req,"trainId")),"STA Remote:"+admin)
+                        .toCompletableFuture().getNow(null);
+                yield result(id,reason==null?"PENDING":reason.equals("REVOKED_TR")?"APPLIED":"REJECTED",
+                        reason==null?"WAITING_TR":reason,null);
+            }
+            case "events.list" -> {
+                StaRemoteProtocol.keys(req, "id", "type");
+                var source = services.load(net.skyworld.sta.api.v3.RailwayEventService.class);
+                if (source == null) throw new IllegalArgumentException("SERVICE_UNAVAILABLE");
+                yield result(id, "OK", "RAILWAY_EVENTS", JSON.toJsonTree(source.history()));
+            }
             case "graph.get" -> {
                 StaRemoteProtocol.keys(req, "id", "type");
                 var network = services.load(RailNetworkService.class);

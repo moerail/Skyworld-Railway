@@ -47,6 +47,13 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
     private volatile net.skyworld.sta.api.v6.OperationalAuthorityService.Snapshot operational;
     private final Map<UUID,net.skyworld.sta.api.v6.OperationalAuthorityService.Grant> liveGrants=new HashMap<>();
     private final Map<UUID,UUID> acknowledgedGrants=new HashMap<>();
+    private final Map<UUID,UUID> dispatcherSuspended=new HashMap<>();
+    private final Set<UUID> dispatcherTripped=new HashSet<>();
+    private final Map<UUID,Set<String>> dispatcherRetainedPoints=new HashMap<>();
+    private final Map<UUID,UUID> rerouteTrains=new HashMap<>();
+    private record RevokeJob(UUID train, CompletableFuture<String> result) {}
+    private final Map<UUID,RevokeJob> revokeJobs=new LinkedHashMap<>();
+    java.util.function.Supplier<net.skyworld.sta.api.v6.DispatcherBrakeService> brakeSource=()->null;
     private final Set<UUID> warnedLostGrants=new HashSet<>();
     private volatile Diagnostics diagnostics;
     private final NodePassageMonitor integrity = new NodePassageMonitor();
@@ -98,6 +105,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
         if (plugin.getConfig().contains("ma.horizon-meters", true))
             plugin.getLogger().info("Legacy ma.horizon-meters supplies missing distance settings; explicit new keys take priority.");
         var services=plugin.getServer().getServicesManager();
+        brakeSource=()->services.load(net.skyworld.sta.api.v6.DispatcherBrakeService.class);
         double jump = plugin.getConfig().getDouble("ma.sound.jump-threshold-meters", 20);
         soundJumpMeters = Double.isFinite(jump) && jump >= 1 ? jump : 20;
         double low = plugin.getConfig().getDouble("ma.sound.low-remaining-meters", 50);
@@ -181,11 +189,14 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                 return "NO_REPORT";
             if (report != null && report.physical().state().speedMetersPerSecond() > .05) return "STOP_FIRST";
             soundTracker.reset(train);
+            dispatcherSuspended.remove(train); dispatcherTripped.remove(train);
+            dispatcherRetainedPoints.remove(train);
             intents.remove(train);reserved.remove(train);maPoints.remove(train);reversed.remove(train);reasons.put(train,"RELEASED");
             liveGrants.remove(train);
             acknowledgedGrants.remove(train);
             warnedLostGrants.remove(train);
         } else if(List.of("request","sh","sr").contains(action)) {
+            if(dispatcherSuspended.containsKey(train)) return "DISPATCHER_HOLD";
             if(Set.of("ISOLATED","RECOVERING").contains(desk.atpMode())) return desk.atpMode();
             if(!action.equals("request") && report.physical().state().speedMetersPerSecond() > .05) return "STOP_FIRST";
             String requestedMode=action.equals("request")?"FS":action.toUpperCase(Locale.ROOT);
@@ -265,6 +276,70 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                 || model==null || model.graph.revision!=graphRevision) return false;
         acknowledgedGrants.put(trainId,grantId);
         return true;
+    }
+    public synchronized CompletionStage<String> revokeMa(UUID requestId, UUID trainId, String actor) {
+        var previous=revokeJobs.get(requestId);
+        if(previous!=null) return previous.train().equals(trainId) ? previous.result()
+                : CompletableFuture.completedFuture("REQUEST_ID_CONFLICT");
+        var brake=brakeSource.get();
+        if(closed || failed || brake==null) return CompletableFuture.completedFuture("UNAVAILABLE");
+        if(dispatcherTripped.contains(trainId)) return CompletableFuture.completedFuture("REVOKED_TR");
+        if(dispatcherSuspended.containsKey(trainId)) return CompletableFuture.completedFuture("BUSY");
+        if(revokeJobs.size()>=256) {
+            var old=revokeJobs.entrySet().stream().filter(e->e.getValue().result().isDone()).map(Map.Entry::getKey).findFirst().orElse(null);
+            if(old==null) return CompletableFuture.completedFuture("BUSY");
+            revokeJobs.remove(old);
+        }
+        var result=new CompletableFuture<String>();
+        revokeJobs.put(requestId,new RevokeJob(trainId,result));
+        dispatcherSuspended.put(trainId,requestId);
+        Set<String> retainedPoints=new HashSet<>(maPoints.getOrDefault(trainId,Set.of()));
+        var oldGrant=liveGrants.get(trainId);
+        if(oldGrant!=null && model!=null) for(var segment:oldGrant.path()) {
+            var edge=model.edges.get(segment.edgeId());
+            if(edge!=null) {retainedPoints.add(edge.from());retainedPoints.add(edge.to());}
+        }
+        dispatcherRetainedPoints.put(trainId,Set.copyOf(retainedPoints));
+        onboardHold(brake,trainId,requestId,false).orTimeout(6,TimeUnit.SECONDS).whenComplete((status,error)->{
+            synchronized(ShadowRuntime.this) {
+                if(error!=null || !"TR".equals(status)) {
+                    dispatcherSuspended.remove(trainId,requestId);
+                    if(error==null) dispatcherRetainedPoints.remove(trainId);
+                    result.complete(error!=null?"UNCONFIRMED":status); return;
+                }
+                intents.remove(trainId); dispatcherTripped.add(trainId);
+                warnedLostGrants.add(trainId);
+                reasons.put(trainId,"DISPATCHER_REVOKED");
+                try { eventSink.accept(new MaAction(trainId,diagnostics.trainNames().getOrDefault(trainId,trainId.toString()),
+                        null,actor,"unavailable","TR","DISPATCHER_REVOKED","TR",false)); }
+                catch(RuntimeException ignored) { /* Event delivery cannot undo the confirmed Trip. */ }
+                tick(); result.complete("REVOKED_TR");
+            }
+        });
+        return result;
+    }
+    private boolean stoppedForDispatch(UUID train) {
+        var input=inputSource.get(); long now=System.currentTimeMillis();
+        return input.available() && !uncertain.contains(train) && input.reports().stream().anyMatch(m->
+                m.header().trainId().equals(train) && m.header().kind()==StaMessage.Kind.TRACK_REPORT
+                && m.tracking().quality()==StaMessage.Quality.VALID
+                && m.tracking().telemetrySessionId().equals(input.driverSession())
+                && m.tracking().graphRevision()==model.graph.revision
+                && fresh(m.header().emittedAtMillis(),now) && fresh(m.physical().state().observedAtMillis(),now)
+                && Math.abs(m.physical().state().speedMetersPerSecond())<=.02);
+    }
+    private void clearForward(UUID train) {
+        reserved.remove(train); maPoints.remove(train); liveGrants.remove(train); acknowledgedGrants.remove(train);
+        dispatcherRetainedPoints.remove(train);
+    }
+    private static CompletableFuture<String> onboardHold(net.skyworld.sta.api.v6.DispatcherBrakeService brake,
+            UUID train, UUID operation, boolean stoppedOnly) {
+        try { return brake.hold(train,operation,stoppedOnly).toCompletableFuture(); }
+        catch(RuntimeException|LinkageError ex) { return CompletableFuture.completedFuture("UNAVAILABLE"); }
+    }
+    private boolean heldStopped(UUID train, UUID operation) {
+        var brake=brakeSource.get();
+        return brake!=null && brake.stoppedHeld(train,operation) && stoppedForDispatch(train);
     }
     public synchronized void revokeForChannelChange(UUID trainId) {
         if (trainId == null) return;
@@ -420,6 +495,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                 coverage.add(new Coverage(id,names.getOrDefault(id,"--"),state,entry.getValue().size(),record.positions()));
             }
             List<Authority> authorities=new ArrayList<>();
+            for(UUID train:dispatcherTripped) if(heldStopped(train,dispatcherSuspended.get(train))) clearForward(train);
             List<net.skyworld.sta.api.v6.OperationalAuthorityService.Grant> grants=new ArrayList<>();
             Map<String,String> switchStates=new HashMap<>(input.switchStates());
             pendingPoints.keySet().forEach(id->switchStates.put(id.toString(),"pending"));
@@ -435,6 +511,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                 var m=reports.get(id);var desk=drivers.get(id);var intent=intents.get(id);
                 String reason=reasons.getOrDefault(id,"IDLE");
                 boolean eligible=intent!=null;
+                if(dispatcherSuspended.containsKey(id)) {eligible=false;reason="DISPATCHER_HOLD";}
                 if(intent!=null && (desk==null||!intent.lease().equals(desk.leaseId())||!intent.driver().equals(desk.driverId())
                         || !intent.provider().equals(input.driverSession())
                         || !intent.channel().equals(desk.atpMode()))) {
@@ -784,13 +861,43 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
         switchRequests.put(request.requestId(),request);
         tick();
         String rejection=pointRejection(request);
+        if("MA_CONFLICT".equals(rejection)) {
+            var holders=maPoints.entrySet().stream().filter(e->e.getValue().contains(request.switchId().toString()))
+                    .map(Map.Entry::getKey).toList();
+            var brake=brakeSource.get();
+            if(holders.size()==1 && brake!=null && stoppedForDispatch(holders.getFirst())
+                    && !dispatcherSuspended.containsKey(holders.getFirst()) && pointRejection(request,true)==null) {
+                UUID train=holders.getFirst();
+                pendingPoints.put(request.switchId(),request);
+                dispatcherSuspended.put(train,request.requestId()); rerouteTrains.put(request.requestId(),train);
+                switchProgress.put(request.requestId(),"WITHDRAWING_MA");
+                onboardHold(brake,train,request.requestId(),true).orTimeout(6,TimeUnit.SECONDS)
+                        .whenComplete((status,error)->{
+                    synchronized(ShadowRuntime.this) {
+                        if(error!=null || !"HELD".equals(status)) {
+                            finishPoint(request,answer,"REJECTED_"+(error!=null?"UNCONFIRMED":status)); return;
+                        }
+                        clearForward(train); tick();
+                        String blocked=pointRejection(request);
+                        if(blocked!=null || !heldStopped(train,request.requestId())) {
+                            finishPoint(request,answer,"REJECTED_"+(blocked==null?"STOP_FIRST":blocked)); return;
+                        }
+                        executePoint(request,answer);
+                    }
+                });
+                return answer;
+            }
+        }
         if(rejection!=null) {answer.complete(new Reply(request.requestId(),"REJECTED",rejection));return answer;}
         pendingPoints.put(request.switchId(),request);switchProgress.put(request.requestId(),"QUEUED");
+        executePoint(request,answer);
+        return answer;
+    }
+    private void executePoint(Request request, CompletableFuture<Reply> answer) {
         try {
             var future=pointControl.change(request,()->pointGuard(request),stage->progress(request,stage));
             future.whenComplete((status,error)->finishPoint(request,answer,error==null?status:"FAILED_STF_ERROR"));
         } catch(RuntimeException ex) {finishPoint(request,answer,"FAILED_INCOMPATIBLE_STF");}
-        return answer;
     }
     private synchronized void progress(Request request,String stage) {
         if(request.equals(pendingPoints.get(request.switchId()))) switchProgress.put(request.requestId(),stage);
@@ -801,11 +908,21 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
     }
     private synchronized boolean pointGuard(Request request) {
         String rejection=pointRejection(request);
+        UUID train=rerouteTrains.get(request.requestId());
+        if(train!=null && !heldStopped(train,request.requestId())) rejection="STOP_FIRST";
         if(rejection!=null) switchProgress.put(request.requestId(),rejection);
         return request.equals(pendingPoints.get(request.switchId())) && rejection==null;
     }
     private synchronized void finishPoint(Request request,CompletableFuture<Reply> result,String status) {
         pendingPoints.remove(request.switchId(),request);
+        UUID train=rerouteTrains.remove(request.requestId());
+        if(train!=null) {
+            if(!"COMPLETED".equals(status)) intents.remove(train);
+            dispatcherSuspended.remove(train,request.requestId());
+            tick();
+            var brake=brakeSource.get();
+            if(brake!=null) brake.resume(train,request.requestId());
+        }
         String reason=Objects.requireNonNullElse(status,"FAILED_STF_ERROR");
         if(reason.equals("REJECTED_REVALIDATION")) reason=switchProgress.getOrDefault(request.requestId(),reason);
         String category=reason.equals("COMPLETED")?"COMPLETED":Objects.requireNonNullElse(status,"").startsWith("REJECTED")?"REJECTED"
@@ -813,6 +930,9 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
         result.complete(new Reply(request.requestId(),category,reason));
     }
     private String pointRejection(Request request) {
+        return pointRejection(request,false);
+    }
+    private String pointRejection(Request request, boolean ignoreMa) {
         if(closed||failed||model==null||!diagnostics.sourceAvailable()||System.currentTimeMillis()-latest.emittedAtMillis()>1500
                 ||request.graphRevision()!=model.graph.revision) return "UNAVAILABLE_OR_GRAPH_CHANGED";
         var pending=pendingPoints.get(request.switchId());
@@ -823,7 +943,8 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
         var p=node.rail();var position=request.position();
         if(position==null) return "POSITION_REQUIRED";
         if(!position.world().equals(p.world())||position.x()!=p.x()||position.y()!=p.y()||position.z()!=p.z()) return "POSITION_MISMATCH";
-        if(maPoints.values().stream().anyMatch(points->points.contains(node.id()))) return "MA_CONFLICT";
+        if(dispatcherRetainedPoints.values().stream().anyMatch(points->points.contains(node.id()))) return "MA_CONFLICT";
+        if(!ignoreMa && maPoints.values().stream().anyMatch(points->points.contains(node.id()))) return "MA_CONFLICT";
         Set<String> local=model.near(p.world(),p.x()+.5,p.y(),p.z()+.5);
         for(var entry:occupied.entrySet()) {
             UUID id=entry.getKey();

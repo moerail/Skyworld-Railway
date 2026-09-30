@@ -1,6 +1,8 @@
 # SkyRail Suite 鐵道運轉試驗規程
 
-現行候補ハ STF 四・〇・六、STCS 四・〇・四、STA 二・一・一、SkyPCC 二・〇・一トス。STF ノ單一 JAR ハ Shiroha 二六・二及ビ二六・三ノ表示封包ヲ起動時ニ選擇ス。兩版ノ分離構築及ビ Java 試驗ハ通過セリ。實サーバー驗收ハ未了ナリ。[適合報告](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。
+本更新は **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2** です。手動列車の停車後、指令による分岐器転換は車上の停止保持確認、前方予約撤回、転換、MA 再計算の順に実行し、運転士の事前 release は不要です。Web PCC に「MA 取消 → TR」を追加。走行中・停車中とも車上確認後に TR へ移行して制動します。走行中の予約は全車停止確認まで保持し、車両在線は消去しません。この明示的な指令はシャドーチャネルにも適用されます。復帰は停車後 `/stcs ma ack`、`/stcs ma release`、MA 再要求の順です。タイムアウトは実行確認ではありません。導入済みプラグインを一緒に更新し、クライアントを再読込してください。証明書とトークンは継続使用できます。実サーバー検証は未完了です。 [4.0.7 release notes](doc/releases/suite-v4.0.7.md)
+
+現行候補ハ STF 四・〇・七、STCS 四・〇・五、STA 二・一・三、SkyPCC 二・〇・二トス。STF ノ單一 JAR ハ Shiroha 二六・二及ビ二六・三ノ表示封包ヲ起動時ニ選擇ス。兩版ノ分離構築及ビ Java 試驗ハ通過セリ。實サーバー驗收ハ未了ナリ。[適合報告](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。
 
 舊第四・〇・二版附記：制限速度四十粁毎時以下ニ於テハ、五粁手前ニ警報ヲ發シ、八粁下ニ解除ス。超速警報及ビ制動規則ハ變更セズ。臺帳入出力障害ノ後、管理者ハ `/stcs admin ma restart` ニテ復舊ヲ試ミ得ルモ、占有ヲ消去セズ、制動ヲ緩解セズ。運轉士ハ MA ヲ再要求スベシ。
 
@@ -8,7 +10,7 @@
 
 舊豫備公開 `suite-v4.0.2` ノ[公開要領](doc/releases/suite-v4.0.2.md)ハ別ニ存ス。
 
-現行ハ STF 四・〇・六、STCS 四・〇・四、STA 二・一・一、SkyPCC 二・〇・一ヲ一組トス。管理者ハ停車中ニ `/stcs admin enforce true|false` ヲ用ヒ、實驗的制動監視ノ通道ヲ明示ス。false ハ RECOVERING ノ制動保持ニ歸ス。手動列車ノミ SB/FS/SH/SR/TR/PT ヲ用ヒ、標識式擬似 ATO 自動列車ニハ適用セズ。影方式ハ依然トシテ制動ヲ執行セズ。
+現行ハ STF 四・〇・七、STCS 四・〇・五、STA 二・一・三、SkyPCC 二・〇・二ヲ一組トス。管理者ハ停車中ニ `/stcs admin enforce true|false` ヲ用ヒ、實驗的制動監視ノ通道ヲ明示ス。false ハ RECOVERING ノ制動保持ニ歸ス。手動列車ノミ SB/FS/SH/SR/TR/PT ヲ用ヒ、標識式擬似 ATO 自動列車ニハ適用セズ。影方式ハ依然トシテ制動ヲ執行セズ。
 
 SH/SR ノ既定上限ハ每時四十粁トシ、小許容幅ヲ超エタル速度超過ニハ FS ノ緩和待機時間ヲ置カズ B7 ヲ施ス。EoA 接近曲線ハ更ニ低速ヲ求ムル場合アリ。側欄及ビ運轉士ノ BossBar ニ ATP B7/EB ヲ揭示ス。冒進 TR ニハ案内及ビ非常制動音ヲ發ス。停車後 `/stcs ma ack` ニテ PT、次ニ `/stcs ma release` ニテ SB トシ、再申請スベシ。
 
@@ -75,10 +77,10 @@ STA ハ自動的ニ公開サルル Python 用通信線ニ非ズ。同一サー�
 4. 設定變更ハ停止中ニ行ヒ、再ビ完全起動スベシ。動的差替ニ依存スベカラズ。
 
 ```text
-SkyTrainFolia-4.0.6.jar
-STCS-4.0.4.jar
-SkyworldTrainAPI-2.1.1.jar
-SkyPCC-2.0.1.jar
+SkyTrainFolia-4.0.7.jar
+STCS-4.0.5.jar
+SkyworldTrainAPI-2.1.3.jar
+SkyPCC-2.0.2.jar
 ```
 
 `/st version` ニテ STF ノ版ヲ確認ス。全體系ヲ裝備セル場合ハ `/stcs status` ヲ併セテ確認シ、サーバー機ヨリ `http://127.0.0.1:8765/` ヲ開クベシ。

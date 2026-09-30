@@ -1,10 +1,12 @@
 # SkyRail Suite
 
+This patch uses **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. For a stopped manual train, a dispatcher point change first obtains an onboard brake-hold acknowledgement, then withdraws the affected forward reservation, changes the point and replans MA; no driver release is needed first. Web PCC adds “Revoke MA → TR”. A moving or stopped manual train enters TR and brakes after onboard confirmation. Moving-train reservations remain until the complete train is confirmed stopped; body occupancy is retained. This explicit dispatcher command also holds trains in the shadow channel. Recovery: stop, `/stcs ma ack`, `/stcs ma release`, then request MA again. Timeout is not confirmation. Update installed plugins together and refresh clients; retain certificates and tokens. Live-server acceptance is pending. [4.0.7 release notes](doc/releases/suite-v4.0.7.md)
+
 **Players: start with the [Driver Manual](doc/driver/README.en.md)** for boarding, driving control, hotbar, shadow MA and stopping.
 
 ## Current Candidate: Shiroha 26.2 / 26.3
 
-SkyTrainFolia **4.0.6** packages both display packet adapters in one JAR and selects the matching one at startup. The current suite is STCS **4.0.4**, STA **2.1.1** and SkyPCC **2.0.1**. Isolated compilation and Java tests pass on both server versions; live-server acceptance is pending. [Adaptation report](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
+SkyTrainFolia **4.0.7** packages both display packet adapters in one JAR and selects the matching one at startup. The current suite is STCS **4.0.5**, STA **2.1.3** and SkyPCC **2.0.2**. Isolated compilation and Java tests pass on both server versions; live-server acceptance is pending. [Adaptation report](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
 
 ## Earlier 4.0.2 Update: Warnings and Service Recovery
 
@@ -26,7 +28,7 @@ shadow-atp:
 
 The earlier `suite-v4.0.2` pre-release is documented in its [release notes](doc/releases/suite-v4.0.2.md).
 
-Use STF **4.0.6**, STCS **4.0.4**, STA **2.1.1** and SkyPCC **2.0.1** together. Back up RailGraph and occupancy ledgers before replacing installed components; do not mix versions. STF remains useful on its own, but `Enforced` requires STA and STCS. The v5 shadow service remains observational; STA v6 operational permission is a separate channel.
+Use STF **4.0.7**, STCS **4.0.5**, STA **2.1.3** and SkyPCC **2.0.2** together. Back up RailGraph and occupancy ledgers before replacing installed components; do not mix versions. STF remains useful on its own, but `Enforced` requires STA and STCS. The v5 shadow service remains observational; STA v6 operational permission is a separate channel.
 
 Only **manual trains** enter `SB`, `FS`, `SH`, `SR`, `TR` and `PT`. A stopped train with a driver starts in `SB`; `/stcs ma demand` requests `FS`, `/stcs ma sh` requests a bounded shunting permission, and `/stcs ma sr` requests a dispatcher-approved permission to a selected infrastructure node. An accepted request is not yet an allocated, executable MA. After an EoA trip, stop, use `/stcs ma ack` to enter `PT`, then `/stcs ma release` before requesting anew. Admins may explicitly switch a stopped manual train between shadow and active channels using `/stcs admin enforce true|false`; `false` returns to `RECOVERING` brake hold. The sidebar displays a translated channel and stable mode code, for example **`Enforced | SR`**. `shadow-atp` remains read-only; `active-atp` has relaxed and strict configurable profiles.
 
@@ -154,10 +156,10 @@ This illustrates responsibilities, not a mandatory serial call chain. Browser in
 Current installation files:
 
 ```text
-SkyTrainFolia-4.0.6.jar
-STCS-4.0.4.jar
-SkyworldTrainAPI-2.1.1.jar
-SkyPCC-2.0.1.jar
+SkyTrainFolia-4.0.7.jar
+STCS-4.0.5.jar
+SkyworldTrainAPI-2.1.3.jar
+SkyPCC-2.0.2.jar
 ```
 
 STF/STCS declare STA as a soft dependency, but install all four for the complete suite. PCC requires STCS and STA. Standalone STF does not provide the complete graph, authority and dispatching functionality.

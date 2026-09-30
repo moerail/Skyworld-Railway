@@ -1,10 +1,12 @@
 # SkyRail Suite
 
+Deze patch gebruikt **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. Bij een stilstaande handmatige trein bevestigt de trein eerst de remvasthouding; daarna worden de voorwaartse reservering ingetrokken, de wissel omgelegd en de MA opnieuw berekend, zonder voorafgaande release door de machinist. Web PCC krijgt “Revoke MA → TR”: zowel rijdend als stilstaand gaat de trein na bevestiging in TR en remt. Reserveringen blijven behouden tot de hele trein aantoonbaar stilstaat; treinbezetting blijft altijd behouden. Deze expliciete opdracht werkt ook in het schaduwkanaal. Herstel: stoppen, `/stcs ma ack`, `/stcs ma release`, opnieuw MA aanvragen. Een time-out bevestigt niets. Werk de geïnstalleerde plugins samen bij en vernieuw de clients; behoud certificaten en tokens. Praktijktests op de server zijn nog nodig. [4.0.7 release notes](doc/releases/suite-v4.0.7.md)
+
 **Voor spelers:** de bestuurdershandleiding is beschikbaar in [Engels](doc/driver/README.en.md), [Chinees](doc/driver/README.zh.md), [Frans](doc/driver/README.fr.md) en [Japans](doc/driver/README.ja.md).
 
 ## Huidige kandidaatversie: Shiroha 26.2 / 26.3
 
-SkyTrainFolia **4.0.6** bevat beide displaypakketadapters in één JAR en kiest bij het starten de adapter voor de serverversie. De huidige suite bestaat uit STCS **4.0.4**, STA **2.1.1** en SkyPCC **2.0.1**. Geïsoleerde compilatie en Java-tests slagen op beide versies; acceptatie op een draaiende server staat nog open. [Aanpassingsrapport](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
+SkyTrainFolia **4.0.7** bevat beide displaypakketadapters in één JAR en kiest bij het starten de adapter voor de serverversie. De huidige suite bestaat uit STCS **4.0.5**, STA **2.1.3** en SkyPCC **2.0.2**. Geïsoleerde compilatie en Java-tests slagen op beide versies; acceptatie op een draaiende server staat nog open. [Aanpassingsrapport](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
 
 ## Eerdere update 4.0.2: waarschuwingen en serviceherstel
 
@@ -26,7 +28,7 @@ shadow-atp:
 
 De eerdere voorlopige uitgave `suite-v4.0.2` staat in de [uitgavenotities](doc/releases/suite-v4.0.2.md).
 
-Gebruik STF **4.0.6**, STCS **4.0.4**, STA **2.1.1** en SkyPCC **2.0.1** samen. Stop de server en maak een back-up van RailGraph en bezettingsregisters voordat u componenten vervangt; meng geen versies. STF blijft zelfstandig bruikbaar, maar `Enforced` vereist STA en STCS. De bestaande v5-schaduwservice blijft adviserend; de uitvoerbare STA v6-autoriteit is een apart kanaal.
+Gebruik STF **4.0.7**, STCS **4.0.5**, STA **2.1.3** en SkyPCC **2.0.2** samen. Stop de server en maak een back-up van RailGraph en bezettingsregisters voordat u componenten vervangt; meng geen versies. STF blijft zelfstandig bruikbaar, maar `Enforced` vereist STA en STCS. De bestaande v5-schaduwservice blijft adviserend; de uitvoerbare STA v6-autoriteit is een apart kanaal.
 
 Alleen **handbestuurde treinen** volgen de toestanden `SB/FS/SH/SR/TR/PT`. Na het claimen van de bediening begint de trein in `SB`. `/stcs ma demand` vraagt `FS`, `/stcs ma sh` een begrensde rangeertoestemming en `/stcs ma sr` wacht op goedkeuring door PCC of een beheerder tot een gekozen spoorobject. Een geaccepteerd verzoek is nog geen uitvoerbare MA. Na het overschrijden van EoA (`TR`): stoppen, `/stcs ma ack` voor `PT`, daarna `/stcs ma release` voor een nieuw verzoek. Een beheerder wisselt het kanaal alleen bij stilstand met `/stcs admin enforce true|false`; `false` keert terug naar `RECOVERING` met remvasthouding. De zijbalk toont het vertaalde kanaal en de onvertaalde moduscode, bijvoorbeeld **`Enforced | SR`**.
 
@@ -154,10 +156,10 @@ Dit schema toont verantwoordelijkheden, geen verplichte opeenvolging van alle aa
 Huidige installatiebestanden:
 
 ```text
-SkyTrainFolia-4.0.6.jar
-STCS-4.0.4.jar
-SkyworldTrainAPI-2.1.1.jar
-SkyPCC-2.0.1.jar
+SkyTrainFolia-4.0.7.jar
+STCS-4.0.5.jar
+SkyworldTrainAPI-2.1.3.jar
+SkyPCC-2.0.2.jar
 ```
 
 STF/STCS declareren STA als zachte afhankelijkheid, maar installeer alle vier voor de volledige suite. PCC vereist STCS en STA. STF alleen levert niet de volledige graaf-, MA- en verkeersleidingsfunctionaliteit.

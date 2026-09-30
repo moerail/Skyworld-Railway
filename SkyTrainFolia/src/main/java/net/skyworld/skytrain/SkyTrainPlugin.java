@@ -219,9 +219,11 @@ public final class SkyTrainPlugin extends JavaPlugin {
         if (train == null || train.properties().conductionMode.automatic()) return "MANUAL_ONLY";
         if (!manager.isDriver(player, train)) return "NOT_DRIVER";
         synchronized (train) {
-            if (train.protectionMode != ProtectionMode.ACTIVE) return "SHADOW";
             if (train.currentSpeed() > .001 || train.maxMemberSpeed() > .001) return "STOP_FIRST";
             if (train.operatingMode == OperatingMode.TR) return "ACK_TRIP_FIRST";
+            if (train.dispatcherBrake.held() && !train.dispatcherBrake.trip()) return "DISPATCHER_BUSY";
+            train.dispatcherBrake.clear();
+            if (train.protectionMode != ProtectionMode.ACTIVE) { train.operatingMode=OperatingMode.SB; return "SHADOW"; }
             train.operatingMode = train.operatingMode.release(true);
             train.activeAtp.clear();
             train.activeAtpLimitMps = null;

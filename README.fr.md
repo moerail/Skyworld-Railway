@@ -1,10 +1,12 @@
 # SkyRail Suite
 
+Cette révision utilise **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. Pour un train manuel arrêté, la manœuvre d’aiguille obtient d’abord la confirmation embarquée du maintien au frein, retire la réservation avant, manœuvre puis recalcule la MA, sans release préalable du conducteur. Le PCC web ajoute « Révoquer MA → TR » : en marche ou à l’arrêt, le train passe en TR et freine après confirmation embarquée. Les réservations restent jusqu’à confirmation de l’arrêt complet ; l’occupation du train est conservée. Cette commande explicite agit aussi en mode observation. Reprise : arrêt, `/stcs ma ack`, `/stcs ma release`, puis nouvelle demande MA. Un délai expiré ne confirme pas l’exécution. Mettre à jour les composants installés ensemble et actualiser les clients ; conserver certificats et jetons. Validation sur serveur réel à effectuer. [4.0.7 release notes](doc/releases/suite-v4.0.7.md)
+
 **Joueurs : commencez par le [manuel de conduite](doc/driver/README.fr.md)** pour la montée à bord, la prise de conduite, la barre rapide, la MA fantôme et l'arrêt.
 
 ## Version candidate actuelle : Shiroha 26.2 / 26.3
 
-SkyTrainFolia **4.0.6** contient les deux adaptateurs de paquets d'affichage dans un seul JAR et choisit celui du serveur au démarrage. L'ensemble actuel comprend STCS **4.0.4**, STA **2.1.1** et SkyPCC **2.0.1**. La compilation et les essais Java isolés réussissent avec les deux versions ; la validation sur serveur réel reste à faire. [Rapport d'adaptation](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
+SkyTrainFolia **4.0.7** contient les deux adaptateurs de paquets d'affichage dans un seul JAR et choisit celui du serveur au démarrage. L'ensemble actuel comprend STCS **4.0.5**, STA **2.1.3** et SkyPCC **2.0.2**. La compilation et les essais Java isolés réussissent avec les deux versions ; la validation sur serveur réel reste à faire. [Rapport d'adaptation](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
 
 ## Ancienne mise à jour 4.0.2 : alertes et rétablissement du service
 
@@ -26,7 +28,7 @@ shadow-atp:
 
 L'ancienne préversion `suite-v4.0.2` est décrite dans ses [notes de version](doc/releases/suite-v4.0.2.md).
 
-Utiliser ensemble STF **4.0.6**, STCS **4.0.4**, STA **2.1.1** et SkyPCC **2.0.1**. Arrêter le serveur et sauvegarder RailGraph et les registres d'occupation avant de remplacer les composants ; ne pas mélanger les versions. STF reste autonome, mais `Enforced` exige STA et STCS. Le service fantôme v5 reste consultatif ; l'autorisation opérationnelle STA v6 est un canal distinct.
+Utiliser ensemble STF **4.0.7**, STCS **4.0.5**, STA **2.1.3** et SkyPCC **2.0.2**. Arrêter le serveur et sauvegarder RailGraph et les registres d'occupation avant de remplacer les composants ; ne pas mélanger les versions. STF reste autonome, mais `Enforced` exige STA et STCS. Le service fantôme v5 reste consultatif ; l'autorisation opérationnelle STA v6 est un canal distinct.
 
 Seuls les **trains manuels** entrent dans l'automate `SB/FS/SH/SR/TR/PT`. Après prise de conduite, le train est en `SB`. `/stcs ma demand` demande `FS`, `/stcs ma sh` une autorisation limitée de manœuvre et `/stcs ma sr` attend l'approbation du PCC ou d'un administrateur jusqu'à un équipement choisi. Une demande acceptée n'est pas encore une MA exécutable. Après un dépassement de l'EoA (`TR`), arrêter le train, utiliser `/stcs ma ack` pour passer en `PT`, puis `/stcs ma release` avant une nouvelle demande. L'administrateur change explicitement de canal à l'arrêt avec `/stcs admin enforce true|false` ; `false` revient à `RECOVERING` avec frein maintenu. Le tableau de bord affiche le canal traduit et le code de mode invariant, par exemple **`Protection active | SR`**.
 
@@ -154,10 +156,10 @@ Ce schéma illustre les responsabilités, et non une chaîne d’appels série o
 Fichiers d’installation actuels :
 
 ```text
-SkyTrainFolia-4.0.6.jar
-STCS-4.0.4.jar
-SkyworldTrainAPI-2.1.1.jar
-SkyPCC-2.0.1.jar
+SkyTrainFolia-4.0.7.jar
+STCS-4.0.5.jar
+SkyworldTrainAPI-2.1.3.jar
+SkyPCC-2.0.2.jar
 ```
 
 STF/STCS déclarent STA comme dépendance facultative, mais installez les quatre éléments pour disposer de la suite complète. PCC requiert STCS et STA. STF seul ne fournit pas toutes les fonctions de graphe, d’autorisation et de régulation.

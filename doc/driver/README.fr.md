@@ -1,8 +1,10 @@
 # Manuel de conduite SkyRail
 
+Cette révision utilise **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. Pour un train manuel arrêté, la manœuvre d’aiguille obtient d’abord la confirmation embarquée du maintien au frein, retire la réservation avant, manœuvre puis recalcule la MA, sans release préalable du conducteur. Le PCC web ajoute « Révoquer MA → TR » : en marche ou à l’arrêt, le train passe en TR et freine après confirmation embarquée. Les réservations restent jusqu’à confirmation de l’arrêt complet ; l’occupation du train est conservée. Cette commande explicite agit aussi en mode observation. Reprise : arrêt, `/stcs ma ack`, `/stcs ma release`, puis nouvelle demande MA. Un délai expiré ne confirme pas l’exécution. Mettre à jour les composants installés ensemble et actualiser les clients ; conserver certificats et jetons. Validation sur serveur réel à effectuer. [4.0.7 release notes](../releases/suite-v4.0.7.md)
+
 [中文](README.zh.md) | [English](README.en.md) | [Français](README.fr.md) | [日本語](README.ja.md) · [Accueil du projet](../../README.md)
 
-Pour les joueurs à bord d'un train manuel. Version candidate actuelle : STF 4.0.6, STCS 4.0.4, STA 2.1.1, SkyPCC 2.0.1 sur Shiroha 26.2 ou 26.3. La création des trains, les voies et la configuration relèvent des administrateurs ; la validation sur serveur réel reste à faire.
+Pour les joueurs à bord d'un train manuel. Version candidate actuelle : STF 4.0.7, STCS 4.0.5, STA 2.1.3, SkyPCC 2.0.2 sur Shiroha 26.2 ou 26.3. La création des trains, les voies et la configuration relèvent des administrateurs ; la validation sur serveur réel reste à faire.
 
 > **En cas de danger : `/st eb`.** La MA fantôme et sa limite restent consultatives. Le canal expérimental distinct `Enforced` ne peut freiner un train manuel qu'après activation explicite par un administrateur et émission d'une MA exécutable par STCS. Ne supposez ni son activation ni une validation sur serveur. Ce guide concerne un jeu, pas l'exploitation ferroviaire réelle.
 

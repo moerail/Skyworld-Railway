@@ -102,6 +102,7 @@
       <dl id="infrastructureInspector" class="inspector" hidden></dl>
       <button id="infrastructureSwitch" type="button" hidden data-i18n="Change switch">Change switch</button>
       <button id="srApprove" type="button" hidden data-i18n="Approve SR to this point">Approve SR to this point</button>
+      <button id="revokeMa" type="button" hidden data-i18n="Revoke MA → TR">Revoke MA → TR</button>
     </aside>
   </main>
 
@@ -130,6 +131,16 @@
     <input id="srToken" type="password" autocomplete="off" spellcheck="false">
     <p id="srResult" role="status"></p>
     <button id="srConfirm" type="button" data-i18n="Approve SR">Approve SR</button>
+  </dialog>
+  <dialog id="revokeDialog">
+    <h2 data-i18n="Revoke MA → TR">Revoke MA → TR</h2>
+    <p id="revokeTarget"></p>
+    <p data-i18n="Moving or stopped, the selected train will enter TR and brake.">Moving or stopped, the selected train will enter TR and brake.</p>
+    <label for="revokeToken" data-i18n="Operator token">Operator token</label>
+    <input id="revokeToken" type="password" autocomplete="off">
+    <p id="revokeResult" role="status"></p>
+    <button id="revokeConfirm" type="button" data-i18n="Revoke MA → TR">Revoke MA → TR</button>
+    <button id="revokeClose" type="button" data-i18n="Close">Close</button>
   </dialog>
   <script src="/assets/i18n.js"></script>
   <script src="/assets/app.js"></script>
