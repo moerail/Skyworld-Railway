@@ -1,10 +1,12 @@
 # SkyRail Driver Manual
 
+Local development candidate **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3** adds TIMS checks for a fixed roster, fresh member samples and adjacent spacing along the rail path. Unknown or lost integrity commands a brake hold and retains occupancy and MA protection. `/st info <train>` shows a current position or the last reported world coordinates and time when uncertain. Only riders in the outermost cart at either end may use `/st drive`; forward/backward are relative to that cab end. After restoring the original consist and stopping, use `/st tims ack`; for TR then use `/stcs ma ack`, `/stcs ma release` and request a new MA. Existing saved trains need a one-time manifest check and TIMS acknowledgement. This candidate is not published or live-tested. [4.0.8 development notes](../releases/suite-v4.0.8.md)
+
 This patch uses **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. For a stopped manual train, a dispatcher point change first obtains an onboard brake-hold acknowledgement, then withdraws the affected forward reservation, changes the point and replans MA; no driver release is needed first. Web PCC adds “Revoke MA → TR”. A moving or stopped manual train enters TR and brakes after onboard confirmation. Moving-train reservations remain until the complete train is confirmed stopped; body occupancy is retained. This explicit dispatcher command also holds trains in the shadow channel. Recovery: stop, `/stcs ma ack`, `/stcs ma release`, then request MA again. Timeout is not confirmation. Update installed plugins together and refresh clients; retain certificates and tokens. Live-server acceptance is pending. [4.0.7 release notes](../releases/suite-v4.0.7.md)
 
 [中文](README.zh.md) | [English](README.en.md) | [Français](README.fr.md) | [日本語](README.ja.md) · [Project home](../../README.md)
 
-For ordinary players aboard a manual train. Current candidate: STF 4.0.7, STCS 4.0.5, STA 2.1.3, SkyPCC 2.0.2 on Shiroha 26.2 or 26.3. Administrators handle train creation, track construction and plugin configuration; live-server acceptance of this combination is pending.
+For ordinary players aboard a manual train. Published release: STF 4.0.7, STCS 4.0.5, STA 2.1.3, SkyPCC 2.0.2 on Shiroha 26.2 or 26.3. Administrators handle train creation, track construction and plugin configuration; live-server acceptance of this combination is pending.
 
 > **In an emergency, use `/st eb`.** Shadow MA and ATP limits remain advisory. The separate experimental `Enforced` channel can brake a manual train only after an administrator explicitly enables it and STCS issues an executable MA. Do not assume it is enabled or live-validated. This is a game guide, not a real railway rulebook.
 

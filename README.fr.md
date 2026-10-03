@@ -1,12 +1,14 @@
 # SkyRail Suite
 
+Version locale de développement **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3** : TIMS vérifie la composition fixe, la fraîcheur des mesures et l’écart entre véhicules le long de la voie. Une intégrité inconnue ou perdue maintient le frein et conserve l’occupation ainsi que la protection MA. `/st info <train>` affiche la position actuelle ou les dernières coordonnées et l’heure si elle est incertaine. Seuls les passagers des véhicules extrêmes peuvent utiliser `/st drive` ; forward/backward suivent le poste occupé. Après reconstitution et arrêt complet : `/st tims ack`, puis en TR `/stcs ma ack`, `/stcs ma release` et nouvelle MA. Les trains enregistrés nécessitent une première vérification de composition. Cette version n’est pas publiée ni validée en circulation. [Notes de développement 4.0.8](doc/releases/suite-v4.0.8.md)
+
 Cette révision utilise **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. Pour un train manuel arrêté, la manœuvre d’aiguille obtient d’abord la confirmation embarquée du maintien au frein, retire la réservation avant, manœuvre puis recalcule la MA, sans release préalable du conducteur. Le PCC web ajoute « Révoquer MA → TR » : en marche ou à l’arrêt, le train passe en TR et freine après confirmation embarquée. Les réservations restent jusqu’à confirmation de l’arrêt complet ; l’occupation du train est conservée. Cette commande explicite agit aussi en mode observation. Reprise : arrêt, `/stcs ma ack`, `/stcs ma release`, puis nouvelle demande MA. Un délai expiré ne confirme pas l’exécution. Mettre à jour les composants installés ensemble et actualiser les clients ; conserver certificats et jetons. Validation sur serveur réel à effectuer. [4.0.7 release notes](doc/releases/suite-v4.0.7.md)
 
 **Joueurs : commencez par le [manuel de conduite](doc/driver/README.fr.md)** pour la montée à bord, la prise de conduite, la barre rapide, la MA fantôme et l'arrêt.
 
-## Version candidate actuelle : Shiroha 26.2 / 26.3
+## Version publiée : Shiroha 26.2 / 26.3
 
-SkyTrainFolia **4.0.7** contient les deux adaptateurs de paquets d'affichage dans un seul JAR et choisit celui du serveur au démarrage. L'ensemble actuel comprend STCS **4.0.5**, STA **2.1.3** et SkyPCC **2.0.2**. La compilation et les essais Java isolés réussissent avec les deux versions ; la validation sur serveur réel reste à faire. [Rapport d'adaptation](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
+SkyTrainFolia **4.0.7** contient les deux adaptateurs de paquets d'affichage dans un seul JAR et choisit celui du serveur au démarrage. L'ensemble publié comprend STCS **4.0.5**, STA **2.1.3** et SkyPCC **2.0.2**. La compilation et les essais Java isolés réussissent avec les deux versions ; la validation sur serveur réel reste à faire. [Rapport d'adaptation](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
 
 ## Ancienne mise à jour 4.0.2 : alertes et rétablissement du service
 

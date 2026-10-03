@@ -27,7 +27,6 @@ final class TrainDrivingControls {
 
     void start(String name, Double speed) {
         Train train = trainLookup.apply(name);
-        train.driverEmergencyHold = false;
         startTrain(train, speed);
         saveAction.run();
     }
@@ -129,6 +128,7 @@ final class TrainDrivingControls {
         train.clearPlayerPush();
         train.driveControlEnabled = true;
         train.reverser = target;
+        if(target!=Reverser.NEUTRAL)train.lastSelectedReverser=target;
         if (train.reverser == Reverser.NEUTRAL) {
             train.powerNotch = 0;
         }
@@ -147,17 +147,15 @@ final class TrainDrivingControls {
         if (train.reverser == Reverser.BACKWARD) {
             return Reverser.FORWARD;
         }
-        return train.reversed ? Reverser.FORWARD : Reverser.BACKWARD;
+        return train.reversed != train.cabAtRear ? Reverser.FORWARD : Reverser.BACKWARD;
     }
 
     Reverser cycleReverserTarget(Train train) {
-        if (train.reverser != Reverser.NEUTRAL) {
-            return Reverser.NEUTRAL;
-        }
-        return train.reversed ? Reverser.FORWARD : Reverser.BACKWARD;
+        return CabOrientation.cycle(train.reverser,train.lastSelectedReverser);
     }
 
     void setPowerNotch(Train train, int notch) {
+        if(train.tims.view(System.currentTimeMillis()).brakeHeld()) throw new IllegalArgumentException("error.tims-hold");
         train.protectionMode.requireTraction(train.operatingMode);
         if (train.driverEmergencyHold) throw new IllegalArgumentException("error.drive-declare");
         takeManualControl(train);
@@ -234,11 +232,15 @@ final class TrainDrivingControls {
         stopTrain(train);
         train.driverEmergencyHold = false;
         train.manualTakeover = false;
-        train.reverser = train.reversed ? Reverser.BACKWARD : Reverser.FORWARD;
+        train.cabAtRear=false;train.cabMember=null;
+        train.reverser=train.reversed?Reverser.BACKWARD:Reverser.FORWARD;
         train.properties().conductionMode = ConductionMode.AUTOMATIC;
     }
 
     void startTrain(Train train, Double speed) {
+        if (train.tims.view(System.currentTimeMillis()).brakeHeld())
+            throw new IllegalArgumentException("error.tims-hold");
+        train.driverEmergencyHold = false;
         if (speed != null) {
             train.targetSpeed = RailMath.clamp(speed, 0.0, train.maxSpeed);
         }
@@ -247,7 +249,7 @@ final class TrainDrivingControls {
         train.powerNotch = 0;
         train.brakeNotch = 0;
         train.emergencyBrake = false;
-        train.reverser = train.reversed ? Reverser.BACKWARD : Reverser.FORWARD;
+        train.reverser = train.reversed != train.cabAtRear ? Reverser.BACKWARD : Reverser.FORWARD;
         train.pauseUntilMillis = 0L;
         train.reverseSettleUntilMillis = 0L;
         train.reverseBrakeDeadlineMillis = 0L;

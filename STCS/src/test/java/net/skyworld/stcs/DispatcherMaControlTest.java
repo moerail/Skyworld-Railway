@@ -30,7 +30,7 @@ public final class DispatcherMaControlTest {
         long now=System.currentTimeMillis(), at=now-(stale?10000:0);
         String edge="a-"+point;
         var roster=new ConsistObservation(session,1,train,"T",at,List.of(member),List.of(
-                new ConsistObservation.Member(member,"world",20.5,64.06,.5,at,at,ConsistObservation.State.OBSERVED)),false);
+                new ConsistObservation.Member(member,"world",20.5,64.06,.5,at,at,ConsistObservation.State.OBSERVED)),false,ShadowRuntimeTest.completeIntegrity(List.of(member),at));
         var physical=new TrainTelemetrySnapshot(train,"T",1,at,"world",20,64,0,20.5,64.06,.5,1,0,0,
                 speed,1,1,false,false,TrainMode.MANUAL,"Driver");
         var position=new TrackPositionSnapshot(graph.revision,edge,"a",point.toString(),20.,100.,"L",20.,at,true,false);

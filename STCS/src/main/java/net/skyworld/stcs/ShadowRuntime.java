@@ -185,6 +185,8 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
             return "AUTOMATIC_TRAIN";
         if (report == null && !action.equals("request") && !action.equals("release")) return "NO_REPORT";
         if(action.equals("release")) {
+            var c=input.roster().stream().filter(v->v.train().equals(train)).findFirst().orElse(null);
+            if(c==null || !c.integrity().permitsClearance(c.expectedMembers(),System.currentTimeMillis())) return "TIMS_HOLD";
             if (report == null && liveGrants.containsKey(train) && liveGrants.get(train).executable())
                 return "NO_REPORT";
             if (report != null && report.physical().state().speedMetersPerSecond() > .05) return "STOP_FIRST";
@@ -343,7 +345,10 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
     }
     public synchronized void revokeForChannelChange(UUID trainId) {
         if (trainId == null) return;
-        intents.remove(trainId); reserved.remove(trainId); maPoints.remove(trainId);
+        var c=inputSource.get().roster().stream().filter(v->v.train().equals(trainId)).findFirst().orElse(null);
+        boolean clear=c!=null && c.integrity().permitsClearance(c.expectedMembers(),System.currentTimeMillis());
+        intents.remove(trainId);
+        if(clear) {reserved.remove(trainId);maPoints.remove(trainId);}
         liveGrants.remove(trainId); acknowledgedGrants.remove(trainId);
         warnedLostGrants.remove(trainId); reversed.remove(trainId);
         soundTracker.reset(trainId); reasons.put(trainId,"CHANNEL_CHANGED");
@@ -363,8 +368,10 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
             RailGraph graph=input.graph();
             if(model==null||model.graph!=graph) {
                 model=new ShadowGraph(graph);
-                reserved.entrySet().removeIf(e -> !liveGrants.containsKey(e.getKey())
-                        || !liveGrants.get(e.getKey()).executable());
+                maPoints.forEach((id,points)->{
+                    var keep=new HashSet<>(dispatcherRetainedPoints.getOrDefault(id,Set.of()));keep.addAll(points);
+                    dispatcherRetainedPoints.put(id,Set.copyOf(keep));
+                });
                 maPoints.clear();intents.clear();reversed.clear();acknowledgedGrants.clear();
                 occupied.keySet().forEach(id->{uncertain.add(id);reasons.put(id,"GRAPH_CHANGED");});
                 // A previously uncovered parked train can become covered after a graph expansion.
@@ -391,6 +398,11 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
             }
             uncertain.addAll(occupied.keySet());
             unbounded=!available;
+            Map<UUID,UUID> owners=new HashMap<>();Set<UUID> identityConflicts=new HashSet<>();
+            for(var c:input.roster())if(!c.removed())for(UUID member:c.expectedMembers()) {
+                UUID other=owners.putIfAbsent(member,c.train());
+                if(other!=null && !other.equals(c.train())) {identityConflicts.add(other);identityConflicts.add(c.train());}
+            }
             if(available) for(var train:input.roster()) {
                 if (train.session().equals(input.rosterSession()) && train.session().equals(input.driverSession())
                         && fresh(train.sampledAtMillis(), now) && train.confirmedDestruction()
@@ -410,6 +422,8 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                 }
                 boolean physicalComplete=!train.expectedMembers().isEmpty()
                         && train.expectedMembers().size()==train.members().size() && fresh(train.sampledAtMillis(),now);
+                boolean timsClear=!identityConflicts.contains(train.train()) && train.integrity().permitsClearance(train.expectedMembers(),now);
+                physicalComplete &= timsClear;
                 boolean complete=physicalComplete;
                 Map<UUID,ConsistObservation.Member> byId=new HashMap<>();
                 long earliest=Long.MAX_VALUE, last=0;
@@ -511,6 +525,16 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                 var m=reports.get(id);var desk=drivers.get(id);var intent=intents.get(id);
                 String reason=reasons.getOrDefault(id,"IDLE");
                 boolean eligible=intent!=null;
+                var consist=observed.get(id);
+                if(consist==null || !consist.integrity().permitsClearance(consist.expectedMembers(),now)) {
+                    eligible=false;
+                    reason=consist==null?"TIMS_UNAVAILABLE":consist.integrity().state()==TrainIntegrity.State.COMPLETE
+                            && !fresh(consist.integrity().confirmedAtMillis(),now)?"TIMS_STALE"
+                            :consist.integrity().state()==TrainIntegrity.State.COMPLETE
+                                    && consist.integrity().brakeHeld()?"TIMS_BRAKE_HELD"
+                                    :"TIMS_"+consist.integrity().reason();
+                    intents.remove(id);
+                }
                 if(dispatcherSuspended.containsKey(id)) {eligible=false;reason="DISPATCHER_HOLD";}
                 if(intent!=null && (desk==null||!intent.lease().equals(desk.leaseId())||!intent.driver().equals(desk.driverId())
                         || !intent.provider().equals(input.driverSession())
@@ -817,6 +841,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
     private void clearRetained(UUID id) {
         occupied.remove(id); retained.remove(id); reserved.remove(id); intents.remove(id);
         maPoints.remove(id); occupiedPoints.remove(id); uncertain.remove(id);
+        dispatcherSuspended.remove(id);dispatcherTripped.remove(id);dispatcherRetainedPoints.remove(id);
         reversed.remove(id); reasons.remove(id); soundTracker.reset(id);
     }
 

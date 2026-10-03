@@ -123,6 +123,17 @@ final class TrainPersistence {
                                 loadedCartIndex.put(entityId, id);
                             }
 
+                            var manifest=section.getStringList("tims.expected-members").stream().map(UUID::fromString).toList();
+                            train.tims.restore(manifest.isEmpty()?train.members():manifest,
+                                    !section.contains("tims.expected-members") || section.getBoolean("tims.brake-held",false),
+                                    section.getString("tims.permanent-failure"),section.getString("tims.last-trip-reason"));
+                            train.manifestReady=true;
+                            train.cabAtRear=section.getBoolean("cab-at-rear",false);
+                            if(section.contains("last-position.world")) {
+                                train.lastReportedPosition=new MemberSnapshot(id,section.getString("last-position.world"),
+                                        section.getDouble("last-position.x"),section.getDouble("last-position.y"),section.getDouble("last-position.z"),
+                                        section.getLong("last-position.at"));
+                            }
                             loadedTrains.put(id, train);
                             loadedNameIndex.put(train.key(), id);
                         } catch (RuntimeException ex) {
@@ -190,6 +201,17 @@ final class TrainPersistence {
                                 : null);
                 config.set(path + ".mileage.in-signal-range", mileage.inSignalRange());
                 config.set(path + ".members", train.members().stream().map(UUID::toString).toList());
+                config.set(path+".tims.expected-members",train.tims.manifest().stream().map(UUID::toString).toList());
+                config.set(path+".tims.brake-held",train.tims.view(System.currentTimeMillis()).brakeHeld());
+                config.set(path+".tims.permanent-failure",train.tims.permanentFailure());
+                config.set(path+".tims.last-trip-reason",train.tims.latchedReason());
+                config.set(path+".cab-at-rear",train.cabAtRear);
+                var last=train.lastReportedPosition;
+                if(last!=null) {
+                    config.set(path+".last-position.world",last.worldName);config.set(path+".last-position.x",last.x);
+                    config.set(path+".last-position.y",last.y);config.set(path+".last-position.z",last.z);
+                    config.set(path+".last-position.at",last.timeMillis);
+                }
                 train.properties().save(config, path + ".properties");
             }
 

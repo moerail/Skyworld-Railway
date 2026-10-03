@@ -21,7 +21,8 @@ const server=http.createServer((req,res)=>{
   if(req.url==='/api/v5/config')body={updateMode:'poll',pollIntervalMillis:250,controlEnabled:true};
   else if(req.url==='/api/v5/graph')body=graph;
   else if(req.url==='/api/v5/trains')body={schemaVersion:5,serviceStatus:'AVAILABLE',serverTimeMillis:now,graphRevision:1,
-    trains:[{...train,observedAtMillis:now,ageMillis:0}],
+    trains:[{...train,observedAtMillis:now,ageMillis:0,
+      integrity:{state:'LOST',reason:'GAP_EXCEEDED',observedAtMillis:now,brakeHeld:true,affectedMembers:['cart-2'],messageId:1136,packetId:1000}}],
     shadowMa:{version:5,simulationOnly:true,executable:false,status:'SHADOW',graphRevision:1,emittedAtMillis:now,
       authorities:[{trainId:'t1',state:'ALLOCATED_SHADOW', NID_MESSAGE:1003, NID_PACKET:1015,signedRemainingMeters:40,eoaEdgeId:'e',eoaOffsetMeters:70,reason:'SWITCH_UNKNOWN'}],sections:[
         {edgeId:'e',resourceId:'r',state:'OCCUPIED',occupants:['t1'],reservations:[],fromMeters:25,toMeters:30},
@@ -58,6 +59,7 @@ const server=http.createServer((req,res)=>{
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await page.locator('.train-row').click();
+    assert((await page.locator('#detailIntegrity').textContent()).includes('GAP_EXCEEDED'));
     await page.locator('#followTrain').click();
     const out=path.resolve(__dirname,'../target/pcc-i18n');fs.mkdirSync(out,{recursive:true});
     await page.locator('#revokeMa').click();
@@ -75,6 +77,7 @@ const server=http.createServer((req,res)=>{
       await page.waitForTimeout(150);
       assert.equal(await page.locator('#detailName').textContent(),'Train 原名');
       assert.equal(await page.locator('#detailLine').textContent(),'test_up');
+      assert((await page.locator('#detailIntegrity').textContent()).includes('GAP_EXCEEDED'));
       assert(await page.locator('#cancelFollow').isVisible());
       assert.equal(await page.locator('#detailMaReason').textContent(),await page.evaluate(()=>PccI18n.code('SWITCH_UNKNOWN')));
       assert.equal(await page.locator('.event-row').count(),5);

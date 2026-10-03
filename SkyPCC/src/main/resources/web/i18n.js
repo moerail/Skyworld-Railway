@@ -2,6 +2,10 @@
   'use strict';
   const languages = ['zh', 'en', 'fr', 'ja'];
   const rows = [
+  ['Train integrity','列车完整性','Intégrité du train','列車完全性'],
+  ['Integrity complete','完整','Intégrité confirmée','完全性確認済み'],
+  ['Integrity unknown','完整性未知','Intégrité inconnue','完全性不明'],
+  ['Integrity lost','失完整','Intégrité perdue','完全性喪失'],
   ['Revoke MA → TR','撤销 MA → TR','Révoquer MA → TR','MA 取消 → TR'],
   ['Moving or stopped, the selected train will enter TR and brake.','所选列车无论运行或停车，都会进入 TR 并制动。','En marche ou à l’arrêt, le train sélectionné passe en TR et freine.','選択列車は走行中も停車中も TR に移行し制動します。'],
   ['MA revoke unconfirmed. Check train state.','MA 撤销未确认，请核实列车状态。','Révocation MA non confirmée. Vérifiez le train.','MA 取消未確認。列車状態を確認してください。'],

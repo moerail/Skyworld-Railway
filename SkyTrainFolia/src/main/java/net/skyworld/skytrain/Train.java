@@ -41,6 +41,12 @@ final class Train {
     volatile OperatingMode operatingMode = OperatingMode.SB;
     final ActiveAtpState activeAtp = new ActiveAtpState();
     final DispatcherBrake dispatcherBrake = new DispatcherBrake();
+    final TrainIntegrityMonitor tims = new TrainIntegrityMonitor();
+    volatile boolean cabAtRear;
+    volatile UUID cabMember;
+    volatile Reverser lastSelectedReverser=Reverser.BACKWARD;
+    volatile boolean manifestReady;
+    volatile MemberSnapshot lastReportedPosition;
     volatile Double activeAtpLimitMps;
     volatile String activeAtpReason = "UNAVAILABLE";
     volatile int activeAtpBrakeLevel;
@@ -626,6 +632,7 @@ final class Train {
     }
 
     boolean removeMember(UUID entityId) {
+        if(manifestReady) tims.removed(entityId);
         snapshots.remove(entityId);
         memberSpeeds.remove(entityId);
         return members.remove(entityId);
@@ -665,6 +672,7 @@ final class Train {
 
     void snapshot(UUID entityId, MemberSnapshot snapshot) {
         snapshots.put(entityId, snapshot);
+        if(indexOf(entityId)==(reversed?memberCount()-1:0)) lastReportedPosition=snapshot;
         memberEvidence.compute(entityId, (id, old) -> old != null && old.stateAtMillis() >= snapshot.timeMillis
                 ? old : new MemberEvidence(snapshot, "OBSERVED", snapshot.timeMillis));
     }
@@ -677,6 +685,14 @@ final class Train {
 
     MemberSnapshot snapshot(UUID entityId) {
         return snapshots.get(entityId);
+    }
+
+    synchronized TrainIntegrityMonitor.View sampleIntegrity(long now) {
+        if(!manifestReady)return tims.view(now);
+        var evidence=memberEvidence();
+        var samples=evidence.entrySet().stream().map(e->{var p=e.getValue().position();
+            return new TrainIntegrityMonitor.Sample(e.getKey(),p.worldName,p.x,p.y,p.z,p.timeMillis,e.getValue().state());}).toList();
+        return tims.evaluate(members(),samples,trackPath==null?List.of():trackPath.integrityGeometry(),spacing,now,(reversed?-1:1)*currentSpeed());
     }
 
     List<MemberSnapshot> snapshots() {

@@ -144,6 +144,11 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
             else warn("STA event service unavailable; driver safety actions still applied");
         } catch (RuntimeException | LinkageError ex) { warn("Driver event delivery failed: " + ex); }
     }
+    private static TrainIntegrity integrityReport(Train train,long now) {
+        var v=train.tims.view(now);
+        return new TrainIntegrity(TrainIntegrity.State.valueOf(v.state().name()),v.reason(),v.observedAtMillis(),
+                v.confirmedAtMillis(),v.expectedMembers(),v.affectedMembers(),v.brakeHeld());
+    }
     public Collection<ConsistObservation> consistObservations() { return consists; }
     public Consumer<UUID> beginRemoval(Train train) {
         var expected = List.copyOf(train.members());
@@ -196,7 +201,7 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
                         p.timeMillis, e.stateAtMillis(), ConsistObservation.State.valueOf(e.state())));
             });
             result.add(new ConsistObservation(session, sequence.incrementAndGet(), train.id(), train.name(),
-                    now, train.members(), members, false));
+                    now, train.tims.manifest(), members, false, integrityReport(train,now)));
         }
         // Persist before publication; receipts survive missed sampling and server restarts.
         var receipts = destructions.values().stream().sorted(Comparator.comparing(r -> r.train().toString())).toList();

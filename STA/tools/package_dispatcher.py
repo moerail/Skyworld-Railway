@@ -7,9 +7,10 @@ import zipapp
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DESTINATION = ROOT / "dist" / "SkyRail-Dispatcher-2.1.1.pyz"
+DESTINATION = ROOT / "dist" / "SkyRail-Dispatcher-2.1.4.pyz"
 SOURCES = (
     ROOT / "STA" / "tools" / "sta_dispatcher.py",
+    ROOT / "STA" / "tools" / "dispatcher_profile.py",
     ROOT / "STA" / "tools" / "sta_remote.py",
     ROOT / "STA" / "tools" / "dispatcher_view.py",
     ROOT / "STCS" / "tools" / "testbench" / "railgraph_simulation.py",
@@ -26,7 +27,7 @@ def main():
         for source in SOURCES:
             shutil.copy2(source, stage / source.name)
         (stage / "__main__.py").write_text(
-            "from sta_dispatcher import main\nmain()\n", encoding="utf-8"
+            "from sta_dispatcher import main\nraise SystemExit(main())\n", encoding="utf-8"
         )
         zipapp.create_archive(stage, DESTINATION, compressed=True)
     print(DESTINATION)

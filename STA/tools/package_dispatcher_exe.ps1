@@ -19,7 +19,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Install PyInstaller in this Python first: py -
 
 & $Python @arguments -m PyInstaller `
     --noconfirm --onefile --windowed `
-    --name 'SkyRail-Dispatcher-2.1.1' `
+    --name 'SkyRail-Dispatcher-2.1.4' `
     --distpath (Join-Path $root 'dist') `
     --workpath $buildDirectory `
     --specpath $specDirectory `
@@ -28,4 +28,4 @@ if ($LASTEXITCODE -ne 0) { throw 'Install PyInstaller in this Python first: py -
     (Join-Path $root 'STA\tools\sta_dispatcher.py')
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller packaging failed.' }
 
-Write-Host "Built $(Join-Path $root 'dist\SkyRail-Dispatcher-2.1.1.exe')"
+Write-Host "Built $(Join-Path $root 'dist\SkyRail-Dispatcher-2.1.4.exe')"

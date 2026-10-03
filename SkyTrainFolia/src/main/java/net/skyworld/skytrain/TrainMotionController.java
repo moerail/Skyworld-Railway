@@ -71,6 +71,25 @@ final class TrainMotionController {
         }
         applyForcedSpacing(train);
         int index = train.indexOf(entityId);
+        if(index==activeLeaderIndex(train)) {
+            var before=train.tims.view(now);
+            boolean previouslyLatched = train.tims.latched();
+            var current=train.sampleIntegrity(now);
+            if (!previouslyLatched && train.tims.latched())
+                plugin.announceIntegrityHold(train, train.tims.latchedReason());
+            if(!current.reason().startsWith("DEBOUNCING_")
+                    && (before.state()!=current.state() || (!before.reason().startsWith("DEBOUNCING_")
+                            && !before.reason().equals(current.reason()))) && plugin.telemetrySink()!=null)
+                plugin.telemetrySink().driverEvent(train,null,"","INTEGRITY_CHANGED",current.state()+":"+current.reason());
+        }
+        boolean integrityHold=train.tims.view(now).brakeHeld();
+        if(integrityHold) {
+            train.powerNotch=0;
+            if(train.tims.latched() || train.tims.view(now).state()==TrainIntegrityMonitor.State.LOST) {
+                train.moving=false;
+                train.operatingMode=OperatingMode.TR;
+            }
+        }
         if (index == activeLeaderIndex(train)) {
             boolean stopped = train.currentSpeed() <= .001 && train.maxMemberSpeed() <= .001
                     && !train.members().isEmpty() && train.members().stream().allMatch(id -> {
@@ -169,7 +188,7 @@ final class TrainMotionController {
         Vector direction = RailMath.direction(rail.rail.getShape(), preference);
 
         ActiveAtpState.Decision atp = null;
-        if (index == activeLeaderIndex(train) && !train.dispatcherBrake.held() && train.protectionMode == ProtectionMode.ACTIVE
+        if (index == activeLeaderIndex(train) && !train.dispatcherBrake.held() && !integrityHold && train.protectionMode == ProtectionMode.ACTIVE
                 && !train.properties().conductionMode.automatic()) {
             var desk = plugin.driverDesks().stream().filter(d -> d.trainId().equals(train.id()))
                     .findFirst().orElse(null);
@@ -202,6 +221,10 @@ final class TrainMotionController {
             }
         }
 
+        if(integrityHold) {
+            atp=ActiveAtpState.Decision.hold(train.operatingMode,"TIMS_"+train.tims.view(now).reason());
+            train.activeAtpBrakeLevel=8;train.activeAtpLimitMps=0.0;train.activeAtpReason=atp.reason();
+        }
         if (train.dispatcherBrake.held()) {
             atp = ActiveAtpState.Decision.hold(train.operatingMode,
                     train.dispatcherBrake.trip() ? "DISPATCHER_REVOKED" : "DISPATCHER_REROUTE");
@@ -227,7 +250,7 @@ final class TrainMotionController {
         boolean settlingReverse = reverseBraking(train, now);
         boolean controlledStop = (!train.driveControlEnabled && !train.moving) || waiting || settlingReverse
                 || train.emergencyBrake || (atp != null && atp.emergency());
-        boolean playerPushCoasting = controlledStop && train.playerPushActive && !train.dispatcherBrake.held();
+        boolean playerPushCoasting = controlledStop && train.playerPushActive && !train.dispatcherBrake.held() && !integrityHold;
         boolean automaticHandle = train.automaticRun != null && host.automaticEligible(train);
         double desiredTrainSpeed = controlledStop ? 0.0
                 : stationMoving ? stationMotion.commandedSpeed(signActions.stationMotionMinimumSpeed(stationMotion))
@@ -241,6 +264,8 @@ final class TrainMotionController {
             desiredTrainSpeed *= 0.25;
         }
         desiredTrainSpeed *= RailMath.clamp(train.properties().friction, 0.0, 4.0);
+        if (automaticHandle && train.properties().automaticTargetSpeed != null)
+            desiredTrainSpeed = Math.min(desiredTrainSpeed, train.properties().automaticTargetSpeed);
         desiredTrainSpeed = RailMath.clamp(desiredTrainSpeed, 0.0, trainSpeedLimit);
         SpeedLimit obstacleLimit = index == activeLeaderIndex(train)
                 ? frontMinecartSpeedLimit(train, cart, location, direction, desiredTrainSpeed)
@@ -270,7 +295,7 @@ final class TrainMotionController {
             boolean tractionAllowed = !controlledStop
                     && train.moving
                     && train.reverser != Reverser.NEUTRAL
-                    && train.reverser.wantsBackward() == train.reversed
+                    && CabOrientation.reversed(train.cabAtRear,train.reverser) == train.reversed
                     && train.powerNotch > 0
                     && train.brakeNotch == 0
                     && !train.emergencyBrake
@@ -471,7 +496,7 @@ final class TrainMotionController {
         if (!train.driveControlEnabled || train.reverser == Reverser.NEUTRAL) {
             return;
         }
-        boolean desiredReversed = train.reverser.wantsBackward();
+        boolean desiredReversed = CabOrientation.reversed(train.cabAtRear,train.reverser);
         if (train.reversed == desiredReversed) {
             return;
         }

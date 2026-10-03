@@ -16,11 +16,14 @@ public final class ShadowRuntimeTest {
     static String mode="SHADOW";
     static TrainMode trainMode=TrainMode.MANUAL;
     static ConsistObservation.State memberState=ConsistObservation.State.OBSERVED;
+    static TrainIntegrity completeIntegrity(List<UUID> members,long at) {
+        return new TrainIntegrity(TrainIntegrity.State.COMPLETE,"CONFIRMED",at,at,members,List.of(),false);
+    }
     static ShadowRuntime.Inputs input() {
         long now=System.currentTimeMillis(),at=now-(stale?10000:0);
         var desk=new DriverDeskService.Desk(train,driver,lease,mode);
         var observation=new ConsistObservation(session,1,train,"T",at,List.of(member),List.of(
-                new ConsistObservation.Member(member,"world",20.5,64.06,.5,at,at,memberState)),false);
+                new ConsistObservation.Member(member,"world",20.5,64.06,.5,at,at,memberState)),false,completeIntegrity(List.of(member),at));
         var physical=new TrainTelemetrySnapshot(train,"T",1,at,"world",20,64,0,20.5,64.06,.5,1,0,0,
                 0,1,1,false,reverse,trainMode,"Name is not a lease");
         var position=new TrackPositionSnapshot(graph.revision,"a-b","a","b",20.,100.,"L",20.,at,true,false);
@@ -70,14 +73,16 @@ public final class ShadowRuntimeTest {
                 mode="BYPASS";runtime.command(driver,"request");assert authority(runtime).state().equals("ALLOCATED_SHADOW");
                 reverse=true;runtime.tick();assert authority(runtime).reason().equals("DIRECTION_CHANGED");
                 runtime.command(driver,"request");assert authority(runtime).state().equals("ALLOCATED_SHADOW");
-                stale=true;runtime.tick();assert authority(runtime).state().equals("WAITING");
-                runtime.command(driver,"request");assert events.getLast().state().equals("WAITING");
+                stale=true;runtime.tick();assert authority(runtime).state().equals("INACTIVE");
+                runtime.command(driver,"request");assert events.getLast().state().equals("INACTIVE");
                 runtime.eventSink = event -> {throw new IllegalStateException("event service unavailable");};
                 assert runtime.command(driver,"request").equals("REQUESTED") : "notification failure must not break controls";
                 runtime.eventSink = events::add;
                 assert runtime.snapshot().sections().stream().anyMatch(s->s.state().equals("UNCERTAIN"));
-                stale=false;memberState=ConsistObservation.State.PLAYER_QUIT;runtime.tick();assert authority(runtime).state().equals("WAITING");
-                memberState=ConsistObservation.State.OBSERVED;runtime.tick();assert authority(runtime).state().equals("ALLOCATED_SHADOW");
+                stale=false;memberState=ConsistObservation.State.PLAYER_QUIT;runtime.tick();assert authority(runtime).state().equals("INACTIVE");
+                memberState=ConsistObservation.State.OBSERVED;runtime.tick();
+                assert authority(runtime).state().equals("INACTIVE") : "TIMS recovery must not restore old intent";
+                runtime.command(driver,"request");assert authority(runtime).state().equals("ALLOCATED_SHADOW");
                 graph=new RailGraph(2,256,1,graph.nodes,graph.edges,graph.unresolved);runtime.tick();
                 assert authority(runtime).state().equals("INACTIVE") : "rebuild invalidates intent";
             }

@@ -503,7 +503,7 @@
     let count = 0;
     for (const event of events) {
       const warning = event.type === 'DRIVER_UNAVAILABLE' || event.type === 'SWITCH_RUN_THROUGH_SUSPECTED'
-        || event.type === 'MA_UNAVAILABLE'
+        || event.type === 'MA_UNAVAILABLE' || (event.type === 'INTEGRITY_CHANGED' && !event.reason.startsWith('COMPLETE:'))
         || (event.type === 'EMERGENCY_BRAKE_APPLIED' && event.reason !== 'EB_INPUT');
       if (ui.eventFilter.value === 'warning' && !warning) continue;
       count++;
@@ -542,6 +542,7 @@
         driver, mode: code(event.details?.mode || '--'), state: code(event.details?.state || 'UNKNOWN'),
         reason, executable: code(event.details?.executable || 'false') });
       else if (event.type === 'MA_RELEASED') message.textContent = t('{driver} released forward MA reservation. Train occupancy retained.', { driver });
+      else if (event.type === 'INTEGRITY_CHANGED') message.textContent = `${t('Train integrity')}: ${reason}`;
       else if (event.type === 'MA_UNAVAILABLE' && event.reason === 'DISPATCHER_REVOKED') message.textContent = code('DISPATCHER_REVOKED');
       else if (event.type === 'MA_UNAVAILABLE') message.textContent = t('Executable MA unavailable for {train} ({reason}). Stop at the last confirmed EoA.', {
         train: event.trainName || event.trainId, reason });
@@ -835,6 +836,10 @@
     ui.detailHandle.textContent = cab ? `P${cab.powerNotch} / ${cab.emergencyBrake ? 'EB' : `B${cab.brakeNotch}`}` : '--';
     ui.detailHandle.title = t('Handle input; brake hold can override traction');
     ui.detailBrakeHold.textContent = cab ? (cab.brakeHold ? t('Active') : t('Off')) : '--';
+    const ti=train.integrity, tiFresh=available && ti && Date.now()>=ti.observedAtMillis && Date.now()-ti.observedAtMillis<=1500;
+    document.getElementById('detailIntegrity').textContent=tiFresh
+      ? `${t(ti.state === 'COMPLETE' ? 'Integrity complete' : ti.state === 'LOST' ? 'Integrity lost' : 'Integrity unknown')} · ${ti.reason} · ${new Date(ti.observedAtMillis).toLocaleTimeString()} · hold=${ti.brakeHeld} · ${(ti.affectedMembers || []).join(', ')}`
+      : t('Integrity unknown');
     ui.detailDriver.textContent = train.mode === 'automatic' ? t('Automatic') : (train.driver || '--');
     ui.detailLine.textContent = train.line || '--';
     ui.detailMileage.textContent = train.currentMileageMeters != null && Number.isFinite(Number(train.currentMileageMeters))

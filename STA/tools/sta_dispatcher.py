@@ -2,6 +2,8 @@
 """SkyRail administrator desk over STA Remote/1. Run with Python 3.11+."""
 from __future__ import annotations
 
+import argparse
+from datetime import datetime
 import math
 import queue
 import sys
@@ -10,7 +12,7 @@ import time
 import uuid
 from pathlib import Path
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import colorchooser, font as tkfont, messagebox, ttk
 
 if not getattr(sys, "frozen", False):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "STCS" / "tools" / "testbench"))
@@ -18,7 +20,8 @@ if not getattr(sys, "frozen", False):
 from railgraph_simulation import Graph
 from railgraph_geometry import edge_screen_coords, fit_transform
 from sta_remote import Remote, RemoteError
-from dispatcher_view import FACES, assigned_line, line_color, face_arrow, edge_unit, current_shadow
+from dispatcher_view import FACES, assigned_line, face_arrow, edge_unit, current_shadow
+from dispatcher_profile import ConnectionProfile, ProfileError, default_profile_path, load_profile
 
 
 WORDS = {
@@ -36,6 +39,11 @@ WORDS = {
     "change": ("转换道岔", "Change switch", "Manœuvrer l'aiguille", "分岐器を転換"),
     "pending": ("待审批 SR", "Pending SR", "SR en attente", "承認待ち SR"),
     "train": ("列车", "Train", "Train", "列車"),
+    "revoke_ma": ("撤销所选列车 MA → TR", "Revoke selected MA → TR", "Révoquer MA → TR", "選択列車の MA 取消 → TR"),
+    "confirm_revoke": ("撤销 {train} 的 MA？运行或停车都会进入 TR 并制动。",
+                       "Revoke MA for {train}? Moving or stopped, the train will enter TR and brake.",
+                       "Révoquer la MA de {train} ? Passage en TR et freinage, même à l'arrêt.",
+                       "{train} の MA を取り消しますか？走行中も停車中も TR に移行し制動します。"),
     "driver": ("司机", "Driver", "Conducteur", "運転士"),
     "target": ("目标节点 UUID", "Target node UUID", "UUID du nœud cible", "目標ノード UUID"),
     "approve": ("批准 SR", "Approve SR", "Autoriser SR", "SR を承認"),
@@ -71,8 +79,27 @@ WORDS = {
     "shadow_stale": ("占用未知／快照过期", "Occupancy unknown / stale", "Occupation inconnue / périmée", "在線不明／期限切れ"),
     "main_line": ("正线", "Main line", "Voie principale", "本線"),
     "siding": ("侧线", "Siding", "Voie de service", "側線"),
+    "font_size": ("字号", "Font size", "Taille du texte", "文字サイズ"),
+    "operations": ("调度", "Operations", "Exploitation", "運行"),
+    "lines": ("线路", "Lines", "Lignes", "路線"),
+    "session_color": ("设置临时颜色", "Set session color", "Couleur temporaire", "一時色を設定"),
+    "reset_color": ("恢复无着色", "Reset color", "Effacer la couleur", "色をリセット"),
+    "line_hint": ("当前世界的已确认线路。颜色仅本次会话有效，占用图层优先显示。",
+                  "Confirmed lines in this world. Colors last for this session; occupancy stays above them.",
+                  "Lignes confirmées de ce monde. Couleurs temporaires ; occupation au premier plan.",
+                  "現在のワールドの確定路線。一時色より在線表示を優先します。"),
+    "hidden_labels": ("拥挤隐藏 {count} 个标签；放大地图查看", "{count} crowded labels hidden; zoom in",
+                      "{count} libellés masqués ; zoomez", "混雑したラベル {count} 件を非表示。拡大してください"),
+    "railway_events": ("运行事件", "Railway events", "Événements", "運行イベント"),
+    "warnings_only": ("仅看警告", "Warnings only", "Avertissements", "警告のみ"),
+    "events_upgrade": ("运行事件需更新 STA 服务端 JAR", "Update the STA server JAR for railway events",
+                       "Mettez à jour le JAR STA pour les événements", "イベントには STA JAR の更新が必要です"),
 }
 CODES = {
+    "WAITING_TR": ("等待车端确认 TR", "Waiting for onboard TR", "Attente du TR embarqué", "車上 TR 確認待ち"),
+    "REVOKED_TR": ("MA 已撤销，车端已确认 TR", "MA revoked; onboard TR confirmed", "MA révoquée ; TR confirmé", "MA 取消・車上 TR 確認済み"),
+    "DISPATCHER_REVOKED": ("调度员撤销 MA，进入 TR", "Dispatcher revoked MA; TR", "MA révoquée ; TR", "指令員による MA 取消・TR"),
+    "WITHDRAWING_MA": ("转岔前正在收回 MA", "Withdrawing MA before switch change", "Retrait de MA", "転換前の MA 撤回中"),
     "straight": ("直向", "Straight", "Directe", "直進"),
     "diverging": ("侧向", "Diverging", "Déviée", "分岐"),
     "APPLIED": ("已执行", "Applied", "Appliqué", "適用済み"),
@@ -117,7 +144,7 @@ THEMES = {
 
 
 class Desk:
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root: tk.Tk, profile: ConnectionProfile | None = None):
         self.root = root
         self.language = tk.StringVar(value="zh")
         self.theme = tk.StringVar(value="night")
@@ -127,6 +154,20 @@ class Desk:
         self.fingerprint = tk.StringVar()
         self.admin = tk.StringVar()
         self.token = tk.StringVar()
+        self.font_size = tk.IntVar(value=10)
+        self.map_font_size = 10
+        self.line_colors = {}
+        self.line_rows = {}
+        self.line_signature = None
+        self.revoke_request = None
+        self.railway_history = None
+        self.events_state = tk.StringVar()
+        self.warnings_only = tk.BooleanVar(value=False)
+        if profile is not None:
+            self.host.set(profile.host)
+            self.port.set(str(profile.port))
+            self.fingerprint.set(profile.fingerprint)
+            self.admin.set(profile.admin)
         self.switch_id = tk.StringVar()
         self.target_id = tk.StringVar()
         self.world = tk.StringVar()
@@ -183,13 +224,15 @@ class Desk:
         self.root.minsize(1000, 650)
         top = ttk.Frame(self.root, padding=8)
         top.pack(fill="x")
-        for key, var, width, hidden in (
-                ("host", self.host, 22, False), ("port", self.port, 6, False),
-                ("fingerprint", self.fingerprint, 40, False), ("admin", self.admin, 12, False),
-                ("token", self.token, 22, True)):
-            self.label(top, key, side="left", padx=(7, 3))
-            ttk.Entry(top, textvariable=var, width=width, show="*" if hidden else "").pack(side="left")
-        self.button(top, "connect", self.connect, side="left", padx=6)
+        for fields in ((("host", self.host, 22, False), ("port", self.port, 6, False),
+                        ("admin", self.admin, 12, False)),
+                       (("fingerprint", self.fingerprint, 40, False), ("token", self.token, 22, True))):
+            row = ttk.Frame(top)
+            row.pack(fill="x", pady=2)
+            for key, var, width, hidden in fields:
+                self.label(row, key, side="left", padx=(7, 3))
+                ttk.Entry(row, textvariable=var, width=width, show="*" if hidden else "").pack(side="left", fill="x", expand=True)
+        self.button(row, "connect", self.connect, side="left", padx=6)
         bar = ttk.Frame(self.root, padding=(8, 2))
         bar.pack(fill="x")
         self.label(bar, "world", side="left")
@@ -197,6 +240,12 @@ class Desk:
         self.world_box.pack(side="left", padx=5)
         self.world_box.bind("<<ComboboxSelected>>", lambda _: self.fit())
         self.button(bar, "fit", self.fit, side="left", padx=5)
+        self.label(bar, "font_size", side="left", padx=4)
+        size_box = ttk.Spinbox(bar, from_=8, to=24, textvariable=self.font_size, width=3,
+                               command=self.change_font_size)
+        size_box.pack(side="left")
+        size_box.bind("<Return>", self.change_font_size)
+        size_box.bind("<FocusOut>", self.change_font_size)
         ttk.Combobox(bar, textvariable=self.language, values=LANGS, state="readonly", width=5).pack(side="right", padx=5)
         self.theme_box = ttk.Combobox(bar, textvariable=self.theme_display, state="readonly", width=8)
         self.theme_box.pack(side="right", padx=5)
@@ -213,15 +262,55 @@ class Desk:
         self.canvas.bind("<B3-Motion>", self.pan_move)
         self.canvas.bind("<MouseWheel>", self.wheel)
         self.canvas.bind("<Configure>", lambda _: self.draw())
-        side = ttk.Frame(main, width=370, padding=12)
-        side.pack(side="right", fill="y")
-        side.pack_propagate(False)
+        self.sidebar = ttk.Notebook(main, width=370)
+        self.sidebar.pack(side="right", fill="y")
+        operations_panel = ttk.Frame(self.sidebar)
+        operations_canvas = tk.Canvas(operations_panel, width=370, highlightthickness=0)
+        operations_scroll = ttk.Scrollbar(operations_panel, command=operations_canvas.yview)
+        operations_scroll.pack(side="right", fill="y")
+        operations_canvas.pack(side="left", fill="both", expand=True)
+        operations_canvas.configure(yscrollcommand=operations_scroll.set)
+        side = ttk.Frame(operations_canvas, padding=12)
+        side_window = operations_canvas.create_window(0, 0, window=side, anchor="nw")
+        side.bind("<Configure>", lambda _: operations_canvas.configure(scrollregion=operations_canvas.bbox("all")))
+        operations_canvas.bind("<Configure>", lambda e: operations_canvas.itemconfigure(side_window, width=e.width))
+        lines_panel = ttk.Frame(self.sidebar, padding=12)
+        self.sidebar.add(operations_panel)
+        self.sidebar.add(lines_panel)
+        events_panel = ttk.Frame(self.sidebar, padding=8)
+        self.sidebar.add(events_panel)
+        ttk.Label(events_panel, textvariable=self.events_state, wraplength=330).pack(fill="x")
+        warning_toggle = ttk.Checkbutton(events_panel, variable=self.warnings_only, command=self.render_railway_events)
+        self.widgets.setdefault("warnings_only", []).append(warning_toggle)
+        warning_toggle.pack(anchor="w")
+        event_body = ttk.Frame(events_panel)
+        event_body.pack(fill="both", expand=True)
+        self.railway_log = tk.Text(event_body, width=38, wrap="word", state="disabled", font="TkDefaultFont")
+        event_scroll = ttk.Scrollbar(event_body, command=self.railway_log.yview)
+        event_scroll.pack(side="right", fill="y")
+        self.railway_log.pack(side="left", fill="both", expand=True)
+        self.railway_log.configure(yscrollcommand=event_scroll.set)
+        lines_body = ttk.Frame(lines_panel)
+        lines_body.pack(fill="both", expand=True)
+        self.line_list = ttk.Treeview(lines_body, show="tree", selectmode="browse", height=12)
+        self.line_list.column("#0", width=300, stretch=True)
+        line_scroll = ttk.Scrollbar(lines_body, command=self.line_list.yview)
+        line_scroll.pack(side="right", fill="y")
+        self.line_list.pack(fill="both", expand=True, side="left")
+        self.line_list.configure(yscrollcommand=line_scroll.set)
+        scroll = ttk.Scrollbar(lines_panel, orient="horizontal", command=self.line_list.xview)
+        scroll.pack(fill="x")
+        self.line_list.configure(xscrollcommand=scroll.set)
+        self.button(lines_panel, "session_color", self.choose_line_color, fill="x", pady=4)
+        self.button(lines_panel, "reset_color", self.reset_line_color, fill="x", pady=4)
+        self.label(lines_panel, "line_hint", fill="x", pady=6).configure(wraplength=320)
         self.label(side, "trains", anchor="w", fill="x")
         self.train_list = ttk.Treeview(side, columns=("train", "speed"), show="headings", height=4)
         self.train_list.pack(fill="x", pady=4)
         self.train_list.bind("<<TreeviewSelect>>", self.select_train)
         self.train_detail_label = ttk.Label(side, textvariable=self.train_detail, wraplength=340, justify="left")
         self.train_detail_label.pack(fill="x", pady=4)
+        self.revoke_button = self.button(side, "revoke_ma", self.revoke_ma, fill="x", pady=4)
         ttk.Label(side, textvariable=self.occupancy_status).pack(fill="x", pady=2)
         ttk.Separator(side).pack(fill="x", pady=7)
         self.label(side, "switch", anchor="w", fill="x")
@@ -239,13 +328,16 @@ class Desk:
         ttk.Entry(side, textvariable=self.target_id).pack(fill="x", pady=5)
         self.approve_button = self.button(side, "approve", self.approve, fill="x", pady=3)
         self.label(side, "status", anchor="w", fill="x", pady=(15, 4))
-        self.log = tk.Text(side, height=5, wrap="word", state="disabled")
+        self.log = tk.Text(side, height=5, wrap="word", state="disabled", font="TkDefaultFont")
         self.log.pack(fill="both", expand=True)
         ttk.Label(self.root, textvariable=self.status, padding=5).pack(fill="x")
         self.apply_theme()
 
     def localize(self):
         self.root.title(self.word("title"))
+        self.sidebar.tab(0, text=self.word("operations"))
+        self.sidebar.tab(1, text=self.word("lines"))
+        self.sidebar.tab(2, text=self.word("railway_events"))
         for key, group in self.widgets.items():
             for widget in group:
                 widget.configure(text=self.word(key))
@@ -259,10 +351,59 @@ class Desk:
         self.theme_display.set(self.word(self.theme.get()))
         self.status.set(self.word("connected" if self.connected else "disconnected"))
         self.refresh_train_details()
+        self.render_railway_events()
         self.draw()
 
     def select_theme(self, _event):
         self.theme.set("day" if self.theme_display.get() == self.word("day") else "night")
+
+    def change_font_size(self, _event=None):
+        try:
+            size = max(8, min(24, self.font_size.get()))
+        except (tk.TclError, ValueError):
+            size = self.map_font_size
+        self.font_size.set(size)
+        self.map_font_size = size
+        for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont"):
+            tkfont.nametofont(name, root=self.root).configure(size=size)
+        ttk.Style(self.root).configure("Treeview", rowheight=size * 2 + 8)
+        self.draw()
+
+    def refresh_lines(self):
+        names = sorted({assigned_line(self.graph, edge.id) for edge in self.visible_edges()} - {""})
+        signature = (tuple(names), tuple(sorted(self.line_colors.items())), self.theme.get())
+        if signature == self.line_signature:
+            return
+        selected = self.line_list.selection()
+        selected_name = self.line_rows.get(selected[0]) if selected else None
+        self.line_list.delete(*self.line_list.get_children())
+        self.line_rows = {}
+        for index, name in enumerate(names):
+            row = f"line-{index}"
+            color = self.line_colors.get(name)
+            self.line_list.insert("", "end", iid=row, text=name + (f"  {color}" if color else ""), tags=(row,))
+            self.line_list.tag_configure(row, foreground=color or THEMES[self.theme.get()]["text"])
+            self.line_rows[row] = name
+            if name == selected_name:
+                self.line_list.selection_set(row)
+        self.line_signature = signature
+
+    def choose_line_color(self):
+        selection = self.line_list.selection()
+        if not selection:
+            return
+        name = self.line_rows[selection[0]]
+        color = colorchooser.askcolor(self.line_colors.get(name, THEMES[self.theme.get()]["rail"]),
+                                      parent=self.root, title=name)[1]
+        if color:
+            self.line_colors[name] = color
+            self.draw()
+
+    def reset_line_color(self):
+        selection = self.line_list.selection()
+        if selection:
+            self.line_colors.pop(self.line_rows[selection[0]], None)
+            self.draw()
 
     def apply_theme(self):
         p = THEMES[self.theme.get()]
@@ -273,9 +414,12 @@ class Desk:
         style.configure("TLabel", background=p["panel"], foreground=p["text"])
         style.configure("TButton", padding=5)
         style.configure("Treeview", background=p["bg"], fieldbackground=p["bg"], foreground=p["text"])
+        style.configure("Treeview", rowheight=self.map_font_size * 2 + 8)
         style.configure("Treeview.Heading", background=p["panel"], foreground=p["text"])
         self.canvas.configure(bg=p["bg"])
         self.log.configure(bg=p["bg"], fg=p["text"], insertbackground=p["text"])
+        self.railway_log.configure(bg=p["bg"], fg=p["text"], insertbackground=p["text"])
+        self.railway_log.tag_configure("warning", foreground=p["occupied"])
         self.draw()
 
     def connect(self):
@@ -299,7 +443,8 @@ class Desk:
         try:
             remote = Remote(host, port, fingerprint, admin, token)
             self.events.put(("connected", None))
-            graph_at = sr_at = train_at = shadow_at = 0.0
+            graph_at = sr_at = train_at = shadow_at = events_at = 0.0
+            events_supported = True
             while not self.stop.is_set():
                 try:
                     operation, fields = self.commands.get_nowait()
@@ -319,6 +464,11 @@ class Desk:
                 if now - shadow_at > 1:
                     self.events.put(("shadow", remote.call("shadow.get")))
                     shadow_at = now
+                if events_supported and now - events_at > 1:
+                    answer = remote.call("events.list")
+                    events_supported = answer.get("reason") != "UNKNOWN_OPERATION"
+                    self.events.put(("railway_events", answer))
+                    events_at = now
                 self.stop.wait(0.15)
         except (OSError, ValueError, RemoteError) as exc:
             self.events.put(("error", str(exc)))
@@ -336,11 +486,17 @@ class Desk:
                 kind, value = self.events.get_nowait()
                 if kind == "connected":
                     self.connected = True
+                    self.railway_history = None
+                    self.render_railway_events()
+                    self.events_state.set(self.word("connected"))
                     self.status.set(self.word("connected"))
                     self.write_log(self.word("connected"))
                 elif kind == "disconnected":
+                    self.revoke_request = None
+                    self.revoke_button.configure(state="normal")
                     self.connected = False
                     self.status.set(self.word("disconnected"))
+                    self.events_state.set(self.word("disconnected"))
                     self.preview = None
                     self.pending = []
                     self.selected_sr = None
@@ -361,6 +517,17 @@ class Desk:
                             break
                 elif kind == "error":
                     self.write_log(value)
+                elif kind == "railway_events":
+                    if value.get("status") == "OK":
+                        history = value.get("data") or {}
+                        if history != self.railway_history:
+                            self.railway_history = history
+                            self.render_railway_events()
+                        self.events_state.set(f'{self.word("connected")} · {len(history.get("events", []))} · '
+                                              f'{datetime.now().strftime("%H:%M:%S")}')
+                    else:
+                        self.events_state.set(self.word("events_upgrade") if value.get("reason") == "UNKNOWN_OPERATION"
+                                              else self.code(value.get("reason", "SERVICE_UNAVAILABLE")))
                 elif kind == "graph" and value.get("status") == "OK":
                     try:
                         graph = Graph(value["data"])
@@ -421,6 +588,16 @@ class Desk:
                             self.commands.put(("graph.get", {}))
                         if operation == "sr.approve":
                             self.approve_button.configure(state="normal")
+                        if operation == "ma.revoke":
+                            if answer.get("status") == "PENDING" and self.revoke_request and time.monotonic() < self.revoke_deadline:
+                                request = dict(self.revoke_request)
+                                self.root.after(1100, lambda: self.commands.put(("ma.revoke", request))
+                                                if self.connected and self.revoke_request == request else None)
+                            else:
+                                if answer.get("status") == "PENDING":
+                                    self.write_log(self.code("TIMEOUT"))
+                                self.revoke_request = None
+                                self.revoke_button.configure(state="normal")
         except queue.Empty:
             pass
         if self.shadow and time.monotonic() - self.shadow_at > 2.5:
@@ -432,11 +609,60 @@ class Desk:
             self.refresh_train_details()
         self.root.after(100, self.drain_events)
 
+    def revoke_ma(self):
+        if not self.connected or not self.selected_train or self.revoke_request:
+            return
+        train = next((t for t in self.trains if t.get("trainId") == self.selected_train), {})
+        if not messagebox.askyesno(self.word("revoke_ma"),
+                self.word("confirm_revoke", train=train.get("name") or self.selected_train), parent=self.root):
+            return
+        self.revoke_request = {"requestId": str(uuid.uuid4()), "trainId": self.selected_train}
+        self.revoke_deadline = time.monotonic() + 15
+        self.revoke_button.configure(state="disabled")
+        self.commands.put(("ma.revoke", dict(self.revoke_request)))
+
     def write_log(self, value):
         self.log.configure(state="normal")
-        self.log.insert("end", str(value) + "\n")
+        self.log.insert("end", datetime.now().strftime("[%H:%M:%S] ") + str(value) + "\n")
+        if int(self.log.index("end-1c").split(".")[0]) > 500:
+            self.log.delete("1.0", "2.0")
         self.log.see("end")
         self.log.configure(state="disabled")
+
+    def render_railway_events(self):
+        if not hasattr(self, "railway_log"):
+            return
+        history = self.railway_history or {}
+        events = {(e.get("session"), e.get("sequence")): e for e in history.get("events", [])}
+        position = self.railway_log.yview()[0]
+        self.railway_log.configure(state="normal")
+        self.railway_log.delete("1.0", "end")
+        names = {"DRIVER_ACQUIRED": "取得驾驶权", "DRIVER_RELEASED": "交出驾驶权",
+                 "DRIVER_UNAVAILABLE": "司机不可用", "EMERGENCY_BRAKE_APPLIED": "紧急制动",
+                 "MA_REQUESTED": "申请 MA", "MA_RELEASED": "释放前方 MA 预约（保留占用）",
+                 "MA_UNAVAILABLE": "MA 不可用", "SR_GRANTED": "批准 SR",
+                 "ATP_MODE_CHANGED": "ATP 模式变更", "SWITCH_CHANGED": "道岔转换完成",
+                 "SWITCH_RUN_THROUGH_SUSPECTED": "疑似挤岔"}
+        for event in sorted(events.values(), key=lambda e: e.get("sequence", 0), reverse=True)[:500]:
+            kind = event.get("type", "--")
+            warning = kind in ("DRIVER_UNAVAILABLE", "SWITCH_RUN_THROUGH_SUSPECTED", "MA_UNAVAILABLE") or (
+                kind == "EMERGENCY_BRAKE_APPLIED" and event.get("reason") != "EB_INPUT")
+            if self.warnings_only.get() and not warning:
+                continue
+            stamp = datetime.fromtimestamp(event.get("emittedAtMillis", 0) / 1000).astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
+            details = event.get("details") or {}
+            target = event.get("trainName") or details.get("switchName") or event.get("trainId") or details.get("switchId") or "--"
+            title = names.get(kind, kind) if self.language.get() == "zh" else kind
+            actor = event.get("driverName") or event.get("driverId") or details.get("actorName") or "--"
+            text = f'[{stamp}] {"⚠" if warning else "ℹ"} #{event.get("sequence", "--")} {target}\n'
+            text += f'{title} · {self.code(event.get("reason", "--"))} · {actor} · {event.get("source", "--")}\n'
+            if details:
+                text += " · ".join(f'{key}={value}' for key, value in sorted(details.items())) + "\n"
+            self.railway_log.insert("end", text + "\n", "warning" if warning else "info")
+        if history.get("evictedCount", 0):
+            self.railway_log.insert("end", f'[{history["evictedCount"]} older events expired]\n')
+        self.railway_log.configure(state="disabled")
+        self.railway_log.yview_moveto(position)
 
     def show_sr(self):
         selected = self.selected_sr
@@ -572,6 +798,14 @@ class Desk:
                   f'{self.word("mileage")}: {mileage_label}  ·  {self.word("ma")}: {ma}',
                   f'{self.word("edge")}: {str(value("edgeId"))[:20]} @ {float(train.get("edgeOffsetMeters") or 0):.1f} m',
                   f'{self.code("OCCUPIED")}: {occupied}  ·  {self.code("RESERVED_SHADOW")}: {reserved}']
+        ti = train.get("integrity") or {}
+        observed = ti.get("observedAtMillis") or 0
+        fresh = isinstance(observed, (int, float)) and 0 <= time.time() * 1000 - observed <= 1500
+        if not fresh:
+            ti = {"state": "UNKNOWN", "reason": "TIMS_STALE", "brakeHeld": True,
+                  "observedAtMillis": observed, "affectedMembers": ti.get("affectedMembers", [])}
+        detail.append(f'TIMS: {ti.get("state", "UNKNOWN")} / {ti.get("reason", "NO_TIMS")} / hold={ti.get("brakeHeld", True)}')
+        detail.append(f'TIMS time: {ti.get("observedAtMillis", "--")} / affected: {ti.get("affectedMembers", [])}')
         self.train_detail.set("\n".join(detail))
 
     def visible_edges(self):
@@ -611,10 +845,13 @@ class Desk:
         c.delete("all")
         self.node_hits = []
         self.train_hits = []
+        self.refresh_lines()
         if not self.graph:
             return
         p = THEMES[self.theme.get()]
         w, h = c.winfo_width(), c.winfo_height()
+        labels = []
+        obstacles = []
         grid = 100 * self.scale
         while grid < 50:
             grid *= 10
@@ -633,9 +870,9 @@ class Desk:
             coords = edge_screen_coords(edge, self.screen)
             if coords:
                 line = assigned_line(self.graph, edge.id)
-                c.create_line(*coords, fill=line_color(line) if line else p["rail"],
+                c.create_line(*coords, fill=self.line_colors.get(line, p["rail"]),
                               width=3.4 if line else 1.5, dash=() if shadow else (3, 4),
-                              joinstyle="round")
+                              joinstyle="round", tags=("rail",))
         if shadow:
             order = {"RESERVED_SHADOW": 0, "UNCERTAIN": 1, "OCCUPIED": 2}
             for section in sorted(shadow.get("sections", []), key=lambda s: order.get(s.get("state"), -1)):
@@ -676,26 +913,16 @@ class Desk:
                 for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
                     c.create_text(arrow_x + dx, arrow_y + dy, text=direction,
                                   fill=p["bg"], font=("Microsoft YaHei UI", 18, "bold"))
-                c.create_text(arrow_x, arrow_y, text=direction,
+                arrow = c.create_text(arrow_x, arrow_y, text=direction,
                               fill=p["switch_diverging"] if state == "diverging" else p["switch"],
                               font=("Microsoft YaHei UI", 18, "bold"))
+                obstacles.append(c.bbox(arrow))
             else:
                 c.create_oval(x - 3, y - 3, x + 3, y + 3, fill=color, outline=p["bg"])
             label = str(node.get("name") or node_id)
-            if switch:
-                label_x = x - 9 if vx > 0.25 else x + 9
-                label_y = y + 9 if vy < -0.25 else y - 9
-                anchor = ("n" if vy < -0.25 else "s") + ("e" if vx > 0.25 else "w")
-                text_id = c.create_text(label_x, label_y, text=label, anchor=anchor,
-                                        fill="#111111", font=("Microsoft YaHei UI", 10, "bold"))
-                box = c.bbox(text_id)
-                if box:
-                    c.create_rectangle(box[0] - 3, box[1] - 1, box[2] + 3, box[3] + 1,
-                                       fill="#ffe05a", outline="")
-                    c.tag_raise(text_id)
-            else:
-                c.create_text(x + 8, y - 10, text=label, anchor="sw", fill=p["muted"],
-                              font=("Microsoft YaHei UI", 10))
+            obstacles.append((x - 7, y - 7, x + 7, y + 7))
+            labels.append((2 if switch else 3, str(node_id), x, y, label,
+                           "#111111" if switch else p["muted"], "#ffe05a" if switch else p["bg"]))
             self.node_hits.append((x, y, node_id))
         for train in self.trains:
             if train.get("world") != self.world.get():
@@ -720,19 +947,72 @@ class Desk:
             speed = train.get("speedMetersPerSecond")
             speed_label = f'{float(speed) * 3.6:.1f}' if speed is not None else "--"
             label = f'{train.get("trainNumber") or "--"} | {train.get("name") or str(train.get("trainId"))[:8]} | {speed_label} km/h'
-            c.create_text(x + 13, y - 9, text=label, anchor="sw", fill=p["text"],
-                          font=("Microsoft YaHei UI", 10, "bold"))
+            obstacles.append((x - 11, y - 11, x + 11, y + 11))
+            labels.append((0 if selected else 1, str(train.get("trainId")), x, y, label, p["text"], p["bg"]))
             self.train_hits.append((x, y, str(train.get("trainId"))))
         legend = ((self.word("main_line"), p["rail"], 3.4, ()),
                   (self.word("siding"), p["rail"], 1.5, ()),
                   (self.code("OCCUPIED"), p["occupied"], 5, ()),
                   (self.code("UNCERTAIN"), p["uncertain"], 5, (7, 4)),
                   (self.code("RESERVED_SHADOW"), p["reserved"], 7, ()))
-        for index, (name, color, width, dash) in enumerate(legend):
-            left = 12 + index * 112
-            c.create_line(left, h - 16, left + 18, h - 16, fill=color, width=width, dash=dash)
-            c.create_text(left + 23, h - 16, text=name, anchor="w", fill=p["text"],
-                          font=("Microsoft YaHei UI", 9))
+        legend_font = tkfont.Font(root=self.root, family="Microsoft YaHei UI", size=self.map_font_size)
+        left, bottom = 12, h - 18
+        legend_top = bottom - legend_font.metrics("linespace")
+        for name, color, width, dash in legend:
+            item_width = 35 + legend_font.measure(name)
+            if left > 12 and left + item_width > w - 8:
+                left = 12
+                bottom -= legend_font.metrics("linespace") + 8
+                legend_top = bottom - legend_font.metrics("linespace")
+            c.create_line(left, bottom, left + 18, bottom, fill=color, width=width, dash=dash)
+            c.create_text(left + 23, bottom, text=name, anchor="w", fill=p["text"],
+                          font=("Microsoft YaHei UI", self.map_font_size))
+            left += item_width
+        self.layout_labels(labels, obstacles, w, legend_top - 6)
+
+    def layout_labels(self, labels, obstacles, width, height):
+        """Place higher priority labels first; never paint overlapping label boxes."""
+        c = self.canvas
+        occupied = [box for box in obstacles if box]
+        self.label_boxes = []
+        hidden = 0
+        for priority, identity, x, y, label, color, background in sorted(labels):
+            text_id = c.create_text(0, 0, text=label, anchor="nw", fill=color,
+                                    font=("Microsoft YaHei UI", self.map_font_size,
+                                          "bold" if priority < 3 else "normal"), tags=("map-label",))
+            box = c.bbox(text_id)
+            tw, th = box[2] - box[0] + 8, box[3] - box[1] + 6
+            placed = None
+            for distance in (14, 32, 56, 88, 128, 176):
+                for px, py in ((x + distance, y - th - 4), (x - distance - tw, y - th - 4),
+                               (x + distance, y + 4), (x - distance - tw, y + 4),
+                               (x - tw / 2, y - distance - th), (x - tw / 2, y + distance)):
+                    candidate = (px, py, px + tw, py + th)
+                    if px < 4 or py < 32 or candidate[2] > width - 4 or candidate[3] > height:
+                        continue
+                    if any(candidate[0] < b[2] + 3 and candidate[2] > b[0] - 3 and
+                           candidate[1] < b[3] + 3 and candidate[3] > b[1] - 3 for b in occupied):
+                        continue
+                    placed = candidate
+                    break
+                if placed:
+                    break
+            if placed is None:
+                c.delete(text_id)
+                hidden += 1
+                continue
+            px, py, right, bottom = placed
+            c.move(text_id, px + 4 - box[0], py + 3 - box[1])
+            leader = c.create_line(x, y, min(max(x, px), right), min(max(y, py), bottom),
+                                   fill=THEMES[self.theme.get()]["muted"], tags=("label-leader",))
+            c.tag_lower(leader, text_id)
+            rectangle = c.create_rectangle(*placed, fill=background, outline="", tags=("label-background",))
+            c.tag_raise(text_id, rectangle)
+            occupied.append(placed)
+            self.label_boxes.append(placed)
+        if hidden:
+            c.create_text(8, 8, text=self.word("hidden_labels", count=hidden), anchor="nw",
+                          fill=THEMES[self.theme.get()]["text"], tags=("label-notice",))
 
     def select_node(self, event):
         if not self.graph:
@@ -760,11 +1040,23 @@ class Desk:
         self.root.destroy()
 
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="SkyRail STA desktop dispatcher")
+    parser.add_argument("--profile", type=Path, help="connection profile generated by the server setup script")
+    args = parser.parse_args(argv)
+    try:
+        profile = load_profile(args.profile or default_profile_path(), required=args.profile is not None)
+    except ProfileError as exc:
+        window = tk.Tk()
+        window.withdraw()
+        messagebox.showerror("SkyRail Dispatch", str(exc), parent=window)
+        window.destroy()
+        return 2
     window = tk.Tk()
-    Desk(window)
+    Desk(window, profile)
     window.mainloop()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

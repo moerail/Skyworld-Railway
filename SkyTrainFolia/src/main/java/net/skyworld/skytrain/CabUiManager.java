@@ -601,7 +601,42 @@ final class CabUiManager implements Listener {
                         "Station identified at the sign. Braking without advance notice.",
                         "Station identifiée au panneau. Début du freinage sans annonce anticipée.",
                         "駅看板で駅を認識しました。事前予告なしで減速を開始します。");
-                plugin.send(player, "&b[SkyTrain] &f" + message);
+                plugin.send(player, "&f" + message);
+            }, () -> {});
+        }
+    }
+
+    void announceAutomaticTargetSpeed(Train train, double targetSpeed) {
+        for (CabSession session : List.copyOf(sessions.values())) {
+            if (!session.trainId.equals(train.id())) continue;
+            Player player = Bukkit.getPlayer(session.playerId);
+            if (player == null) continue;
+            player.getScheduler().run(plugin, task -> {
+                if (!player.isOnline() || sessions.get(session.playerId) != session
+                        || !manager.automaticEligible(train)
+                        || !(player.getVehicle() instanceof Minecart cart)
+                        || manager.trainForCart(cart) != train) return;
+                SpeedUnit unit = ui.speedUnit(player);
+                String speed = format(unit.convert(targetSpeed)) + " " + unit.label;
+                plugin.send(player, "&f" + localized(ui.language(player),
+                        "当前 V_target 已更新为 " + speed + "。",
+                        "V_target updated to " + speed + ".",
+                        "V_target mise à jour : " + speed + ".",
+                        "現在の V_target を " + speed + " に更新しました。"));
+            }, () -> {});
+        }
+    }
+
+    void announceIntegrityHold(Train train, String reason) {
+        for (CabSession session : List.copyOf(sessions.values())) {
+            if (!session.trainId.equals(train.id())) continue;
+            Player player = Bukkit.getPlayer(session.playerId);
+            if (player == null) continue;
+            player.getScheduler().run(plugin, task -> {
+                if (!player.isOnline() || sessions.get(session.playerId) != session
+                        || !(player.getVehicle() instanceof Minecart cart)
+                        || manager.trainForCart(cart) != train) return;
+                plugin.send(player, "&e" + ui.text(player, "error.tims-hold") + " &7(" + reason + ")");
             }, () -> {});
         }
     }

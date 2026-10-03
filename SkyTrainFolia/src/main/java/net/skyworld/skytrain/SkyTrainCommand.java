@@ -18,7 +18,7 @@ import org.bukkit.entity.Player;
 
 final class SkyTrainCommand implements TabExecutor {
     private static final List<String> SUBCOMMANDS = List.of(
-            "help", "version", "list", "info", "syncstatus", "scan", "connect", "create", "append",
+            "help", "version", "list", "info", "tims", "syncstatus", "scan", "connect", "create", "append",
             "start", "stop", "reverse", "speed", "maxspeed", "spacing", "unlink", "remove",
             "property", "tag", "owner", "route", "savedtrain", "switch", "balise", "origin", "end", "mileage", "clearkm",
             "save", "reload", "lang", "speedunit", "unit",
@@ -119,6 +119,7 @@ final class SkyTrainCommand implements TabExecutor {
                 }
                 case "list" -> list(sender, args);
                 case "info" -> info(sender, args);
+                case "tims" -> integrity(sender,args);
                 case "scan" -> scan(sender, args);
                 case "connect" -> connect(sender, args);
                 case "create" -> create(sender, args);
@@ -275,7 +276,38 @@ final class SkyTrainCommand implements TabExecutor {
             return;
         }
         plugin.send(sender, ui.trainSummary(sender, train));
+        var p=train.lastReportedPosition;
+        long now=System.currentTimeMillis();
+        boolean current=p!=null && train.contains(p.entityId) && now>=p.timeMillis && now-p.timeMillis<=1000
+                && train.tims.view(now).state()==TrainIntegrityMonitor.State.COMPLETE;
+        plugin.send(sender,p==null?ui.text(sender,"info.position-none"):
+                ui.text(sender,current?"info.position-current":"info.position-last",p.worldName,p.x,p.y,p.z,
+                        java.time.Instant.ofEpochMilli(p.timeMillis).toString()));
+        var tims=train.tims.view(now);
+        plugin.send(sender,"TIMS: "+tims.state()+" / "+tims.reason()+" / hold="+tims.brakeHeld()
+                +" / affected="+tims.affectedMembers());
+        if (tims.brakeHeld()) plugin.send(sender, "&e" + ui.text(sender, "error.tims-hold"));
         manager.showConsistLabels(train);
+    }
+
+    private void integrity(CommandSender sender,String[] args) {
+        requireUse(sender);
+        if(args.length<2 || !"ack".equalsIgnoreCase(args[1])) throw new IllegalArgumentException("/st tims ack [train]");
+        Train train;
+        if(args.length>=3) {requireAdmin(sender);train=manager.requireTrain(args[2]);}
+        else train=controlledTrain(sender);
+        if(train==null)throw new IllegalArgumentException(ui.text(sender,"error.need-train"));
+        synchronized(train) {
+            long now=System.currentTimeMillis();
+            boolean stopped=train.currentSpeed()<=.001 && train.maxMemberSpeed()<=.001 && !train.members().isEmpty()
+                    && train.members().stream().allMatch(id->{var p=train.snapshot(id);return p!=null
+                        && now>=p.timeMillis && now-p.timeMillis<=1000 && p.velocity.lengthSquared()<=.000001;});
+            if(!train.tims.acknowledge(now,stopped)) throw new IllegalArgumentException(ui.text(sender,"error.tims-ack"));
+            train.powerNotch=0;train.brakeNotch=7;train.activeAtp.clear();
+            manager.save();
+        }
+        plugin.send(sender,ui.text(sender,train.properties().conductionMode.automatic()
+                ? "tims.ack-auto" : "tims.ack"));
     }
 
     private void scan(CommandSender sender, String[] args) {

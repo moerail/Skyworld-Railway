@@ -20,7 +20,7 @@ public final class ShadowDiagnosticsTest {
             roster.add(new ConsistObservation(ShadowRuntimeTest.session,1,unloaded,"unloaded",now,List.of(UUID.randomUUID()),List.of(),false));
             UUID member=UUID.randomUUID();
             roster.add(new ConsistObservation(ShadowRuntimeTest.session,1,outside,"outside",now,List.of(member),
-                    List.of(new ConsistObservation.Member(member,"world",10000,64,0,now,now,ConsistObservation.State.OBSERVED)),false));
+                    List.of(new ConsistObservation.Member(member,"world",10000,64,0,now,now,ConsistObservation.State.OBSERVED)),false,ShadowRuntimeTest.completeIntegrity(List.of(member),now)));
             return new ShadowRuntime.Inputs(original.graph(),original.switchStates(),original.available(),original.driverSession(),
                     original.rosterSession(),original.desks(),roster,original.reports());
         };

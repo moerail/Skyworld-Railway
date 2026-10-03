@@ -412,6 +412,14 @@ final class UiMessages {
                 "No controllable STF train nearby.",
                 "Aucun train STF contrôlable à proximité.",
                 "近くに操作できるSTF列車がありません。");
+        add("error.drive-end-seat", "仅列车两端最外侧车厢的乘客可申请驾驶。", "Only passengers in the outermost carts at either end may claim driving.", "Seuls les passagers des wagonnets d’extrémité peuvent prendre la conduite.", "編成両端の最外側の車両に乗車してください。");
+        add("error.tims-hold", "TIMS 停车保持：请查看 /st info，确认完整并停稳后 /st tims ack。", "TIMS brake hold: check /st info, restore integrity, stop and /st tims ack.", "Maintien TIMS : /st info, rétablir l’intégrité, arrêter puis /st tims ack.", "TIMS 停止保持：/st info で確認し、完全性回復・停車後 /st tims ack。");
+        add("error.tims-ack", "全列未停稳或完整性未连续确认；不可解除 TIMS 保持。", "Train not fully stopped or integrity not confirmed; TIMS hold retained.", "Arrêt complet ou intégrité non confirmé : maintien TIMS conservé.", "全車停止または完全性未確認。TIMS 保持を継続。");
+        add("tims.ack-auto", "TIMS 保持已确认解除；自动列车请执行 /st start <列车名> 重新启动。", "TIMS hold acknowledged. Restart the automatic train with /st start <train>.", "Maintien TIMS acquitté. Redémarrez le train automatique avec /st start <train>.", "TIMS 保持解除を確認しました。自動列車は /st start <列車名> で再始動してください。");
+        add("tims.ack", "TIMS 保持已确认解除；仍保持制动，TR 请按 ack → release 流程恢复并重新申请 MA。", "TIMS hold acknowledged; brakes remain. Recover TR via ack then release and request new MA.", "Maintien TIMS acquitté ; freins maintenus. Reprise TR : ack, release puis nouvelle MA.", "TIMS 確認済み。制動継続。TR は ack、release、MA 再要求の順で復帰。");
+        add("info.position-none", "位置：尚无报告。", "Position: no report yet.", "Position : aucun rapport.", "位置：報告なし。");
+        add("info.position-current", "当前位置（行驶端）：%s %.2f, %.2f, %.2f | %s", "Current position (travel end): %s %.2f, %.2f, %.2f | %s", "Position actuelle (extrémité de marche) : %s %.2f, %.2f, %.2f | %s", "現在位置（進行端）：%s %.2f, %.2f, %.2f | %s");
+        add("info.position-last", "位置不确定；最后报告：%s %.2f, %.2f, %.2f | %s", "Position uncertain; last report: %s %.2f, %.2f, %.2f | %s", "Position incertaine ; dernier rapport : %s %.2f, %.2f, %.2f | %s", "位置不確定・最終報告：%s %.2f, %.2f, %.2f | %s");
         add("error.reverser-moving",
                 "列车未停稳，不能切换换向器。",
                 "Stop the train before changing the reverser.",

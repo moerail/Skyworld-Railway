@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -111,6 +112,10 @@ public final class TrainManagerRefactorTest {
 
     private static void controls(TrainSettings settings) {
         Train train = new Train(UUID.randomUUID(), "controls", .4, 1, 1.1);
+        UUID member=UUID.randomUUID();train.addMember(member);
+        long at=System.currentTimeMillis();
+        train.tims.evaluate(train.members(),List.of(new TrainIntegrityMonitor.Sample(member,"w",0,0,0,at-1000,"OBSERVED")),List.of(),1.1,at-1000);
+        train.tims.evaluate(train.members(),List.of(new TrainIntegrityMonitor.Sample(member,"w",0,0,0,at,"OBSERVED")),List.of(),1.1,at);
         AtomicInteger saves = new AtomicInteger();
         TrainDrivingControls controls = new TrainDrivingControls(settings, new Object(), name -> train,
                 saves::incrementAndGet, ignored -> { });
@@ -133,6 +138,29 @@ public final class TrainManagerRefactorTest {
         controls.confirmManualRelease(train);
         TrainDrivingControls.authorizeAutomatic(train, false, .001);
         assert !train.emergencyBrake && !train.manualTakeover;
+        // COMPLETE describes current evidence, not permission to clear a latched stop.
+        at = System.currentTimeMillis();
+        train.tims.restore(train.members(), true, null, "GAP_SUSPECTED");
+        train.tims.evaluate(train.members(), List.of(new TrainIntegrityMonitor.Sample(
+                member, "w", 0, 0, 0, at, "OBSERVED")), List.of(), 1.1, at);
+        assert train.tims.view(at).state() == TrainIntegrityMonitor.State.COMPLETE;
+        train.moving = false;
+        train.driverEmergencyHold = true;
+        train.brakeNotch = 7;
+        double previousTarget = train.targetSpeed;
+        int previousSaves = saves.get();
+        try {
+            controls.start("controls", .8);
+            throw new AssertionError("TIMS-held start must be rejected");
+        } catch (IllegalArgumentException expected) {
+            assert expected.getMessage().equals("error.tims-hold");
+        }
+        assert !train.moving && train.driverEmergencyHold && train.brakeNotch == 7;
+        assert train.targetSpeed == previousTarget && saves.get() == previousSaves;
+        assert train.tims.acknowledge(at, true);
+        controls.start("controls", .8);
+        assert train.moving && !train.driverEmergencyHold && train.brakeNotch == 0;
+        assert train.targetSpeed == .8 && saves.get() == previousSaves + 1;
     }
 
     private static void relocationAndTickGate() {

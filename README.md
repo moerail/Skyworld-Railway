@@ -1,5 +1,7 @@
 # SkyRail Suite
 
+本地开发候选 **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3**：新增列车完整性监测（固定编组、采样时效、沿轨道的相邻车厢间隔）、未知或失完整时停车保持并保留占用与 MA 保护。`/st info <列车名>` 显示当前位置；不确定时显示最后报告的世界坐标和时间。仅两端最外侧车厢的乘客可 `/st drive`，forward/backward 以所坐驾驶端为准。完整性恢复且全列停稳后执行 `/st tims ack`；若已进入 TR，再执行 `/stcs ma ack`、`/stcs ma release` 并重新申请 MA。既有存档首次升级需要核对编组后执行 TIMS 确认。本候选尚未发布或实车验收。 [4.0.8 开发说明](doc/releases/suite-v4.0.8.md)
+
 本次小版本为 **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**。停车后，调度转岔会先取得车端停车保持确认，再释放相关 MA 预约、转岔并重算 MA，司机无需先 release。网页 PCC 新增“撤销所选列车 MA → TR”：手动列车运行或停车都进入 TR 并制动；运行中的旧预约保留到全列确认停稳，车身占用始终保留。影子通道也执行此项主动调度停车命令。司机停稳后执行 `/stcs ma ack`、`/stcs ma release`，再重新申请 MA。失败／超时不代表撤销完成。需配套更新已安装插件并刷新客户端，保留原证书和令牌；实服验收待完成。 [4.0.7 release notes](doc/releases/suite-v4.0.7.md)
 
 <p align="center">
@@ -20,7 +22,7 @@
 
 From boarding and claiming control to notches, MA requests and handover, without the administrator configuration chapters.
 
-**SkyTrainFolia 4.0.7 candidate:** 单个 JAR 在运行时选择 Shiroha 26.2 或 26.3 的显示包适配器；两版编译与 Java 测试已通过，实服验收仍待完成。详见 [适配报告](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。4.0.5 的[多语言司机引导词库](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md)继续包含在本版中。
+**SkyTrainFolia 4.0.7 published release:** 单个 JAR 在运行时选择 Shiroha 26.2 或 26.3 的显示包适配器；两版编译与 Java 测试已通过，实服验收仍待完成。详见 [适配报告](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。4.0.5 的[多语言司机引导词库](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md)继续包含在本版中。
 
 **趣味别册 / Just for fun:** [鐵道運轉試驗規程 · 舊式技術訓令體](README.ja.classical.md)
 
@@ -44,7 +46,7 @@ Minecraft is both the live operating environment and an interactive railway-syst
 
 ## 破坏性协议升级 / Breaking Protocol Upgrade
 
-**当前候选版本 / Current candidate:** STF **4.0.7**、STCS **4.0.5**、STA **2.1.3**、SkyPCC **2.0.2**。同一个 STF JAR 支持 Shiroha **26.2 和 26.3**；两版隔离测试已通过，实服验收仍待完成。The same STF JAR supports both server versions; live-server acceptance is pending. [适配报告 / Adaptation report](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。
+**已发布版本 / Published release:** STF **4.0.7**、STCS **4.0.5**、STA **2.1.3**、SkyPCC **2.0.2**。同一个 STF JAR 支持 Shiroha **26.2 和 26.3**；两版隔离测试已通过，实服验收仍待完成。The same STF JAR supports both server versions; live-server acceptance is pending. [适配报告 / Adaptation report](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。
 
 SkyPCC 另有 **2.0.1 小版本候选**：远程道岔操作与 SR 审批可通过正确的 Bearer token 授权；默认仍仅监听 `127.0.0.1`。详见 [SkyPCC 2.0.1 更新说明](doc/releases/skypcc-v2.0.1.md)。
 
@@ -60,7 +62,7 @@ Low-speed warnings use 5 / 8 km/h gaps at ATP limits <=40 km/h; normal-band defa
 
 本批版本为 **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**。STA v6 可执行授权与 PCC `/api/v6/operational-ma`、SR 审批接口继续提供；原有 v5 影子信息继续保留。不要混用旧版二进制：停服、备份后一起替换所安装的组件并强制刷新网页。STF 仍可独立安装。保留 RailGraph 与占用账本，不应删除数据来升级。
 
-This candidate uses **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. It retains executable STA v6 permissions, PCC `/api/v6/operational-ma` and SR approval, and v5 shadow information. Do not mix old and new binaries: stop and back up the server, replace installed components together, then hard-refresh the browser. STF remains standalone-capable. Keep RailGraph and occupancy ledgers.
+The published 4.0.7 release uses **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. It retains executable STA v6 permissions, PCC `/api/v6/operational-ma` and SR approval, and v5 shadow information. Do not mix old and new binaries: stop and back up the server, replace installed components together, then hard-refresh the browser. STF remains standalone-capable. Keep RailGraph and occupancy ledgers.
 
 编号彩蛋区分 Message 与 Packet：v5 影子 MA 与 v6 实验性可执行 MA 均使用私有 **Message 1003 / Packet 1015**，列车遥测为 **Message 1136**。自定义列车删除为 **Message 2001**，不代表占用出清；图定位与等待/未分配状态分别为 **Message 2002 / 2003**。SR 审批是 SkyRail 服务调用和行车事件，不是新增的 ETCS 报文。仅借用 SUBSET-026 部分编号加 1000 的概念，不是 ETCS 报文编码或标准符合性声明。
 

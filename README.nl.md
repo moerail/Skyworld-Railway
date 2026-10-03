@@ -1,12 +1,14 @@
 # SkyRail Suite
 
+Lokale ontwikkelversie **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3**: TIMS controleert de vaste samenstelling, actuele metingen en afstand tussen rijtuigen langs het spoor. Bij onbekende of verloren integriteit blijven rem, bezetting en MA bescherming actief. `/st info <trein>` toont de actuele positie of de laatst gemelde coördinaten en tijd. Alleen reizigers in het buitenste rijtuig aan elk uiteinde mogen `/st drive` gebruiken; forward/backward volgen die bestuurderspositie. Na herstel en volledige stilstand: `/st tims ack`, daarna in TR `/stcs ma ack`, `/stcs ma release` en een nieuwe MA. Bestaande opgeslagen treinen vergen een eerste controle van de samenstelling. Deze versie is nog niet gepubliceerd of in bedrijf getest. [Ontwikkelnotities 4.0.8](doc/releases/suite-v4.0.8.md)
+
 Deze patch gebruikt **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. Bij een stilstaande handmatige trein bevestigt de trein eerst de remvasthouding; daarna worden de voorwaartse reservering ingetrokken, de wissel omgelegd en de MA opnieuw berekend, zonder voorafgaande release door de machinist. Web PCC krijgt “Revoke MA → TR”: zowel rijdend als stilstaand gaat de trein na bevestiging in TR en remt. Reserveringen blijven behouden tot de hele trein aantoonbaar stilstaat; treinbezetting blijft altijd behouden. Deze expliciete opdracht werkt ook in het schaduwkanaal. Herstel: stoppen, `/stcs ma ack`, `/stcs ma release`, opnieuw MA aanvragen. Een time-out bevestigt niets. Werk de geïnstalleerde plugins samen bij en vernieuw de clients; behoud certificaten en tokens. Praktijktests op de server zijn nog nodig. [4.0.7 release notes](doc/releases/suite-v4.0.7.md)
 
 **Voor spelers:** de bestuurdershandleiding is beschikbaar in [Engels](doc/driver/README.en.md), [Chinees](doc/driver/README.zh.md), [Frans](doc/driver/README.fr.md) en [Japans](doc/driver/README.ja.md).
 
-## Huidige kandidaatversie: Shiroha 26.2 / 26.3
+## Gepubliceerde versie: Shiroha 26.2 / 26.3
 
-SkyTrainFolia **4.0.7** bevat beide displaypakketadapters in één JAR en kiest bij het starten de adapter voor de serverversie. De huidige suite bestaat uit STCS **4.0.5**, STA **2.1.3** en SkyPCC **2.0.2**. Geïsoleerde compilatie en Java-tests slagen op beide versies; acceptatie op een draaiende server staat nog open. [Aanpassingsrapport](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
+SkyTrainFolia **4.0.7** bevat beide displaypakketadapters in één JAR en kiest bij het starten de adapter voor de serverversie. De gepubliceerde suite bestaat uit STCS **4.0.5**, STA **2.1.3** en SkyPCC **2.0.2**. Geïsoleerde compilatie en Java-tests slagen op beide versies; acceptatie op een draaiende server staat nog open. [Aanpassingsrapport](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
 
 ## Eerdere update 4.0.2: waarschuwingen en serviceherstel
 

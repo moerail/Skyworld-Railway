@@ -231,6 +231,7 @@ final class TrainManager implements TrainMotionController.Host {
 
         appendCarts(train, carts);
         arrangeTrainCarts(train, carts, carts.get(0).getLocation());
+        train.tims.expected(train.members());train.manifestReady=true;
         persistence.save();
         return train;
     }
@@ -388,6 +389,7 @@ final class TrainManager implements TrainMotionController.Host {
             created.targetSpeed = speed > 0 ? speed : created.targetSpeed;
             created.seedCurrentSpeed(speed);
             created.moving = speed > 0;
+            created.tims.expected(created.members());created.manifestReady=true;
             persistence.save();
         } catch (RuntimeException ex) {
             if (created != null) retireTrain(created);
@@ -414,6 +416,7 @@ final class TrainManager implements TrainMotionController.Host {
                 continue;
             }
 
+            if(train.contains(cart.getUniqueId()))continue;
             removeCart(cart, false);
             if (train.addMember(cart.getUniqueId())) {
                 markCart(cart, train, train.memberCount() - 1);

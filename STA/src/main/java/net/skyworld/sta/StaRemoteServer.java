@@ -235,7 +235,25 @@ final class StaRemoteServer implements AutoCloseable {
                 var trains = tracking.snapshots().stream()
                         .filter(message -> message.header().kind() == StaMessage.Kind.TRACK_REPORT)
                         .map(message -> PccProjection.train(message, now)).toList();
-                yield result(id, "OK", "TRAINS", JSON.toJsonTree(trains));
+                var roster=services.load(net.skyworld.sta.api.v3.ConsistObservationService.class);
+                var byId=new java.util.HashMap<String,net.skyworld.sta.api.v3.ConsistObservation>();
+                if(roster!=null) for(var c:roster.consistObservations())if(!c.removed())byId.put(c.train().toString(),c);
+                var enriched=new java.util.ArrayList<java.util.Map<String,Object>>();
+                var located=new java.util.HashSet<String>();
+                for(var row:trains) {
+                    var copy=new java.util.LinkedHashMap<String,Object>(row);
+                    var trainKey=String.valueOf(row.get("trainId"));located.add(trainKey);
+                    var c=byId.get(trainKey);if(c!=null)copy.put("integrity",c.integrity());
+                    enriched.add(copy);
+                }
+                for(var c:byId.values())if(!located.contains(c.train().toString())) {
+                    var row=new java.util.LinkedHashMap<String,Object>();
+                    row.put("trainId",c.train().toString());row.put("name",c.name());
+                    row.put("memberCount",c.expectedMembers().size());row.put("quality","AWAITING_POSITION");
+                    row.put("stale",true);row.put("graphCurrent",false);row.put("mode","unknown");
+                    row.put("integrity",c.integrity());enriched.add(row);
+                }
+                yield result(id, "OK", "TRAINS", JSON.toJsonTree(enriched));
             }
             case "shadow.get" -> {
                 StaRemoteProtocol.keys(req, "id", "type");

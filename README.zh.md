@@ -1,12 +1,14 @@
 # SkyRail Suite
 
+本地开发候选 **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3**：新增列车完整性监测（固定编组、采样时效、沿轨道的相邻车厢间隔）、未知或失完整时停车保持并保留占用与 MA 保护。`/st info <列车名>` 显示当前位置；不确定时显示最后报告的世界坐标和时间。仅两端最外侧车厢的乘客可 `/st drive`，forward/backward 以所坐驾驶端为准。完整性恢复且全列停稳后执行 `/st tims ack`；若已进入 TR，再执行 `/stcs ma ack`、`/stcs ma release` 并重新申请 MA。既有存档首次升级需要核对编组后执行 TIMS 确认。本候选尚未发布或实车验收。 [4.0.8 开发说明](doc/releases/suite-v4.0.8.md)
+
 本次小版本为 **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**。停车后，调度转岔会先取得车端停车保持确认，再释放相关 MA 预约、转岔并重算 MA，司机无需先 release。网页 PCC 新增“撤销所选列车 MA → TR”：手动列车运行或停车都进入 TR 并制动；运行中的旧预约保留到全列确认停稳，车身占用始终保留。影子通道也执行此项主动调度停车命令。司机停稳后执行 `/stcs ma ack`、`/stcs ma release`，再重新申请 MA。失败／超时不代表撤销完成。需配套更新已安装插件并刷新客户端，保留原证书和令牌；实服验收待完成。 [4.0.7 release notes](doc/releases/suite-v4.0.7.md)
 
 **普通玩家从这里开始：[司机手册](doc/driver/README.zh.md)**。包含上车、驾驶权、热键栏、影子 MA 和停车流程。
 
-## 当前候选版本：Shiroha 26.2 / 26.3
+## 已发布版本：Shiroha 26.2 / 26.3
 
-SkyTrainFolia **4.0.7** 将 26.2 与 26.3 的显示包适配器装入同一个 JAR，在启动时自动选择。当前配套版本为 STCS **4.0.5**、STA **2.1.3**、SkyPCC **2.0.2**。两版隔离编译与 Java 测试已通过；实服验收仍待完成。[适配报告](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。
+SkyTrainFolia **4.0.7** 将 26.2 与 26.3 的显示包适配器装入同一个 JAR，在启动时自动选择。对应的已发布配套版本为 STCS **4.0.5**、STA **2.1.3**、SkyPCC **2.0.2**。两版隔离编译与 Java 测试已通过；实服验收仍待完成。[适配报告](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。
 
 ## 历史更新 4.0.2：预警与服务恢复
 
@@ -28,7 +30,7 @@ shadow-atp:
 
 历史预发布 `suite-v4.0.2` 的说明见[发布说明](doc/releases/suite-v4.0.2.md)。
 
-当前配套版本为 STF **4.0.7**、STCS **4.0.5**、STA **2.1.3**、SkyPCC **2.0.2**。停服备份轨道图和占用账本后一起替换已安装组件，不要混用旧版。STF 仍可单独运行，但 `Enforced` 需要 STA 与 STCS。旧 v5 影子服务继续只读；STA v6 可执行许可是另一个通道。
+已发布配套版本为 STF **4.0.7**、STCS **4.0.5**、STA **2.1.3**、SkyPCC **2.0.2**；本地 4.0.8 候选版本见文首。停服备份轨道图和占用账本后一起替换已安装组件，不要混用旧版。STF 仍可单独运行，但 `Enforced` 需要 STA 与 STCS。旧 v5 影子服务继续只读；STA v6 可执行许可是另一个通道。
 
 **仅手动列车**进入 `SB/FS/SH/SR/TR/PT` 状态机。司机上车取得控制权后默认为 `SB`；`/stcs ma demand` 申请 `FS`，`/stcs ma sh` 申请有界调车许可，`/stcs ma sr` 等待 PCC 或管理员批准到指定设备的许可。申请受理不等于获得可执行 MA。越过 EoA 触发 `TR` 后须先停稳，`/stcs ma ack` 进入 `PT`，再用 `/stcs ma release` 释放后重新申请。管理员只能在停车时通过 `/stcs admin enforce true|false` 显式切换；`false` 回到 `RECOVERING` 制动保持。计分板 ATP 模式显示为“通道 | 运行模式”，例如 **`强制保护 | SR`**；通道名翻译，运行模式代号不翻译。
 

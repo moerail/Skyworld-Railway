@@ -261,6 +261,7 @@ final class AutomaticSigns {
                 if (train.automaticRun!=null && train.automaticRun.phase==AutomaticRun.Phase.CRUISE)
                     train.automaticRun.inheritTargetSpeed=true;
                 manager.save();
+                plugin.announceAutomaticTargetSpeed(train, sign.spec().speed());
             }
             if(sign.spec().action().equals("destroy") && (!previous.contains(key) || edge)) {
                 return manager.destroyAutomatic(train);
@@ -349,9 +350,7 @@ final class AutomaticSigns {
         if(run.coasting) { train.powerNotch=0; train.brakeNotch=0; return; }
         double speed=train.currentSpeed();
         double cap=Math.min(train.maxSpeed,v.maxSpeed());
-        double cruise=Math.min(cap,run.inheritTargetSpeed
-                ? train.properties().automaticTargetSpeed==null?defaultSpeed():train.properties().automaticTargetSpeed
-                : run.spec.speed()==null?cap:Math.abs(run.spec.speed()));
+        double cruise=run.cruiseTarget(cap,train.properties().automaticTargetSpeed,defaultSpeed());
         if(run.phase==AutomaticRun.Phase.WAIT && now>=run.until) {
             if(run.reverse && train.reversed==run.initialReversed) {
                 train.reversePending=true;
@@ -367,7 +366,7 @@ final class AutomaticSigns {
         for(int i=1;i<=7;i++) brakes[i]=v.brakeAcceleration(i);
         double resistance=v.rolling()+v.air()*speed*speed+(v.forceMode()?v.grade()*direction.getY():0);
         double target=switch(run.phase) {
-            case APPROACH -> cap;
+            case APPROACH -> cruise;
             case WAIT,HOLD -> 0;
             case DEPART,CRUISE -> cruise;
         };
@@ -378,6 +377,7 @@ final class AutomaticSigns {
         int notch=run.notch(speed,target,powers,brakes,resistance,now,train.brakeNotch>0?-train.brakeNotch:train.powerNotch);
         train.powerNotch=Math.max(0,notch); train.brakeNotch=Math.max(0,-notch);
         if (run.beginBrakingNotice(speed, notch)) plugin.announceStationBraking(train, run);
+        train.cabAtRear=false; train.cabMember=null;
         train.reverser=train.reversed?Reverser.BACKWARD:Reverser.FORWARD;
     }
     private double defaultSpeed() { return plugin.getConfig().getDouble("settings.station-launch-speed",.4); }
