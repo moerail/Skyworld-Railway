@@ -17,6 +17,7 @@ final class TrainRailPath {
     private static final double LEADER_RESET_DISTANCE_SQUARED = 16.0;
 
     private final List<PathPoint> points;
+    private final java.util.NavigableMap<Double,PathPoint> integrityHistory = new java.util.TreeMap<>();
     private double lowCoordinate;
     private double highCoordinate;
     private VanillaRailWalker leaderWalker;
@@ -142,6 +143,9 @@ final class TrainRailPath {
             addProbe(moveProbes, next, moved);
         }
 
+        for(var p:points) integrityHistory.put(p.coordinate(),p);
+        integrityHistory.headMap(lowCoordinate-64,false).clear();
+        integrityHistory.tailMap(highCoordinate+64,false).clear();
         if (reversed) {
             trimEnd(lowCoordinate + consistLength);
         } else {
@@ -187,6 +191,13 @@ final class TrainRailPath {
 
     synchronized TrainTrackPosition activeLeaderTrackPosition(boolean reversed) {
         return leaderWalker != null && leaderReversed == reversed ? leaderWalker.trackPosition() : null;
+    }
+
+    synchronized List<TrainIntegrityMonitor.Point> integrityGeometry() {
+        var geometry=new java.util.TreeMap<Double,PathPoint>(integrityHistory);
+        for(var p:points)geometry.put(p.coordinate(),p);
+        return geometry.values().stream().map(p->new TrainIntegrityMonitor.Point(
+                p.location().getWorld().getName(),p.location().getX(),p.location().getY(),p.location().getZ(),p.coordinate())).toList();
     }
 
     synchronized List<MemberPlacement> placements(int memberCount, double spacing, boolean reversed) {

@@ -161,7 +161,8 @@ final class TrainMemberActuator {
 
     boolean tryOwnedMove(Minecart cart, Location target) {
         if (ownedMoverFailed || !plugin.getConfig().getBoolean("settings.owned-region-movement-enabled", true)
-                || !Bukkit.getMinecraftVersion().equals("26.2")) return false;
+                || !(Bukkit.getMinecraftVersion().equals("26.2")
+                    || Bukkit.getMinecraftVersion().equals("26.3"))) return false;
         try {
             boolean passenger = hasPlayerPassenger(cart);
             if (OwnedTrainMover.move(cart, target, passenger)) {

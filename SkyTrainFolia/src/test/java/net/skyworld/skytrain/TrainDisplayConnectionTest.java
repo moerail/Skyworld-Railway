@@ -20,7 +20,8 @@ public final class TrainDisplayConnectionTest {
         Bootstrap.bootStrap();
         var sync = new TrainDisplaySync(500_000_000L, 8);
         var channel = new EmbeddedChannel();
-        var connection = new TrainDisplayConnection(sync, channel);
+        var connection = new TrainDisplayConnection(sync, channel,
+                TrainDisplayPacketAdapterFactory.forServer("26.2"));
         channel.pipeline().addLast(connection);
         UUID train = UUID.randomUUID(), world = UUID.randomUUID();
         UUID a = UUID.randomUUID(), b = UUID.randomUUID();
@@ -106,7 +107,8 @@ public final class TrainDisplayConnectionTest {
     static void lateAttachAndPrecision() {
         var sync = new TrainDisplaySync(500_000_000L, 8);
         var channel = new EmbeddedChannel();
-        var connection = new TrainDisplayConnection(sync,channel);
+        var connection = new TrainDisplayConnection(sync, channel,
+                TrainDisplayPacketAdapterFactory.forServer("26.2"));
         channel.pipeline().addLast(connection);
         UUID train=UUID.randomUUID(), world=UUID.randomUUID(), uuid=UUID.randomUUID();
         long now=System.nanoTime();

@@ -19,7 +19,7 @@ public final class ShadowSwitchControlTest {
         try(var runtime=new ShadowRuntime(null,null,file,600,2,()->{
             long now=System.currentTimeMillis();
             var observation=new ConsistObservation(session,1,train,"T",now,List.of(member),List.of(new ConsistObservation.Member(
-                    member,"world",x.get()+.5,64.06,.5,now,now,state.get())),false);
+                    member,"world",x.get()+.5,64.06,.5,now,now,state.get())),false,ShadowRuntimeTest.completeIntegrity(List.of(member),now));
             return new ShadowRuntime.Inputs(graph,Map.of(point.toString(),"straight"),true,session,session,List.of(),List.of(observation),List.of());
         }, request->{calls.incrementAndGet();return CompletableFuture.completedFuture("COMPLETED");})) {
             var r=new SwitchControlService.Request(UUID.randomUUID(),point,1,"straight","diverging",position);

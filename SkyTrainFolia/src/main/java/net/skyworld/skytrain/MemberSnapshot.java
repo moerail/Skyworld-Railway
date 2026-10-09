@@ -26,6 +26,10 @@ final class MemberSnapshot {
         this.timeMillis = timeMillis;
     }
 
+    MemberSnapshot(UUID id,String world,double x,double y,double z,long at) {
+        this.entityId=id;this.worldName=world;this.x=x;this.y=y;this.z=z;this.timeMillis=at;this.velocity=new Vector();
+    }
+
     Vector toVector() {
         return new Vector(x, y, z);
     }

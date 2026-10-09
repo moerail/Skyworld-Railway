@@ -1,19 +1,8 @@
 # SkyRail Suite
 
-## 当前源码更新 / Current source update — 2026-10-09
+本地开发候选 **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3**：新增列车完整性监测（固定编组、采样时效、沿轨道的相邻车厢间隔）、未知或失完整时停车保持并保留占用与 MA 保护。`/st info <列车名>` 显示当前位置；不确定时显示最后报告的世界坐标和时间。仅两端最外侧车厢的乘客可 `/st drive`，forward/backward 以所坐驾驶端为准。完整性恢复且全列停稳后执行 `/st tims ack`；若已进入 TR，再执行 `/stcs ma ack`、`/stcs ma release` 并重新申请 MA。既有存档首次升级需要核对编组后执行 TIMS 确认。本候选尚未发布或实车验收。 [4.0.8 开发说明](doc/releases/suite-v4.0.8.md)
 
-**STCS 4.1.0 / SkyTrainFolia 4.0.5 / STA 2.1.1 / SkyPCC 2.0.1。** STCS 4.1.0 已由维护者确认测试通过；其他组件的实服验收状态以各自更新说明为准。下方 4.0.2 发布记录保留作历史基线，并非当前源码版本。
-
-**Current source versions:** STCS 4.1.0, SkyTrainFolia 4.0.5, STA 2.1.1 and SkyPCC 2.0.1. The maintainer confirmed STCS 4.1.0 testing passed; other components retain their own acceptance status. The 4.0.2 release entries below are historical.
-
-- **STCS:** FS 道岔锁定范围随实时车速调整；RailGraph v4 压缩直线路径，保留弯道和坡道完整几何，旧图迁移前备份。/ FS point eligibility follows speed; RailGraph v4 compresses straight paths and backs up legacy graphs. [4.1.0](doc/releases/stcs-v4.1.0-railgraph-storage.md) · [动态锁定配置](doc/STCS-DYNAMIC-SWITCH-LOCK.zh.md)
-- **SkyTrainFolia:** 库莉酱四语言司机提示与可编辑随机词库；坡道等效坡度、停车起步方向、重载几何及车体显示修复。/ Four-language driver hints, editable phrases, effective-grade and parked-launch fixes, reload geometry and member display corrections. [司机引导 / Driver guidance](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md)
-- **STA:** 可选 TLS 管理员桌面调度台，增加实时占用/预约、道岔方向、列车箭头和详情。默认关闭。/ Optional TLS desktop dispatch with live occupancy, reservations, switch directions and train details; disabled by default. [2.1.1](doc/releases/sta-v2.1.1-dispatcher-map.md) · [工具说明 / Tools](STA/tools/README.md)
-- **SkyPCC:** 正确的 Bearer token 可授权远程道岔操作与 SR 审批，默认仍监听本机。/ Bearer-token authorization for remote point control and SR approval; loopback binding remains the default. [2.0.1](doc/releases/skypcc-v2.0.1.md)
-
-FS 锁定距离 / FS point range: `max(ma.lock-distance-meters, v²/(2a) + v × lead-seconds + buffer-meters)`，v 为 m/s；默认 a=1、提前 5 秒、余量 25 米，可通过 `ma.dynamic-lock.enabled: false` 恢复固定距离。搜索 `ma.look-ahead-meters`（默认 600 米）和 MA 上限 `ma.max-authority-distance-meters`（默认 300 米）仍独立限制 MA；动态范围最高 10000 米，不绕过冲突或道岔检查。SH/SR 保持原有范围。
-
-The default dynamic parameters are 1 m/s², 5 seconds and 25 metres; disable `ma.dynamic-lock.enabled` to restore a fixed range. Search (600 m by default) and MA credit (300 m) remain independent configured caps. Dynamic range is capped at 10000 m; conflicts and point checks still apply, and SH/SR keep their existing limits. At 420 km/h these planning parameters give about 7414 m of point range, not a guarantee of full-speed ATP clearance.
+本次小版本为 **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**。停车后，调度转岔会先取得车端停车保持确认，再释放相关 MA 预约、转岔并重算 MA，司机无需先 release。网页 PCC 新增“撤销所选列车 MA → TR”：手动列车运行或停车都进入 TR 并制动；运行中的旧预约保留到全列确认停稳，车身占用始终保留。影子通道也执行此项主动调度停车命令。司机停稳后执行 `/stcs ma ack`、`/stcs ma release`，再重新申请 MA。失败／超时不代表撤销完成。需配套更新已安装插件并刷新客户端，保留原证书和令牌；实服验收待完成。 [4.0.7 release notes](doc/releases/suite-v4.0.7.md)
 
 <p align="center">
   <img src="logo.png" alt="SkyRail Suite" width="64" height="64">
@@ -33,7 +22,7 @@ The default dynamic parameters are 1 m/s², 5 seconds and 25 metres; disable `ma
 
 From boarding and claiming control to notches, MA requests and handover, without the administrator configuration chapters.
 
-**SkyTrainFolia 4.0.5 candidate:** 库莉酱（クリちゃん）会按玩家语言给停稳的手动列车司机发送下一步提示；文案从独立词库随机选择。详见 [司机引导词库更新说明](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md)。
+**SkyTrainFolia 4.0.7 published release:** 单个 JAR 在运行时选择 Shiroha 26.2 或 26.3 的显示包适配器；两版编译与 Java 测试已通过，实服验收仍待完成。详见 [适配报告](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。4.0.5 的[多语言司机引导词库](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md)继续包含在本版中。
 
 **趣味别册 / Just for fun:** [鐵道運轉試驗規程 · 舊式技術訓令體](README.ja.classical.md)
 
@@ -57,7 +46,7 @@ Minecraft is both the live operating environment and an interactive railway-syst
 
 ## 破坏性协议升级 / Breaking Protocol Upgrade
 
-**当前为预发布 / Current pre-release: [`suite-v4.0.2`](https://github.com/moerail/Skyworld-Railway/releases/tag/suite-v4.0.2)。** 自动检查已通过，最近修复尚待服务器复测。Automated checks passed; the latest fixes still await live-server retesting.
+**已发布版本 / Published release:** STF **4.0.7**、STCS **4.0.5**、STA **2.1.3**、SkyPCC **2.0.2**。同一个 STF JAR 支持 Shiroha **26.2 和 26.3**；两版隔离测试已通过，实服验收仍待完成。The same STF JAR supports both server versions; live-server acceptance is pending. [适配报告 / Adaptation report](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。
 
 SkyPCC 另有 **2.0.1 小版本候选**：远程道岔操作与 SR 审批可通过正确的 Bearer token 授权；默认仍仅监听 `127.0.0.1`。详见 [SkyPCC 2.0.1 更新说明](doc/releases/skypcc-v2.0.1.md)。
 
@@ -65,13 +54,15 @@ STA 另有 **2.1.0 测试候选**：可选 TLS/TCP 管理员调度入口及复�
 
 STA **2.1.1 桌面调度台候选**补充实时占用/预约图层、道岔方向和列车箭头、线路线型及列车详情侧栏；需搭配 2.1.1 服务端。详见 [STA 2.1.1 说明](doc/releases/sta-v2.1.1-dispatcher-map.md)。
 
-**4.0.2 更新 / Changes:** 低速预警在 ATP 限速 ≤40 km/h 时提前 5 km/h 触发、低于限速 8 km/h 时解除；普通档新默认 15 / 18 km/h，已有设置保留。新增管理员 MA 服务恢复指令，保留占用，不自动缓解制动。详见 [更新说明](doc/releases/suite-v4.0.2.md)。
+
+
+**历史 4.0.2 更新 / Earlier changes:** 低速预警在 ATP 限速 ≤40 km/h 时提前 5 km/h 触发、低于限速 8 km/h 时解除；普通档新默认 15 / 18 km/h，已有设置保留。新增管理员 MA 服务恢复指令，保留占用，不自动缓解制动。详见 [更新说明](doc/releases/suite-v4.0.2.md)。
 
 Low-speed warnings use 5 / 8 km/h gaps at ATP limits <=40 km/h; normal-band defaults are 15 / 18, preserving existing settings. Administrator MA recovery retains occupancy and does not release brakes. See the [release notes](doc/releases/suite-v4.0.2.md).
 
-本批版本为 **STF 4.0.2 / STCS 4.0.2 / STA 2.0.0 / SkyPCC 2.0.0**。新增 STA v6 可执行授权与 PCC `/api/v6/operational-ma`、SR 审批接口；原有 v5 影子信息继续保留。不要混用旧版二进制：停服、备份后一起替换所安装的组件并强制刷新网页。STF 仍可独立安装。保留 RailGraph 与占用账本，不应删除数据来升级。
+本批版本为 **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**。STA v6 可执行授权与 PCC `/api/v6/operational-ma`、SR 审批接口继续提供；原有 v5 影子信息继续保留。不要混用旧版二进制：停服、备份后一起替换所安装的组件并强制刷新网页。STF 仍可独立安装。保留 RailGraph 与占用账本，不应删除数据来升级。
 
-This release uses **STF 4.0.2 / STCS 4.0.2 / STA 2.0.0 / SkyPCC 2.0.0**. It adds executable STA v6 permissions and PCC `/api/v6/operational-ma` and SR approval, while preserving v5 shadow information. Do not mix old and new binaries: stop and back up the server, replace installed components together, then hard-refresh the browser. STF remains standalone-capable. Keep RailGraph and occupancy ledgers.
+The published 4.0.7 release uses **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. It retains executable STA v6 permissions, PCC `/api/v6/operational-ma` and SR approval, and v5 shadow information. Do not mix old and new binaries: stop and back up the server, replace installed components together, then hard-refresh the browser. STF remains standalone-capable. Keep RailGraph and occupancy ledgers.
 
 编号彩蛋区分 Message 与 Packet：v5 影子 MA 与 v6 实验性可执行 MA 均使用私有 **Message 1003 / Packet 1015**，列车遥测为 **Message 1136**。自定义列车删除为 **Message 2001**，不代表占用出清；图定位与等待/未分配状态分别为 **Message 2002 / 2003**。SR 审批是 SkyRail 服务调用和行车事件，不是新增的 ETCS 报文。仅借用 SUBSET-026 部分编号加 1000 的概念，不是 ETCS 报文编码或标准符合性声明。
 
@@ -99,9 +90,9 @@ This update corrects SH/SR mode-speed braking, TR overrun feedback and distant S
 
 | 插件 / Plugin | 版本 / Version | 职责 / Responsibility |
 | --- | --- | --- |
-| [SkyTrainFolia (STF)](SkyTrainFolia/) | 4.0.2 | 列车运动、编组、驾驶控制、车型、牌子、实体道岔执行与驾驶室 HMI。<br>Train motion, consists, driving control, vehicle profiles, signs, physical point actuation and cab HMI. |
-| [Skyworld Train Control System (STCS)](STCS/) | 4.0.2 | RailGraph、线路归属、定位、保留占用与实验性 MA/EoA 分配。<br>RailGraph, line attribution, localisation, retained occupancy and experimental MA/EoA allocation. |
-| [SkyworldTrainAPI (STA)](STA/) | 2.0.0 | 插件之间的版本化进程内服务契约、遥测与行车事件。<br>Versioned in-process service contracts, telemetry and railway events between plugins. |
+| [SkyTrainFolia (STF)](SkyTrainFolia/) | 4.0.6 | 列车运动、编组、驾驶控制、车型、牌子、实体道岔执行与驾驶室 HMI。<br>Train motion, consists, driving control, vehicle profiles, signs, physical point actuation and cab HMI. |
+| [Skyworld Train Control System (STCS)](STCS/) | 4.0.4 | RailGraph、线路归属、定位、保留占用与实验性 MA/EoA 分配。<br>RailGraph, line attribution, localisation, retained occupancy and experimental MA/EoA allocation. |
+| [SkyworldTrainAPI (STA)](STA/) | 2.1.1 | 插件之间的版本化进程内服务契约、遥测与行车事件。<br>Versioned in-process service contracts, telemetry and railway events between plugins. |
 | [SkyPCC](SkyPCC/) | 2.0.1 | HTTP/SSE 调度显示、基础设施详情、事件日志与经过身份验证的道岔操作、SR 审批。<br>HTTP/SSE dispatch display, inspectors, event log, authenticated turnout control and SR approval. |
 
 [shared/](shared/) 包含编译进各插件的共通指令、帮助与版本界面代码，并非第五个运行时插件。STA 是进程内 Java API，而不是通用的 Python 网络协议。
@@ -204,17 +195,17 @@ Reproduce issues with the relevant server/plugin versions and a small track scen
 - [TrainManager responsibility split](doc/TRAIN-MANAGER-REFACTOR.md): internal boundaries and preserved contracts.
 - [Publishing checklist](doc/PUBLISHING.md): source packaging, dependencies, assets and release checks.
 
-当前构建基线为 **JDK 25，以及已准备好的 Shiroha/Folia 26.2 服务端依赖目录**。在仓库根目录执行：
+当前构建基线为 **JDK 25，以及已准备好的 Shiroha/Folia 26.2、26.3 服务端依赖目录**。在仓库根目录执行：
 
-Current build baseline: **JDK 25 and a prepared Shiroha/Folia 26.2 server dependency tree**. From the repository root:
+Current build baseline: **JDK 25 and prepared Shiroha/Folia 26.2 and 26.3 server dependency trees**. From the repository root:
 
 ```powershell
-./build.ps1 -ServerRoot /path/to/prepared-server -JavaHome /path/to/jdk-25
+./build.ps1 -ServerRoot /path/to/26.2-server -ServerRoot26_3 /path/to/26.3-server -JavaHome /path/to/jdk-25
 ```
 
-[构建脚本](build.ps1) 从该服务端目录读取 `versions/26.2/shiroha-26.2.jar` 和 `libraries/`，构建四个 JAR，并启用断言运行 Java 测试入口。依赖不随源码打包。产物写入 `artifacts/` 和 `target/`，不会启动、部署或修改服务器。
+[构建脚本](build.ps1) 分别读取两版服务端核心与依赖，把两版 SkyTrainFolia 协议适配器装入同一个 JAR，并在两版依赖下编译和运行 Java 测试。产物写入 `artifacts/` 和 `target/`，不会启动、部署或修改服务器。
 
-The [build script](build.ps1) reads `versions/26.2/shiroha-26.2.jar` and `libraries/` from that server tree, builds four JARs and runs Java test entry points with assertions enabled. Dependencies are not bundled. Output is written under `artifacts/` and `target/`; the build does not start, deploy to or modify the server.
+The [build script](build.ps1) reads both server cores and dependency trees, packages both SkyTrainFolia protocol adapters in one JAR, and compiles and runs Java tests against each version. Dependencies are not bundled. Output is written under `artifacts/` and `target/`; the build does not start, deploy to or modify either server.
 
 其他检查需在仓库根目录分别运行：
 
@@ -267,7 +258,7 @@ SkyRail Suite is running and being tested on **Skyworld Minecraft Server**. Join
 
 ### 加入服务器 / Join the Server
 
-**Minecraft Java Edition 26.2** · 无需安装铁路客户端模组 / No railway client mod required
+**Minecraft Java Edition 26.2 / 26.3** · 无需安装铁路客户端模组 / No railway client mod required
 
 | 服务 / Service | 地址 / Address |
 | --- | --- |

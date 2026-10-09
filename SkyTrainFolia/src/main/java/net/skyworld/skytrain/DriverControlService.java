@@ -46,6 +46,9 @@ final class DriverControlService {
             if (!player.isOnline() || player.isDead() || !(player.getVehicle() instanceof Minecart seat)
                     || cartLookup.apply(seat) != train) throw new IllegalArgumentException("error.drive-board");
             if (trainLookup.apply(train.id()) != train) return false;
+            int seatIndex=train.indexOf(seat.getUniqueId());
+            if(!CabOrientation.endSeat(seatIndex,train.memberCount()))
+                throw new IllegalArgumentException("error.drive-end-seat");
             UUID currentDriver = trainDrivers.get(train.id());
             if (currentDriver != null && !currentDriver.equals(playerId)) {
                 Player currentPlayer = Bukkit.getPlayer(currentDriver);
@@ -63,6 +66,10 @@ final class DriverControlService {
             UUID leaseId = UUID.randomUUID();
             driverLeaseIds.put(playerId, leaseId);
             train.lastManualDriver = playerId;
+            train.cabMember=seat.getUniqueId();
+            train.cabAtRear=CabOrientation.rear(seatIndex,train.memberCount());
+            train.reverser=Reverser.NEUTRAL;
+            train.lastSelectedReverser=Reverser.BACKWARD;
             // A fresh declaration never inherits traction from an earlier driver/session.
             DriverSafety.brake(train);
             ScheduledTask check = player.getScheduler().runAtFixedRate(plugin, task -> {
@@ -143,7 +150,9 @@ final class DriverControlService {
     boolean isDriver(Player player, Train train) {
         if (player == null || train == null) return false;
         Entity seat = player.getVehicle();
-        return DriverSafety.ownsSeat(trainDrivers.get(train.id()), player.getUniqueId(),
+        return seat!=null && CabOrientation.endSeat(train.indexOf(seat.getUniqueId()),train.memberCount())
+                && train.cabAtRear==CabOrientation.rear(train.indexOf(seat.getUniqueId()),train.memberCount())
+                && DriverSafety.ownsSeat(trainDrivers.get(train.id()), player.getUniqueId(),
                 driverSeats.get(player.getUniqueId()), seat == null ? null : seat.getUniqueId(),
                 player.isOnline() && !player.isDead());
     }

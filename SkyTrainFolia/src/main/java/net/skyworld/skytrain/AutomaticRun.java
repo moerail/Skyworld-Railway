@@ -71,6 +71,14 @@ final class AutomaticRun {
         return Math.sqrt(2*(low*d+(high-low)*(d-8*Math.log1p(d/8))));
     }
 
+    double cruiseTarget(double cap, Double propertyTarget, double defaultSpeed) {
+        double stationTarget = inheritTargetSpeed
+                ? propertyTarget == null ? defaultSpeed : propertyTarget
+                : spec.speed() == null ? cap : Math.abs(spec.speed());
+        // A station may request a lower speed, but cannot raise the active V_target.
+        return Math.min(Math.min(cap, stationTarget), propertyTarget == null ? cap : propertyTarget);
+    }
+
     /** Full-power departure, P1/coast cruising and distance-feedback station braking. */
     int notch(double speed, double target, double[] powers, double[] brakes, double resistance, long now, int previous) {
         if (phase == Phase.WAIT || phase == Phase.HOLD || remaining <= .02 && phase == Phase.APPROACH) return -7;

@@ -1,12 +1,12 @@
 # Manuel de conduite SkyRail
 
-## Mise à jour : STF 4.0.5 / STCS 4.1.0
+Version locale de développement **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3** : TIMS vérifie la composition fixe, la fraîcheur des mesures et l’écart entre véhicules le long de la voie. Une intégrité inconnue ou perdue maintient le frein et conserve l’occupation ainsi que la protection MA. `/st info <train>` affiche la position actuelle ou les dernières coordonnées et l’heure si elle est incertaine. Seuls les passagers des véhicules extrêmes peuvent utiliser `/st drive` ; forward/backward suivent le poste occupé. Après reconstitution et arrêt complet : `/st tims ack`, puis en TR `/stcs ma ack`, `/stcs ma release` et nouvelle MA. Les trains enregistrés nécessitent une première vérification de composition. Cette version n’est pas publiée ni validée en circulation. [Notes de développement 4.0.8](../releases/suite-v4.0.8.md)
 
-STA est en version 2.1.1 et SkyPCC en 2.0.1. Le mainteneur confirme les essais STCS 4.1.0. Kuri-chan guide les conducteurs manuels à l'arrêt dans leur langue et explique les attentes de localisation, MA et SR ; les phrases modifiables ne commandent jamais le train. En FS, la vitesse augmente la portée de vérification des aiguilles, mais seule une MA valide permet de circuler. Conflits, états inconnus et plafonds restent applicables. L'ancienne base ci-dessous est historique. [Versions](../../README.fr.md).
+Cette révision utilise **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. Pour un train manuel arrêté, la manœuvre d’aiguille obtient d’abord la confirmation embarquée du maintien au frein, retire la réservation avant, manœuvre puis recalcule la MA, sans release préalable du conducteur. Le PCC web ajoute « Révoquer MA → TR » : en marche ou à l’arrêt, le train passe en TR et freine après confirmation embarquée. Les réservations restent jusqu’à confirmation de l’arrêt complet ; l’occupation du train est conservée. Cette commande explicite agit aussi en mode observation. Reprise : arrêt, `/stcs ma ack`, `/stcs ma release`, puis nouvelle demande MA. Un délai expiré ne confirme pas l’exécution. Mettre à jour les composants installés ensemble et actualiser les clients ; conserver certificats et jetons. Validation sur serveur réel à effectuer. [4.0.7 release notes](../releases/suite-v4.0.7.md)
 
 [中文](README.zh.md) | [English](README.en.md) | [Français](README.fr.md) | [日本語](README.ja.md) · [Accueil du projet](../../README.md)
 
-Pour les joueurs à bord d'un train manuel. Versions : STF/STCS 4.0.2, STA/SkyPCC 2.0.0. La création des trains, les voies et la configuration relèvent des administrateurs.
+Pour les joueurs à bord d'un train manuel. Version publiée : STF 4.0.7, STCS 4.0.5, STA 2.1.3, SkyPCC 2.0.2 sur Shiroha 26.2 ou 26.3 ; la candidate locale 4.0.8 est décrite ci-dessus. La création des trains, les voies et la configuration relèvent des administrateurs ; la validation sur serveur réel reste à faire.
 
 > **En cas de danger : `/st eb`.** La MA fantôme et sa limite restent consultatives. Le canal expérimental distinct `Enforced` ne peut freiner un train manuel qu'après activation explicite par un administrateur et émission d'une MA exécutable par STCS. Ne supposez ni son activation ni une validation sur serveur. Ce guide concerne un jeu, pas l'exploitation ferroviaire réelle.
 
@@ -36,7 +36,7 @@ Dans le canal actif, SH/SR sont limités par défaut à **40 km/h**, réglables 
 
 La cible SR approuvée peut être plus éloignée que la MA actuelle. Chaque autorisation glissante est limitée par défaut à 120 m, évolue selon la situation en avant et ne permet pas de dépasser la cible approuvée. **Respectez uniquement la MA actuellement valide.** L'accord ne signifie pas que toutes les aiguilles et sections sont ouvertes. Une géométrie sauvegardée peut couvrir des chunks déchargés, mais des aiguilles inconnues, une occupation incertaine ou des lacunes du graphe peuvent empêcher la prolongation.
 
-## 4.0.2 : Alertes et rétablissement du service
+## Ancienne mise à jour 4.0.2 : alertes et rétablissement du service
 
 La plage sonore dépend de la limite ATP actuelle, pas de la vitesse réelle. Pour une limite **≤40 km/h**, y compris le plafond SH par défaut, l'alerte commence **5 km/h sous la limite** et cesse à **8 km/h sous la limite** ou moins. Au-delà de 40, les nouveaux réglages par défaut sont **15 / 18 km/h** ; les réglages existants de la plage normale sont conservés. La priorité de survitesse, le silence à très basse vitesse et le freinage ATP ne changent pas.
 

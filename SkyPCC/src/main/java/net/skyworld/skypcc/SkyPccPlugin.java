@@ -167,6 +167,7 @@ public final class SkyPccPlugin extends JavaPlugin {
     private void handle(HttpExchange x) throws IOException {
         if ("/api/v5/switch".equals(x.getRequestURI().getPath())) { control(x); return; }
         if ("/api/v6/sr".equals(x.getRequestURI().getPath())) { srControl(x); return; }
+        if ("/api/v6/ma/revoke".equals(x.getRequestURI().getPath())) { revokeControl(x); return; }
         if (!"GET".equals(x.getRequestMethod())) { reply(x, 405, "text/plain", bytes("GET required")); return; }
         String path = x.getRequestURI().getPath();
         switch (path) {
@@ -211,6 +212,25 @@ public final class SkyPccPlugin extends JavaPlugin {
             if(result==null)result=switchGateway.progress(request,switchControl);
             reply(x, result.status().equals("PENDING") ? 202 : 200, "application/json", bytes(JSON.toJson(result)));
         } catch (RuntimeException ex) { reply(x, 400, "application/json", bytes("{\"status\":\"REJECTED\",\"reason\":\"INVALID_REQUEST\"}")); }
+    }
+    private void revokeControl(HttpExchange x) throws IOException {
+        var h=x.getRequestHeaders();
+        if(!ControlAccess.permitted(controlEnabled,controlToken,x.getRequestMethod(),
+                h.getFirst("Authorization"),h.getFirst("Content-Type"))) {
+            reply(x,403,"application/json",bytes("{\"status\":\"REJECTED\",\"reason\":\"CONTROL_AUTH_REQUIRED\"}"));return;
+        }
+        byte[] body=x.getRequestBody().readNBytes(4097);
+        if(body.length>4096){reply(x,413,"application/json",bytes("{}"));return;}
+        try {
+            var o=JsonParser.parseString(new String(body,StandardCharsets.UTF_8)).getAsJsonObject();
+            if(!o.keySet().equals(Set.of("requestId","trainId")))throw new IllegalArgumentException();
+            UUID id=UUID.fromString(o.get("requestId").getAsString()), train=UUID.fromString(o.get("trainId").getAsString());
+            var source=getServer().getServicesManager().load(net.skyworld.sta.api.v6.OperationalAuthorityService.class);
+            String reason=source==null?"UNAVAILABLE":source.revokeMa(id,train,"SkyPCC").toCompletableFuture().getNow(null);
+            String status=reason==null?"PENDING":reason.equals("REVOKED_TR")?"APPLIED":"REJECTED";
+            reply(x,reason==null?202:200,"application/json",bytes(JSON.toJson(Map.of("requestId",id,
+                    "status",status,"reason",reason==null?"WAITING_TR":reason))));
+        } catch(RuntimeException ex){reply(x,400,"application/json",bytes("{\"status\":\"REJECTED\",\"reason\":\"INVALID_REQUEST\"}"));}
     }
     private void srControl(HttpExchange x) throws IOException {
         var h = x.getRequestHeaders();

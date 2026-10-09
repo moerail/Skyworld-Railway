@@ -204,6 +204,7 @@ public final class SkyTrainPlugin extends JavaPlugin {
         if (train == null || train.properties().conductionMode.automatic()) return "MANUAL_ONLY";
         if (!manager.isDriver(player, train)) return "NOT_DRIVER";
         synchronized (train) {
+            if (train.tims.view(System.currentTimeMillis()).brakeHeld()) return "TIMS_HOLD";
             if (train.operatingMode != OperatingMode.TR) return "NO_TRIP";
             if (train.currentSpeed() > .001 || train.maxMemberSpeed() > .001) return "STOP_FIRST";
             train.operatingMode = train.operatingMode.acknowledge(true);
@@ -219,9 +220,12 @@ public final class SkyTrainPlugin extends JavaPlugin {
         if (train == null || train.properties().conductionMode.automatic()) return "MANUAL_ONLY";
         if (!manager.isDriver(player, train)) return "NOT_DRIVER";
         synchronized (train) {
-            if (train.protectionMode != ProtectionMode.ACTIVE) return "SHADOW";
             if (train.currentSpeed() > .001 || train.maxMemberSpeed() > .001) return "STOP_FIRST";
+            if (train.tims.view(System.currentTimeMillis()).brakeHeld()) return "TIMS_HOLD";
             if (train.operatingMode == OperatingMode.TR) return "ACK_TRIP_FIRST";
+            if (train.dispatcherBrake.held() && !train.dispatcherBrake.trip()) return "DISPATCHER_BUSY";
+            train.dispatcherBrake.clear();
+            if (train.protectionMode != ProtectionMode.ACTIVE) { train.operatingMode=OperatingMode.SB; return "SHADOW"; }
             train.operatingMode = train.operatingMode.release(true);
             train.activeAtp.clear();
             train.activeAtpLimitMps = null;
@@ -469,6 +473,15 @@ public final class SkyTrainPlugin extends JavaPlugin {
 
     void announceStationBraking(Train train, AutomaticRun run) {
         if (cabUiManager != null) cabUiManager.announceStationBraking(train, run);
+    }
+
+    void announceAutomaticTargetSpeed(Train train, double targetSpeed) {
+        if (cabUiManager != null) cabUiManager.announceAutomaticTargetSpeed(train, targetSpeed);
+    }
+
+    void announceIntegrityHold(Train train, String reason) {
+        getLogger().warning("TIMS_HOLD train=" + train.name() + " reason=" + reason);
+        if (cabUiManager != null) cabUiManager.announceIntegrityHold(train, reason);
     }
 
     String automaticStatus(Train train) {

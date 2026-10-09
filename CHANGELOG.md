@@ -1,16 +1,11 @@
 # Updates / 更新说明
 
-## Current source snapshot — 2026-10-09
+## SkyTrainFolia v4.0.6 candidate / Shiroha 26.2 + 26.3
 
-STCS **4.1.0**, SkyTrainFolia **4.0.5**, STA **2.1.1**, SkyPCC **2.0.1**. The maintainer confirmed STCS 4.1.0 testing passed. A complete build against Minecraft/Folia 26.2 passed all **82 Java test entry points**. Other components retain their individual live-acceptance status; the historical suite 4.0.2 release is not renamed.
-
-- STCS FS point eligibility now uses `max(lock-distance-meters, v²/(2a) + v*lead-seconds + buffer-meters)` from fresh telemetry. Default planning parameters are 1 m/s², 5 s and 25 m. `ma.dynamic-lock.enabled: false` restores fixed eligibility. Search and MA credit remain independently configured, SH/SR retain their limits, and point-state/conflict/whole-train clearance checks still apply.
-- RailGraph schema v4 stores contiguous axis-aligned straight paths compactly, retaining full curves/slopes and full service geometry. Legacy v2/v3 files are backed up before successful migration. Includes directed SR unresolved-port checks and attended shadow-ledger reset support.
-- SkyTrainFolia includes multilingual driver guidance and an editable word bank, retained launch direction, consist-aware effective grade, reload geometry and visual pose corrections. `settings.max-effective-grade` defaults to 0.04 for force-mode profiles. Ledger reset requires the matching STF challenge support.
-- STA adds the disabled-by-default TLS administrator desk, current occupancy/reservation layers, switch/train directions and selected-train details. SkyPCC allows remote Bearer-token control while requiring a secure browser context for control requests; default bind remains loopback.
-- Update all seven root READMEs, four driver READMEs and desktop-tool instructions. Publish the existing incident reports and the explicitly unimplemented SkyATO design draft as documentation.
-
-[STCS 4.1.0](doc/releases/stcs-v4.1.0-railgraph-storage.md) · [Dynamic lock configuration](doc/STCS-DYNAMIC-SWITCH-LOCK.zh.md) · [Desktop tools](STA/tools/README.md)
+- Package the 26.2 and 26.3 train display packet adapters in one JAR. Select the matching adapter from the server Minecraft version at runtime; unsupported versions retain vanilla display sync.
+- Preserve the tested 26.2 packet stream, and encode 26.3 entity position and movement with `PositionPath` and `VecDelta`.
+- Enable owned-region movement on both versions. Compile and run isolated Java tests against both server cores. Live-server acceptance is pending.
+- [Adaptation report / 双版本适配说明](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
 
 ## SkyTrainFolia v4.0.5 candidate / 多语言司机引导词库
 

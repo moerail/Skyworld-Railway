@@ -25,7 +25,7 @@ public final class ShadowCoverageTest {
         if(present) {
             roster.add(new ConsistObservation(sourceSession,1,other,"Siding",now-sampleAge,
                     partial?List.of(member,missing):List.of(member),List.of(new ConsistObservation.Member(
-                    member,"world",x,64.06,z,now-memberAge,now,state)),false));
+                    member,"world",x,64.06,z,now-memberAge,now,state)),false,ShadowRuntimeTest.completeIntegrity(partial?List.of(member,missing):List.of(member),now-sampleAge)));
             desks.add(new DriverDeskService.Desk(other,otherDriver,otherLease,"SHADOW"));
         }
         roster.add(new ConsistObservation(ShadowRuntimeTest.session,1,unseen,"Not loaded",now,List.of(missing),List.of(),false));
@@ -67,7 +67,7 @@ public final class ShadowCoverageTest {
                 r.command(otherDriver,"request");
                 assert r.snapshot().authorities().stream().anyMatch(v->v.trainId().equals(other)&&v.reason().equals("OUTSIDE_COVERAGE")&&v.signedRemainingMeters()==null);
                 r.command(unseenDriver,"request");
-                assert r.snapshot().authorities().stream().anyMatch(v->v.trainId().equals(unseen)&&v.reason().equals("AWAITING_COVERAGE")&&v.signedRemainingMeters()==null);
+                assert r.snapshot().authorities().stream().anyMatch(v->v.trainId().equals(unseen)&&v.reason().equals("TIMS_NO_TIMS")&&v.signedRemainingMeters()==null);
                 x=50.5;slowInput=true;r.tick();slowInput=false;blockedLocally(r);
                 // An unload, partial consist, stale or wrong-session observation is not a proven exit.
                 x=10000.5;state=ConsistObservation.State.UNLOADED;r.tick();blockedLocally(r);

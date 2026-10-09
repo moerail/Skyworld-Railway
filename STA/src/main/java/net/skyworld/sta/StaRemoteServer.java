@@ -165,7 +165,7 @@ final class StaRemoteServer implements AutoCloseable {
                 try {
                     id = UUID.fromString(StaRemoteProtocol.required(request, "id")).toString();
                     String type = StaRemoteProtocol.required(request, "type");
-                    if (Set.of("switch.set", "sr.approve").contains(type)) {
+                    if (Set.of("switch.set", "sr.approve", "ma.revoke").contains(type)) {
                         long now = System.nanoTime();
                         if (now - lastWrite < TimeUnit.SECONDS.toNanos(1)) {
                             send(output, result(id, "REJECTED", "RATE_LIMIT", null)); continue;
@@ -174,7 +174,7 @@ final class StaRemoteServer implements AutoCloseable {
                     }
                     JsonObject response = process(id, type, request, admin);
                     send(output, response);
-                    if (Set.of("switch.set", "sr.approve").contains(type)) {
+                    if (Set.of("switch.set", "sr.approve", "ma.revoke").contains(type)) {
                         String target = type.equals("switch.set") ? StaRemoteProtocol.required(request, "switchId")
                                 : StaRemoteProtocol.required(request, "trainId");
                         plugin.getLogger().info("STA Remote actor=" + admin + " operation=" + type + " request=" + id
@@ -196,6 +196,22 @@ final class StaRemoteServer implements AutoCloseable {
     private JsonObject process(String id, String type, JsonObject req, String admin) throws Exception {
         var services = plugin.getServer().getServicesManager();
         return switch (type) {
+            case "ma.revoke" -> {
+                StaRemoteProtocol.keys(req,"id","type","requestId","trainId");
+                var service=services.load(OperationalAuthorityService.class);
+                if(service==null)throw new IllegalArgumentException("SERVICE_UNAVAILABLE");
+                String reason=service.revokeMa(UUID.fromString(StaRemoteProtocol.required(req,"requestId")),
+                        UUID.fromString(StaRemoteProtocol.required(req,"trainId")),"STA Remote:"+admin)
+                        .toCompletableFuture().getNow(null);
+                yield result(id,reason==null?"PENDING":reason.equals("REVOKED_TR")?"APPLIED":"REJECTED",
+                        reason==null?"WAITING_TR":reason,null);
+            }
+            case "events.list" -> {
+                StaRemoteProtocol.keys(req, "id", "type");
+                var source = services.load(net.skyworld.sta.api.v3.RailwayEventService.class);
+                if (source == null) throw new IllegalArgumentException("SERVICE_UNAVAILABLE");
+                yield result(id, "OK", "RAILWAY_EVENTS", JSON.toJsonTree(source.history()));
+            }
             case "graph.get" -> {
                 StaRemoteProtocol.keys(req, "id", "type");
                 var network = services.load(RailNetworkService.class);
@@ -219,7 +235,25 @@ final class StaRemoteServer implements AutoCloseable {
                 var trains = tracking.snapshots().stream()
                         .filter(message -> message.header().kind() == StaMessage.Kind.TRACK_REPORT)
                         .map(message -> PccProjection.train(message, now)).toList();
-                yield result(id, "OK", "TRAINS", JSON.toJsonTree(trains));
+                var roster=services.load(net.skyworld.sta.api.v3.ConsistObservationService.class);
+                var byId=new java.util.HashMap<String,net.skyworld.sta.api.v3.ConsistObservation>();
+                if(roster!=null) for(var c:roster.consistObservations())if(!c.removed())byId.put(c.train().toString(),c);
+                var enriched=new java.util.ArrayList<java.util.Map<String,Object>>();
+                var located=new java.util.HashSet<String>();
+                for(var row:trains) {
+                    var copy=new java.util.LinkedHashMap<String,Object>(row);
+                    var trainKey=String.valueOf(row.get("trainId"));located.add(trainKey);
+                    var c=byId.get(trainKey);if(c!=null)copy.put("integrity",c.integrity());
+                    enriched.add(copy);
+                }
+                for(var c:byId.values())if(!located.contains(c.train().toString())) {
+                    var row=new java.util.LinkedHashMap<String,Object>();
+                    row.put("trainId",c.train().toString());row.put("name",c.name());
+                    row.put("memberCount",c.expectedMembers().size());row.put("quality","AWAITING_POSITION");
+                    row.put("stale",true);row.put("graphCurrent",false);row.put("mode","unknown");
+                    row.put("integrity",c.integrity());enriched.add(row);
+                }
+                yield result(id, "OK", "TRAINS", JSON.toJsonTree(enriched));
             }
             case "shadow.get" -> {
                 StaRemoteProtocol.keys(req, "id", "type");

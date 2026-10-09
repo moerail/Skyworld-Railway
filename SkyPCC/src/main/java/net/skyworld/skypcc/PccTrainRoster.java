@@ -12,8 +12,12 @@ final class PccTrainRoster {
         for (var train : roster) {
             String id = train.train().toString();
             if (train.removed()) { result.remove(id); continue; }
-            if (result.containsKey(id)) continue;
+            if (result.containsKey(id)) {
+                var row=new LinkedHashMap<>(result.get(id));row.put("integrity",train.integrity());
+                result.put(id,Collections.unmodifiableMap(row));continue;
+            }
             Map<String, Object> row = new LinkedHashMap<>();
+            row.put("integrity",train.integrity());
             row.put("trainId", id); row.put("name", train.name());
             row.put("memberCount", train.expectedMembers().size());
             row.put("quality", "AWAITING_POSITION"); row.put("stale", true);

@@ -1,5 +1,7 @@
 # STA 2.1.0 — native remote dispatcher candidate
 
+For STA 2.1.1 on Windows, the [first-time setup script](../STA-REMOTE-ONE-CLICK.md) automates the certificate, token, configuration and launch wrapper described below. The manual steps remain here for the 2.1.0 release record.
+
 STA 2.1.0 adds an optional TLS 1.3 TCP listener and a Python/Tkinter administrator desk. It uses no HTTP, HTTPS, RCON or browser. An allowed TCP port such as 8766 is needed for direct access; incoming 80/443 ports are unnecessary. This is a test-server candidate, not a production approval.
 
 ## Authority and protocol

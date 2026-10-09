@@ -14,13 +14,15 @@ const train={trainId:'t1',name:'Train 原名',trainNumber:'G001',mode:'manual',d
   edgeId:'e',edgeOffsetMeters:30,edgeLengthMeters:100,currentMileageMeters:562,
   cab:{atpMode:'SHADOW',reverser:'FORWARD',powerNotch:0,brakeNotch:7,brakeHold:false}};
 const posts=[];
+const revocations=[];
 const server=http.createServer((req,res)=>{
   const now=Date.now();
   let body, type='application/json';
   if(req.url==='/api/v5/config')body={updateMode:'poll',pollIntervalMillis:250,controlEnabled:true};
   else if(req.url==='/api/v5/graph')body=graph;
   else if(req.url==='/api/v5/trains')body={schemaVersion:5,serviceStatus:'AVAILABLE',serverTimeMillis:now,graphRevision:1,
-    trains:[{...train,observedAtMillis:now,ageMillis:0}],
+    trains:[{...train,observedAtMillis:now,ageMillis:0,
+      integrity:{state:'LOST',reason:'GAP_EXCEEDED',observedAtMillis:now,brakeHeld:true,affectedMembers:['cart-2'],messageId:1136,packetId:1000}}],
     shadowMa:{version:5,simulationOnly:true,executable:false,status:'SHADOW',graphRevision:1,emittedAtMillis:now,
       authorities:[{trainId:'t1',state:'ALLOCATED_SHADOW', NID_MESSAGE:1003, NID_PACKET:1015,signedRemainingMeters:40,eoaEdgeId:'e',eoaOffsetMeters:70,reason:'SWITCH_UNKNOWN'}],sections:[
         {edgeId:'e',resourceId:'r',state:'OCCUPIED',occupants:['t1'],reservations:[],fromMeters:25,toMeters:30},
@@ -32,6 +34,14 @@ const server=http.createServer((req,res)=>{
       {session:'test',sequence:3,emittedAtMillis:now,trainId:'t1',trainName:'Train 原名',driverName:'Rin',type:'MA_RELEASED',reason:'RELEASED'},
       {session:'test',sequence:4,emittedAtMillis:now,trainId:'t1',trainName:'Train 原名',driverName:'Rin',type:'MA_REQUESTED',reason:'NO_EXIT_CAPACITY',details:{state:'WAITING'}}]}};
   else if(req.url==='/api/v5/switch') { posts.push(req.method);body={status:'PENDING',reason:'VERIFYING'};res.statusCode=202; }
+  else if(req.url==='/api/v6/ma/revoke') {
+    let data='';req.on('data',chunk=>data+=chunk);req.on('end',()=>{
+      assert.equal(req.headers.authorization,'Bearer revoke-test');
+      const request=JSON.parse(data);revocations.push(request);
+      res.writeHead(revocations.length===1?202:200,{'Content-Type':'application/json'});
+      res.end(JSON.stringify({status:revocations.length===1?'PENDING':'APPLIED',reason:revocations.length===1?'WAITING_TR':'REVOKED_TR'}));
+    });return;
+  }
   else {
     const name=req.url==='/'?'index.html':req.url.startsWith('/assets/')?req.url.slice(8):'';
     if(!['index.html','app.js','i18n.js','styles.css','day_logo.png','night_logo.png'].includes(name)){res.writeHead(404);res.end();return;}
@@ -49,13 +59,25 @@ const server=http.createServer((req,res)=>{
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await page.locator('.train-row').click();
+    assert((await page.locator('#detailIntegrity').textContent()).includes('GAP_EXCEEDED'));
     await page.locator('#followTrain').click();
     const out=path.resolve(__dirname,'../target/pcc-i18n');fs.mkdirSync(out,{recursive:true});
+    await page.locator('#revokeMa').click();
+    await page.locator('#revokeToken').fill('revoke-test');
+    await page.locator('#revokeConfirm').click();
+    await page.waitForFunction(()=>document.querySelector('#revokeResult').textContent.includes(PccI18n.code('REVOKED_TR')));
+    assert.equal(revocations.length,2);
+    assert.deepEqual(revocations[0],revocations[1]);
+    assert.equal(revocations[0].trainId,'t1');
+    assert.equal(await page.locator('#revokeToken').inputValue(),'');
+    assert(await page.locator('#revokeConfirm').isDisabled());
+    await page.locator('#revokeClose').click();
     for(const lang of ['zh','en','fr','ja']) {
       await page.selectOption('#languageSelect',lang);
       await page.waitForTimeout(150);
       assert.equal(await page.locator('#detailName').textContent(),'Train 原名');
       assert.equal(await page.locator('#detailLine').textContent(),'test_up');
+      assert((await page.locator('#detailIntegrity').textContent()).includes('GAP_EXCEEDED'));
       assert(await page.locator('#cancelFollow').isVisible());
       assert.equal(await page.locator('#detailMaReason').textContent(),await page.evaluate(()=>PccI18n.code('SWITCH_UNKNOWN')));
       assert.equal(await page.locator('.event-row').count(),5);
@@ -67,7 +89,7 @@ const server=http.createServer((req,res)=>{
       assert(eventsText[0].includes(await page.evaluate(()=>PccI18n.t('{operator} changed ATP mode: {from} → {to}.',{operator:'Rin',from:PccI18n.code('RECOVERING'),to:PccI18n.code('ISOLATED')}))));
       assert(eventsText[1].includes(await page.evaluate(()=>PccI18n.code('WAITING'))));
       assert(eventsText[3].includes(await page.evaluate(()=>PccI18n.code('ALLOCATED_SHADOW'))));
-      assert(eventsText[2].includes(await page.evaluate(()=>PccI18n.t('{driver} released forward shadow reservations. Train occupancy retained; no brake command.',{driver:'Rin'}))));
+      assert(eventsText[2].includes(await page.evaluate(()=>PccI18n.t('{driver} released forward MA reservation. Train occupancy retained.',{driver:'Rin'}))));
       for(const width of [1440,390]) {
         await page.setViewportSize({width,height:1000});
         await page.screenshot({path:path.join(out,`${lang}-${width}.png`)});

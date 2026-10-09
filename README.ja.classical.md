@@ -1,20 +1,18 @@
 # SkyRail Suite 鐵道運轉試驗規程
 
-## STCS 四・一・〇版　追補告示
+ローカル開発候補 **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3**：TIMS は固定編成、観測時刻、線路経路上の隣接車両間隔を確認します。不明・喪失時は制動保持と在線・MA 保護を継続します。`/st info <列車名>` は現在位置、不確実な場合は最終報告座標と時刻を表示します。`/st drive` は編成両端の最外側車両の乗客のみ使用可能で、forward/backward はその運転端を基準にします。元の編成を復元し全車停止後 `/st tims ack`、TR の場合は `/stcs ma ack`、`/stcs ma release`、MA 再要求の順です。既存保存編成は初回の編成確認が必要です。未公開・実サーバー未検証です。 [4.0.8 開発ノート](doc/releases/suite-v4.0.8.md)
 
-二〇二六年十月九日、管理者ヨリ STCS 四・一・〇ノ試驗合格報告アリ。現源版ハ STF 四・〇・五、STA 二・一・一、SkyPCC 二・〇・一ヲ併載ス。各組件ノ實服驗收ハ別ニ扱フ。
+本更新は **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2** です。手動列車の停車後、指令による分岐器転換は車上の停止保持確認、前方予約撤回、転換、MA 再計算の順に実行し、運転士の事前 release は不要です。Web PCC に「MA 取消 → TR」を追加。走行中・停車中とも車上確認後に TR へ移行して制動します。走行中の予約は全車停止確認まで保持し、車両在線は消去しません。この明示的な指令はシャドーチャネルにも適用されます。復帰は停車後 `/stcs ma ack`、`/stcs ma release`、MA 再要求の順です。タイムアウトは実行確認ではありません。導入済みプラグインを一緒に更新し、クライアントを再読込してください。証明書とトークンは継続使用できます。実サーバー検証は未完了です。 [4.0.7 release notes](doc/releases/suite-v4.0.7.md)
 
-FS 分岐器確保範圍ハ `max(ma.lock-distance-meters, v²/(2a) + v × lead-seconds + buffer-meters)` トス。v ハ米毎秒、既定減速度一米毎秒毎秒、先行五秒、餘裕二十五米ナリ。`ma.dynamic-lock.enabled: false` ニテ固定範圍ニ復ス。探索 `ma.look-ahead-meters` 六百米及ビ MA 上限 `ma.max-authority-distance-meters` 三百米ハ各々ノ設定上限トシ、動的範圍モ一萬米ヲ超エズ。SH/SR ノ規則ハ變更セズ。不明分岐器・占有競合・全編成出清ノ照合ヲ省略セザルモノトス。
+現行候補ハ STF 四・〇・七、STCS 四・〇・五、STA 二・一・三、SkyPCC 二・〇・二トス。STF ノ單一 JAR ハ Shiroha 二六・二及ビ二六・三ノ表示封包ヲ起動時ニ選擇ス。兩版ノ分離構築及ビ Java 試驗ハ通過セリ。實サーバー驗收ハ未了ナリ。[適合報告](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。
 
-RailGraph 第四構造版ハ直線路ヲ壓縮シ、曲線及ビ勾配ノ形狀ヲ保持ス。舊圖ハ置換前ニ備份ス。STF ハ四言語案内詞庫、坡道起動及ビ表示修正、STA ハ TLS 桌上指令臺、SkyPCC ハ Bearer 認證遠隔操作ヲ備フ。[STCS 更新](doc/releases/stcs-v4.1.0-railgraph-storage.md)・[司機案内](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md)・[指令臺](STA/tools/README.md)・[SkyPCC](doc/releases/skypcc-v2.0.1.md)。以下ノ舊版告示ハ履歷トス。
-
-第四・〇・二版附記：制限速度四十粁毎時以下ニ於テハ、五粁手前ニ警報ヲ發シ、八粁下ニ解除ス。超速警報及ビ制動規則ハ變更セズ。臺帳入出力障害ノ後、管理者ハ `/stcs admin ma restart` ニテ復舊ヲ試ミ得ルモ、占有ヲ消去セズ、制動ヲ緩解セズ。運轉士ハ MA ヲ再要求スベシ。
+舊第四・〇・二版附記：制限速度四十粁毎時以下ニ於テハ、五粁手前ニ警報ヲ發シ、八粁下ニ解除ス。超速警報及ビ制動規則ハ變更セズ。臺帳入出力障害ノ後、管理者ハ `/stcs admin ma restart` ニテ復舊ヲ試ミ得ルモ、占有ヲ消去セズ、制動ヲ緩解セズ。運轉士ハ MA ヲ再要求スベシ。
 
 ## M3 手動列車保護　追補告示
 
-**豫備公開 `suite-v4.0.2`。** 自動檢査ハ通過セリ。最新修正ノ實サーバー再檢證ハ未了トス。[公開要領](doc/releases/suite-v4.0.2.md)。
+舊豫備公開 `suite-v4.0.2` ノ[公開要領](doc/releases/suite-v4.0.2.md)ハ別ニ存ス。
 
-現行ハ STF 四・〇・二、STCS 四・〇・二、STA 二・〇・〇、SkyPCC 二・〇・〇ヲ一組トス。管理者ハ停車中ニ `/stcs admin enforce true|false` ヲ用ヒ、實驗的制動監視ノ通道ヲ明示ス。false ハ RECOVERING ノ制動保持ニ歸ス。手動列車ノミ SB/FS/SH/SR/TR/PT ヲ用ヒ、標識式擬似 ATO 自動列車ニハ適用セズ。影方式ハ依然トシテ制動ヲ執行セズ。
+現行ハ STF 四・〇・七、STCS 四・〇・五、STA 二・一・三、SkyPCC 二・〇・二ヲ一組トス。管理者ハ停車中ニ `/stcs admin enforce true|false` ヲ用ヒ、實驗的制動監視ノ通道ヲ明示ス。false ハ RECOVERING ノ制動保持ニ歸ス。手動列車ノミ SB/FS/SH/SR/TR/PT ヲ用ヒ、標識式擬似 ATO 自動列車ニハ適用セズ。影方式ハ依然トシテ制動ヲ執行セズ。
 
 SH/SR ノ既定上限ハ每時四十粁トシ、小許容幅ヲ超エタル速度超過ニハ FS ノ緩和待機時間ヲ置カズ B7 ヲ施ス。EoA 接近曲線ハ更ニ低速ヲ求ムル場合アリ。側欄及ビ運轉士ノ BossBar ニ ATP B7/EB ヲ揭示ス。冒進 TR ニハ案内及ビ非常制動音ヲ發ス。停車後 `/stcs ma ack` ニテ PT、次ニ `/stcs ma release` ニテ SB トシ、再申請スベシ。
 
@@ -60,10 +58,10 @@ STF 三・〇・〇、STCS 三・〇・〇、STA 一・〇・〇、SkyPCC 一・
 
 | 部名 | 現行版 | 分掌 |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `4.0.2` | 編成、軌道運動、力行制動、運轉權、標識、運轉臺及ビ手動列車ノ實驗的 ATP 制動 |
-| STCS | `4.0.2` | 有向 RailGraph、里程、位置標定、占有保持並ニ影方式及ビ實行用 MA/EoA |
-| SkyworldTrainAPI / STA | `2.0.0` | 同一 JVM 內ノ版付き契約、遙測、實行用許可及ビ行車事象 |
-| SkyPCC | `2.0.0` | 配線略圖、施設照會、事象記錄、認證付き分岐器操作及ビ SR 承認 |
+| SkyTrainFolia / STF | `4.0.6` | 編成、軌道運動、力行制動、運轉權、標識、運轉臺及ビ手動列車ノ實驗的 ATP 制動 |
+| STCS | `4.0.4` | 有向 RailGraph、里程、位置標定、占有保持並ニ影方式及ビ實行用 MA/EoA |
+| SkyworldTrainAPI / STA | `2.1.1` | 同一 JVM 內ノ版付き契約、遙測、實行用許可及ビ行車事象 |
+| SkyPCC | `2.0.1` | 配線略圖、施設照會、事象記錄、認證付き分岐器操作及ビ SR 承認 |
 
 STF ハ STA ナクシテ單獨使用ヲ得。手動運轉、運轉臺、快捷欄及ビ基本ノ標識式擬似自動運轉ハ STF ノ職掌トス。二・一・四版ニ於テ STA 型ノ參照ヲ適合部ニ隔離シ、STA 缺如ニ因ル監聽器ノ反射讀込不全ヲ修正セリ。
 
@@ -73,7 +71,7 @@ STA ハ自動的ニ公開サルル Python 用通信線ニ非ズ。同一サー�
 
 ## 第三章　裝備及ビ設置
 
-現行ノ適合基準ハ **Shiroha / Folia 26.2、Java 25** トス。STF ハ實體運動及ビ表示ニ版依存ノ處理ヲ含ム。`folia-supported: true` ヲ以テ萬版互換ノ證ト爲スベカラズ。
+現行ノ適合對象ハ **Shiroha / Folia 26.2・26.3、Java 25** トス。STF ハ實體運動及ビ表示ニ版依存ノ處理ヲ含ム。`folia-supported: true` ヲ以テ萬版互換ノ證ト爲スベカラズ。
 
 1. 世界及ビ `plugins` ヲ複製保存シ、先ヅ試驗サーバーニ於テ驗スベシ。
 2. サーバーヲ停止シ、必要ナル JAR ヲ配置スベシ。同一部ノ新舊 JAR ヲ併置スベカラズ。
@@ -81,10 +79,10 @@ STA ハ自動的ニ公開サルル Python 用通信線ニ非ズ。同一サー�
 4. 設定變更ハ停止中ニ行ヒ、再ビ完全起動スベシ。動的差替ニ依存スベカラズ。
 
 ```text
-SkyTrainFolia-4.0.2.jar
-STCS-4.0.2.jar
-SkyworldTrainAPI-2.0.0.jar
-SkyPCC-2.0.0.jar
+SkyTrainFolia-4.0.7.jar
+STCS-4.0.5.jar
+SkyworldTrainAPI-2.1.3.jar
+SkyPCC-2.0.2.jar
 ```
 
 `/st version` ニテ STF ノ版ヲ確認ス。全體系ヲ裝備セル場合ハ `/stcs status` ヲ併セテ確認シ、サーバー機ヨリ `http://127.0.0.1:8765/` ヲ開クベシ。

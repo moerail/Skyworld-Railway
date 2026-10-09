@@ -10,7 +10,7 @@ import net.skyworld.sta.api.v5.*;
 import net.skyworld.sta.api.v3.*;
 import java.util.function.Consumer;
 
-final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, ConsistObservationService, net.skyworld.sta.api.v5.DriverDeskService {
+final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, ConsistObservationService, net.skyworld.sta.api.v5.DriverDeskService, net.skyworld.sta.api.v6.DispatcherBrakeService {
     private final SkyTrainPlugin plugin;
     private final UUID session = UUID.randomUUID();
     private final AtomicLong sequence = new AtomicLong();
@@ -53,9 +53,29 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
         plugin.getServer().getServicesManager().register(TelemetryService.class, this, plugin, ServicePriority.Normal);
         plugin.getServer().getServicesManager().register(ConsistObservationService.class, this, plugin, ServicePriority.Normal);
         plugin.getServer().getServicesManager().register(net.skyworld.sta.api.v5.DriverDeskService.class, this, plugin, ServicePriority.Normal);
+        plugin.getServer().getServicesManager().register(net.skyworld.sta.api.v6.DispatcherBrakeService.class, this, plugin, ServicePriority.Normal);
         plugin.getLogger().info("STA v5 telemetry provider active; legacy position reporting disabled.");
     }
     public UUID sessionId() { return session; }
+    public CompletionStage<String> hold(UUID trainId, UUID operationId, boolean stoppedOnly) {
+        if (closed) return CompletableFuture.completedFuture("UNAVAILABLE");
+        var train=plugin.observedTrains().stream().filter(t->t.id().equals(trainId)).findFirst().orElse(null);
+        return train==null ? CompletableFuture.completedFuture("UNKNOWN_TRAIN")
+                : train.dispatcherBrake.request(operationId,stoppedOnly,System.currentTimeMillis());
+    }
+    public boolean resume(UUID trainId, UUID operationId) {
+        var train=plugin.observedTrains().stream().filter(t->t.id().equals(trainId)).findFirst().orElse(null);
+        return !closed && train!=null && train.dispatcherBrake.resume(operationId);
+    }
+    public boolean stoppedHeld(UUID trainId, UUID operationId) {
+        var train=plugin.observedTrains().stream().filter(t->t.id().equals(trainId)).findFirst().orElse(null);
+        long now=System.currentTimeMillis();
+        return !closed && train!=null && train.dispatcherBrake.held(operationId)
+                && train.currentSpeed()<=.001 && train.maxMemberSpeed()<=.001 && !train.members().isEmpty()
+                && train.members().stream().allMatch(id->{ var sample=train.snapshot(id);
+                    return sample!=null && now>=sample.timeMillis && now-sample.timeMillis<=1000
+                            && sample.velocity.lengthSquared()<=.000001; });
+    }
     public Collection<net.skyworld.sta.api.v5.DriverDeskService.Desk> driverDesks() { return toDesks(plugin.driverDesks()); }
     static List<net.skyworld.sta.api.v5.DriverDeskService.Desk> toDesks(Collection<DriverDeskSnapshot> desks) {
         return desks.stream().map(d -> new net.skyworld.sta.api.v5.DriverDeskService.Desk(
@@ -124,6 +144,11 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
             else warn("STA event service unavailable; driver safety actions still applied");
         } catch (RuntimeException | LinkageError ex) { warn("Driver event delivery failed: " + ex); }
     }
+    private static TrainIntegrity integrityReport(Train train,long now) {
+        var v=train.tims.view(now);
+        return new TrainIntegrity(TrainIntegrity.State.valueOf(v.state().name()),v.reason(),v.observedAtMillis(),
+                v.confirmedAtMillis(),v.expectedMembers(),v.affectedMembers(),v.brakeHeld());
+    }
     public Collection<ConsistObservation> consistObservations() { return consists; }
     public Consumer<UUID> beginRemoval(Train train) {
         var expected = List.copyOf(train.members());
@@ -176,7 +201,7 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
                         p.timeMillis, e.stateAtMillis(), ConsistObservation.State.valueOf(e.state())));
             });
             result.add(new ConsistObservation(session, sequence.incrementAndGet(), train.id(), train.name(),
-                    now, train.members(), members, false));
+                    now, train.tims.manifest(), members, false, integrityReport(train,now)));
         }
         // Persist before publication; receipts survive missed sampling and server restarts.
         var receipts = destructions.values().stream().sorted(Comparator.comparing(r -> r.train().toString())).toList();
@@ -275,6 +300,7 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
         plugin.getServer().getServicesManager().unregister(TelemetryService.class, this);
         plugin.getServer().getServicesManager().unregister(ConsistObservationService.class, this);
         plugin.getServer().getServicesManager().unregister(net.skyworld.sta.api.v5.DriverDeskService.class, this);
+        plugin.getServer().getServicesManager().unregister(net.skyworld.sta.api.v6.DispatcherBrakeService.class, this);
         consists = List.of();
         store.close(); previous.clear();
         curveHistory.clear();

@@ -9,7 +9,7 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.type.Switch;
 import org.bukkit.craftbukkit.CraftWorld;
 
-/** 26.2 adapter: same two neighbour notifications as vanilla LeverBlock. */
+/** Two vanilla lever neighbour notifications; signatures verified on Shiroha 26.2 and 26.3. */
 final class OwnedLeverPhysics {
     static void notifyNeighbours(Block lever, Switch data) {
         var world = ((CraftWorld) lever.getWorld()).getHandle();

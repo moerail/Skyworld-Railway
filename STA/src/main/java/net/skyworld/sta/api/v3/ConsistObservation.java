@@ -6,8 +6,13 @@ import java.util.UUID;
 
 /** Member centres may have different observation times; this is NOT a swept envelope. */
 public record ConsistObservation(UUID session, long sequence, UUID train, String name,
-        long sampledAtMillis, List<UUID> expectedMembers, List<Member> members, boolean removed) {
+        long sampledAtMillis, List<UUID> expectedMembers, List<Member> members, boolean removed, TrainIntegrity integrity) {
+    public ConsistObservation(UUID session,long sequence,UUID train,String name,long sampledAtMillis,
+            List<UUID> expectedMembers,List<Member> members,boolean removed) {
+        this(session,sequence,train,name,sampledAtMillis,expectedMembers,members,removed,TrainIntegrity.unknown());
+    }
     public ConsistObservation {
+        integrity = integrity == null ? TrainIntegrity.unknown() : integrity;
         Objects.requireNonNull(session); Objects.requireNonNull(train); Objects.requireNonNull(name);
         if (sequence < 0 || sampledAtMillis < 0) throw new IllegalArgumentException("Invalid observation header");
         expectedMembers = List.copyOf(expectedMembers); members = List.copyOf(members);

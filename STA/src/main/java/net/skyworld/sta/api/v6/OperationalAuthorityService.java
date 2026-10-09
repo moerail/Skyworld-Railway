@@ -16,6 +16,11 @@ public interface OperationalAuthorityService {
     /** Called by an authenticated dispatcher after an SR request. No Bukkit entity access is required. */
     String approveSr(UUID trainId, UUID targetNodeId, String actor);
 
+    /** Idempotent dispatcher revoke. Pending responses must be polled with the same request id. */
+    default java.util.concurrent.CompletionStage<String> revokeMa(UUID requestId, UUID trainId, String actor) {
+        return java.util.concurrent.CompletableFuture.completedFuture("UNSUPPORTED");
+    }
+
     /** Onboard receipt acknowledgement, not proof of train integrity or route clearance. */
     default boolean acknowledgeGrant(UUID trainId, UUID driverLeaseId, UUID grantId, long graphRevision) {
         return false;

@@ -32,6 +32,20 @@ public final class AutomaticTargetTest {
         assert AutomaticSigns.localLookAhead(-1)==0;
         assert AutomaticSigns.localLookAhead(Double.NaN)==256;
         assert AutomaticSigns.action("property");
+        var approach = new AutomaticRun("station",
+                AutomaticSignSpec.parse("station", "5", "continue 1.0", .4), 100, false, false);
+        assert approach.phase == AutomaticRun.Phase.APPROACH;
+        assert approach.cruiseTarget(2.0, .5, .4) == .5 : "V_target caps an explicit station speed";
+        assert approach.cruiseTarget(2.0, null, .4) == 1.0 : "Explicit station speed remains valid without V_target";
+        double[] powers = {0, .001, .002, .003, .004};
+        double[] brakes = {0, .001, .002, .003, .004, .005, .006, .007};
+        int previous = 0;
+        for (double speed : new double[]{.5, .495, .5, .49, .5}) {
+            int notch = approach.notch(speed, approach.cruiseTarget(2.0, .5, .4),
+                    powers, brakes, .0001, 1000, previous);
+            assert notch <= 1 : "Approaching a station at V_target must not request P4";
+            previous = notch;
+        }
         System.out.println("PASS V_target units/whitelist/persistence, explicit station speed, lead-cart stop and local range bounds");
     }
 }

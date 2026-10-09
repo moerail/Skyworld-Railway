@@ -2,6 +2,7 @@ package net.skyworld.skypcc;
 
 import java.util.*;
 import net.skyworld.sta.api.v3.ConsistObservation;
+import net.skyworld.sta.api.v3.TrainIntegrity;
 
 public final class PccTrainRosterTest {
     public static void main(String[] args) {
@@ -14,8 +15,11 @@ public final class PccTrainRosterTest {
         assert row.get("quality").equals("AWAITING_POSITION");
         assert row.get("stale").equals(true);
         assert !row.containsKey("edgeId") && !row.containsKey("speedMetersPerSecond") && !row.containsKey("cab");
+        assert ((TrainIntegrity) row.get("integrity")).state() == TrainIntegrity.State.UNKNOWN;
         Map<String, Object> live = Map.of("trainId", id.toString(), "quality", "VALID", "edgeId", "edge-1");
-        assert PccTrainRoster.merge(List.of(live), List.of(roster)).equals(List.of(live));
+        var joined = PccTrainRoster.merge(List.of(live), List.of(roster));
+        assert joined.size() == 1 && joined.getFirst().get("edgeId").equals("edge-1");
+        assert ((TrainIntegrity) joined.getFirst().get("integrity")).state() == TrainIntegrity.State.UNKNOWN;
         assert PccTrainRoster.merge(List.of(live), List.of()).equals(List.of(live));
         var removed = new ConsistObservation(roster.session(), 2, id, roster.name(), 1001,
                 roster.expectedMembers(), List.of(), true);

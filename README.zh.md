@@ -1,21 +1,16 @@
 # SkyRail Suite
 
-## 当前更新：STCS 4.1.0 / STF 4.0.5 / STA 2.1.1 / SkyPCC 2.0.1
+本地开发候选 **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3**：新增列车完整性监测（固定编组、采样时效、沿轨道的相邻车厢间隔）、未知或失完整时停车保持并保留占用与 MA 保护。`/st info <列车名>` 显示当前位置；不确定时显示最后报告的世界坐标和时间。仅两端最外侧车厢的乘客可 `/st drive`，forward/backward 以所坐驾驶端为准。完整性恢复且全列停稳后执行 `/st tims ack`；若已进入 TR，再执行 `/stcs ma ack`、`/stcs ma release` 并重新申请 MA。既有存档首次升级需要核对编组后执行 TIMS 确认。本候选尚未发布或实车验收。 [4.0.8 开发说明](doc/releases/suite-v4.0.8.md)
 
-更新日期：2026-10-09。维护者确认 STCS 4.1.0 测试通过；其他组件的实服验收状态独立，下方旧版本章节保留作历史记录。
-
-- STCS：[4.1.0 更新](doc/releases/stcs-v4.1.0-railgraph-storage.md)包含动态道岔锁定及 RailGraph v4 直线路径压缩。旧图升级前备份，弯道和坡道保留完整几何，服务接口仍提供完整路径。[配置详解](doc/STCS-DYNAMIC-SWITCH-LOCK.zh.md)。
-- SkyTrainFolia：[四语言司机引导和可编辑随机词库](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md)，同时包含坡道等效坡度、停车起步方向、重载几何和车体显示修复。词库位于 `driver-guide.yml`，停车后 `/st reload`。
-- STA：[2.1.1 桌面调度台](doc/releases/sta-v2.1.1-dispatcher-map.md)新增实时占用/预约、道岔方向、列车箭头与详情；TLS 管理员入口默认关闭。[安装与运行](STA/tools/README.md)。
-- SkyPCC：[2.0.1](doc/releases/skypcc-v2.0.1.md)支持正确 Bearer token 授权的远程道岔操作与 SR 审批，默认仍监听 `127.0.0.1`。
-
-FS 道岔锁定范围按实时速度计算：`max(固定距离, v²/(2a) + v × 提前秒数 + 余量)`，v 单位为 m/s。默认减速度 1 m/s²、提前 5 秒、余量 25 米；原 `ma.lock-distance-meters` 为下限。`ma.dynamic-lock.enabled: false` 恢复固定距离，SH/SR 不变。
-
-`ma.look-ahead-meters`（默认 600 米）与 `ma.max-authority-distance-meters`（默认 300 米）仍是独立硬上限，动态锁定范围最高 10000 米。高速线路须同时设置足够的搜索和 MA 长度；420 km/h 按默认规划参数对应约 7414 米锁定范围，实际 MA 需求仍取决于车载 ATP 曲线。动态范围不绕过未知状态、占用冲突和整列车清出检查。
+本次小版本为 **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**。停车后，调度转岔会先取得车端停车保持确认，再释放相关 MA 预约、转岔并重算 MA，司机无需先 release。网页 PCC 新增“撤销所选列车 MA → TR”：手动列车运行或停车都进入 TR 并制动；运行中的旧预约保留到全列确认停稳，车身占用始终保留。影子通道也执行此项主动调度停车命令。司机停稳后执行 `/stcs ma ack`、`/stcs ma release`，再重新申请 MA。失败／超时不代表撤销完成。需配套更新已安装插件并刷新客户端，保留原证书和令牌；实服验收待完成。 [4.0.7 release notes](doc/releases/suite-v4.0.7.md)
 
 **普通玩家从这里开始：[司机手册](doc/driver/README.zh.md)**。包含上车、驾驶权、热键栏、影子 MA 和停车流程。
 
-## 4.0.2：预警与服务恢复
+## 已发布版本：Shiroha 26.2 / 26.3
+
+SkyTrainFolia **4.0.7** 将 26.2 与 26.3 的显示包适配器装入同一个 JAR，在启动时自动选择。对应的已发布配套版本为 STCS **4.0.5**、STA **2.1.3**、SkyPCC **2.0.2**。两版隔离编译与 Java 测试已通过；实服验收仍待完成。[适配报告](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md)。
+
+## 历史更新 4.0.2：预警与服务恢复
 
 预警档位由当前 ATP 限速决定，不是由实际车速决定。限速 **≤40 km/h**（包含 SH 默认限速）时，提前 **5 km/h** 开始报警，降至限速下 **8 km/h** 及以下解除。限速高于 40 时，新安装默认提前 **15 / 18 km/h** 触发／解除；已有普通阈值配置保持不变。超速优先级、低速静音和 ATP 制动逻辑不变。
 
@@ -33,9 +28,9 @@ shadow-atp:
 
 ## M3 实验功能：手动列车保护
 
-**预发布 `suite-v4.0.2`。** 自动检查已通过，最近修复尚待新一轮服务器验收。[发布说明](doc/releases/suite-v4.0.2.md)。
+历史预发布 `suite-v4.0.2` 的说明见[发布说明](doc/releases/suite-v4.0.2.md)。
 
-本轮配套版本为 STF **4.0.2**、STCS **4.0.2**、STA **2.0.0**、SkyPCC **2.0.0**。停服备份轨道图和占用账本后一起替换已安装组件，不要混用旧版。STF 仍可单独运行，但 `Enforced` 需要 STA 与 STCS。旧 v5 影子服务继续只读；新 STA v6 可执行许可是另一个通道。
+已发布配套版本为 STF **4.0.7**、STCS **4.0.5**、STA **2.1.3**、SkyPCC **2.0.2**；本地 4.0.8 候选版本见文首。停服备份轨道图和占用账本后一起替换已安装组件，不要混用旧版。STF 仍可单独运行，但 `Enforced` 需要 STA 与 STCS。旧 v5 影子服务继续只读；STA v6 可执行许可是另一个通道。
 
 **仅手动列车**进入 `SB/FS/SH/SR/TR/PT` 状态机。司机上车取得控制权后默认为 `SB`；`/stcs ma demand` 申请 `FS`，`/stcs ma sh` 申请有界调车许可，`/stcs ma sr` 等待 PCC 或管理员批准到指定设备的许可。申请受理不等于获得可执行 MA。越过 EoA 触发 `TR` 后须先停稳，`/stcs ma ack` 进入 `PT`，再用 `/stcs ma release` 释放后重新申请。管理员只能在停车时通过 `/stcs admin enforce true|false` 显式切换；`false` 回到 `RECOVERING` 制动保持。计分板 ATP 模式显示为“通道 | 运行模式”，例如 **`强制保护 | SR`**；通道名翻译，运行模式代号不翻译。
 
@@ -80,7 +75,7 @@ SkyRail Suite 是 SkyTrain Suite 开发线的新仓库名称；现有插件名�
 
 面向 Minecraft / Folia 的列车运行、铁路基础设施、影子列控与调度显示套件。
 
-本文依据 **2026-09-23 当前本地源码**整理，面向服务器管理员、司机、线路建设者和扩展开发者。历史讨论中的目标不等于已实现功能；旧版安装组合和命令以本手册及当前源码为准。
+本文依据 **2026-09-29 当前本地源码**整理，面向服务器管理员、司机、线路建设者和扩展开发者。历史讨论中的目标不等于已实现功能；旧版安装组合和命令以本手册及当前源码为准。
 
 > **开发版安全边界：影子 MA/EoA 不施加制动。另一个 `Enforced` 通道只在管理员显式启用、手动列车拿到经过校验的可执行许可后介入，仍待实服验证。申请受理、PCC 显示空闲或 RBC 在线，都不能证明安全。**
 
@@ -126,10 +121,10 @@ SkyTrain Suite 把 Minecraft 作为可交互的铁路运行环境：玩家建设
 
 | 组件 | 当前版本 | 主要职责 |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `4.0.2` | 矿车编组、运动、驾驶权、牵引制动、道岔执行、HMI、实验性手动列车 ATP 执行 |
-| STCS | `4.0.2` | RailGraph、定位、保留占用、影子及实验性可执行 MA/EoA 分配 |
-| SkyworldTrainAPI / STA | `2.0.0` | 带版本的插件间契约、遥测、运行许可和行车事件 |
-| SkyPCC | `2.0.0` | 网页调度显示、设备详情、事件、道岔控制和 SR 审批 |
+| SkyTrainFolia / STF | `4.0.6` | 矿车编组、运动、驾驶权、牵引制动、道岔执行、HMI、实验性手动列车 ATP 执行 |
+| STCS | `4.0.4` | RailGraph、定位、保留占用、影子及实验性可执行 MA/EoA 分配 |
+| SkyworldTrainAPI / STA | `2.1.1` | 带版本的插件间契约、遥测、运行许可和行车事件 |
+| SkyPCC | `2.0.1` | 网页调度显示、设备详情、事件、道岔控制和 SR 审批 |
 
 ```text
 Minecraft 玩家 / 矿车 / 轨道 / 红石
@@ -164,7 +159,7 @@ Minecraft 玩家 / 矿车 / 轨道 / 红石
 
 ### 环境
 
-- 当前适配基线是 **Shiroha / Folia 26.2 与 Java 25**，应使用经过验证的同系列服务端构建。
+- 当前双版本适配目标是 **Shiroha / Folia 26.2、26.3 与 Java 25**。SkyTrainFolia 4.0.7 的双版本协议测试已纳入构建；实机验收前请仅在测试服使用。
 - STF 有版本相关的实体运动/显示适配。`folia-supported: true` 不代表所有 Folia 版本都兼容；`api-version: 1.13` 也不是最低可运行游戏版本的承诺。
 - PCC 使用普通浏览器，不要求安装客户端模组。
 - TC / BKCommonLib 不是本套件的必需依赖。不要让两个控车插件同时接管同一辆矿车。
@@ -177,13 +172,13 @@ Minecraft 玩家 / 矿车 / 轨道 / 红石
 4. 停服调整配置，再完整启动。不要用第三方热卸载工具替换这些插件。
 5. 游戏中执行 `/st version`、`/stcs status`；服务器本机浏览器打开 `http://127.0.0.1:8765/`。
 
-从仓库 Releases 获取匹配的一组 JAR；本地构建输出位于 `artifacts/`。当前文件名：
+本地构建输出位于 `artifacts/`。当前文件名：
 
 ```text
-SkyTrainFolia-4.0.2.jar
-STCS-4.0.2.jar
-SkyworldTrainAPI-2.0.0.jar
-SkyPCC-2.0.0.jar
+SkyTrainFolia-4.0.7.jar
+STCS-4.0.5.jar
+SkyworldTrainAPI-2.1.3.jar
+SkyPCC-2.0.2.jar
 ```
 
 STF/STCS 对 STA 使用软依赖，但完整套件应四者一起安装。PCC 硬依赖 STCS 和 STA。STF 单独运行不具备完整套件的图、MA 与调度显示能力。
@@ -921,15 +916,15 @@ Minecraft 更新可能改变实体内部结构、数据包/显示适配和调度
 
 ### 构建四个插件
 
-需要 JDK 25，以及单独准备的匹配 Shiroha/Folia 26.2 服务端依赖。服务端及第三方库不随源码分发。安装已构建的 JAR 不需要自行编译。
+需要 JDK 25，以及分别准备好的 Shiroha/Folia 26.2 和 26.3 服务端依赖。服务端及第三方库不随源码分发。安装已构建的 JAR 不需要自行编译。
 
 在仓库根目录运行 PowerShell：
 
 ```powershell
-./build.ps1 -ServerRoot '/path/to/prepared-server' -JavaHome '/path/to/jdk-25'
+./build.ps1 -ServerRoot '/path/to/26.2-server' -ServerRoot26_3 '/path/to/26.3-server' -JavaHome '/path/to/jdk-25'
 ```
 
-也可设置 `JAVA_HOME` 后省略 `-JavaHome`。脚本默认读取服务端 `versions/26.2/shiroha-26.2.jar` 与 `libraries/`；可用 `-ServerJarRelativePath` 调整相对位置，但路径兼容不代表不同服务端实现兼容。
+也可设置 `JAVA_HOME` 后省略 `-JavaHome`。脚本读取两个服务端的 `versions/26.2/shiroha-26.2.jar`、`versions/26.3/shiroha-26.3.jar` 与各自的 `libraries/`。SkyTrainFolia 的两个协议适配器分别编译后进入同一个 JAR，并分别运行两版测试。
 
 构建顺序为 STA、STF、STCS、PCC，不依赖旧版套件 JAR。脚本执行 Java 回归，输出进入已忽略的 `artifacts/`，中间文件进入 `target/`；不会启动、部署或修改服务器。根许可证与图片范围声明进入四个 JAR，TC 原声明继续保留在 STF 中。
 

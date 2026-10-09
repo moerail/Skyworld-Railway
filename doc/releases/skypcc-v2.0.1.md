@@ -7,7 +7,6 @@ Compatible suite baseline: SkyTrainFolia 4.0.2, STCS 4.0.2, SkyworldTrainAPI 2.0
 - `/api/v5/switch` and `/api/v6/sr` accept remote POST requests with `Content-Type: application/json` and the correct `Authorization: Bearer <token>` header.
 - The old loopback-address and localhost Origin/Host restrictions are removed. Invalid, missing, or too-short configured tokens still deny control. `web.control-enabled: false` still disables control.
 - The denial code is now `CONTROL_AUTH_REQUIRED`, with updated web translations. The operator dialog still clears the entered token after submission and does not place it in a URL.
-- Browser point/SR controls require a secure context with `crypto.randomUUID`; insecure remote pages show a translated HTTPS requirement and disable token entry/control. Read-only display remains available. Current companion sources are STF 4.0.5, STCS 4.1.0 and STA 2.1.1; the baseline above describes protocol compatibility, not the latest source versions.
 
 ## Configuration and deployment
 

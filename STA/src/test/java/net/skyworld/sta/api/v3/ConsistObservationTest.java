@@ -14,6 +14,9 @@ public final class ConsistObservationTest {
         assert observation.expectedMembers().size() == 1;
         assert observation.members().getFirst().observedAtMillis() == 100;
         assert observation.members().getFirst().stateAtMillis() == 200;
+        assert observation.integrity().state() == TrainIntegrity.State.UNKNOWN;
+        assert observation.integrity().messageId() == 1136 && observation.integrity().packetId() == 1000;
+        assert !observation.integrity().permitsClearance(observation.expectedMembers(), 250);
         boolean rejected = false;
         try { new ConsistObservation.Member(id, "world", Double.NaN, 0, 0, 1, 1, ConsistObservation.State.OBSERVED); }
         catch (IllegalArgumentException ex) { rejected = true; }
