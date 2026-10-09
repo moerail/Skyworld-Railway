@@ -1,5 +1,20 @@
 # SkyRail Suite
 
+## 当前源码更新 / Current source update — 2026-10-09
+
+**STCS 4.1.0 / SkyTrainFolia 4.0.8 / STA 2.1.4 / SkyPCC 2.0.3。** STCS 4.1.0 已由维护者确认测试通过；其他组件的实服验收状态以各自更新说明为准。下方 4.0.2 发布记录保留作历史基线，并非当前源码版本。
+
+**Current source versions:** STCS 4.1.0, SkyTrainFolia 4.0.8, STA 2.1.4 and SkyPCC 2.0.3. The maintainer confirmed STCS 4.1.0 testing passed; other components retain their own acceptance status. The 4.0.2 release entries below are historical.
+
+- **STCS:** FS 道岔锁定范围随实时车速调整；RailGraph v4 压缩直线路径，保留弯道和坡道完整几何，旧图迁移前备份。/ FS point eligibility follows speed; RailGraph v4 compresses straight paths and backs up legacy graphs. [4.1.0](doc/releases/stcs-v4.1.0-railgraph-storage.md) · [动态锁定配置](doc/STCS-DYNAMIC-SWITCH-LOCK.zh.md)
+- **SkyTrainFolia:** 库莉酱四语言司机提示与可编辑随机词库；坡道等效坡度、停车起步方向、重载几何及车体显示修复。/ Four-language driver hints, editable phrases, effective-grade and parked-launch fixes, reload geometry and member display corrections. [司机引导 / Driver guidance](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md)
+- **STA:** 可选 TLS 管理员桌面调度台，增加实时占用/预约、道岔方向、列车箭头和详情。默认关闭。/ Optional TLS desktop dispatch with live occupancy, reservations, switch directions and train details; disabled by default. [2.1.1](doc/releases/sta-v2.1.1-dispatcher-map.md) · [工具说明 / Tools](STA/tools/README.md)
+- **SkyPCC:** 正确的 Bearer token 可授权远程道岔操作与 SR 审批，默认仍监听本机。/ Bearer-token authorization for remote point control and SR approval; loopback binding remains the default. [2.0.1](doc/releases/skypcc-v2.0.1.md)
+
+FS 锁定距离 / FS point range: `max(ma.lock-distance-meters, v²/(2a) + v × lead-seconds + buffer-meters)`，v 为 m/s；默认 a=1、提前 5 秒、余量 25 米，可通过 `ma.dynamic-lock.enabled: false` 恢复固定距离。搜索 `ma.look-ahead-meters`（默认 600 米）和 MA 上限 `ma.max-authority-distance-meters`（默认 300 米）仍独立限制 MA；动态范围最高 10000 米，不绕过冲突或道岔检查。SH/SR 保持原有范围。
+
+The default dynamic parameters are 1 m/s², 5 seconds and 25 metres; disable `ma.dynamic-lock.enabled` to restore a fixed range. Search (600 m by default) and MA credit (300 m) remain independent configured caps. Dynamic range is capped at 10000 m; conflicts and point checks still apply, and SH/SR keep their existing limits. At 420 km/h these planning parameters give about 7414 m of point range, not a guarantee of full-speed ATP clearance.
+
 本地开发候选 **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3**：新增列车完整性监测（固定编组、采样时效、沿轨道的相邻车厢间隔）、未知或失完整时停车保持并保留占用与 MA 保护。`/st info <列车名>` 显示当前位置；不确定时显示最后报告的世界坐标和时间。仅两端最外侧车厢的乘客可 `/st drive`，forward/backward 以所坐驾驶端为准。完整性恢复且全列停稳后执行 `/st tims ack`；若已进入 TR，再执行 `/stcs ma ack`、`/stcs ma release` 并重新申请 MA。既有存档首次升级需要核对编组后执行 TIMS 确认。本候选尚未发布或实车验收。 [4.0.8 开发说明](doc/releases/suite-v4.0.8.md)
 
 本次小版本为 **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**。停车后，调度转岔会先取得车端停车保持确认，再释放相关 MA 预约、转岔并重算 MA，司机无需先 release。网页 PCC 新增“撤销所选列车 MA → TR”：手动列车运行或停车都进入 TR 并制动；运行中的旧预约保留到全列确认停稳，车身占用始终保留。影子通道也执行此项主动调度停车命令。司机停稳后执行 `/stcs ma ack`、`/stcs ma release`，再重新申请 MA。失败／超时不代表撤销完成。需配套更新已安装插件并刷新客户端，保留原证书和令牌；实服验收待完成。 [4.0.7 release notes](doc/releases/suite-v4.0.7.md)

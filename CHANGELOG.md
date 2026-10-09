@@ -1,5 +1,13 @@
 # Updates / 更新说明
 
+## STCS 4.1.0 and current source update — 2026-10-09
+
+- Current sources: **STCS 4.1.0 / STF 4.0.8 / STA 2.1.4 / SkyPCC 2.0.3**. The maintainer confirmed the local STCS 4.1.0 testing passed. Preserve GitHub's later TIMS monitoring, dispatcher MA revoke, stopped-train rerouting and dual 26.2/26.3 support; do not downgrade companion versions. Live acceptance of this merged combination remains separate from the earlier STCS test report.
+- FS point eligibility follows `max(lock-distance-meters, v²/(2a) + v*lead-seconds + buffer-meters)` using fresh speed telemetry. Defaults are 1 m/s², 5 s and 25 m. Disable `ma.dynamic-lock.enabled` to restore fixed eligibility. Search/MA caps, SH/SR bounds, conflicts, point checks and throat clearance remain in force.
+- RailGraph schema v4 compresses contiguous straight paths and retains full curved/slope and service geometry; legacy graphs are backed up before migration. Publish the explicit SkyATO design draft and existing incident reports without claiming those incidents resolved.
+- Update seven root READMEs, four driver READMEs and the desktop dispatcher README. [STCS 4.1.0 details](doc/releases/stcs-v4.1.0-railgraph-storage.md) · [Dynamic lock configuration](doc/STCS-DYNAMIC-SWITCH-LOCK.zh.md).
+- Final merged validation: 86 Java test entry points passed on each of Shiroha 26.2 and 26.3; 9 desktop Python tests passed; 60 testbench tests ran with 3 skipped. PCC edge-line/four-language checks and local documentation links passed. Generated packages, a duplicate driver manual and an accidental diff-output file are kept out of this commit.
+
 ## SkyTrainFolia v4.0.6 candidate / Shiroha 26.2 + 26.3
 
 - Package the 26.2 and 26.3 train display packet adapters in one JAR. Select the matching adapter from the server Minecraft version at runtime; unsupported versions retain vanilla display sync.

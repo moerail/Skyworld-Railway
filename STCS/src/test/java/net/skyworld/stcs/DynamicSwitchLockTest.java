@@ -69,7 +69,8 @@ public final class DynamicSwitchLockTest {
                     new StaMessage.Tracking(session, 1, now, now, 15000, 60000, model.graph.revision,
                             StaMessage.Quality.VALID, position, "test"));
             var roster = new ConsistObservation(session, 1, train, "T", now, List.of(member), List.of(
-                    new ConsistObservation.Member(member, "world", 20.5, 64.06, .5, now, now, ConsistObservation.State.OBSERVED)), false);
+                    new ConsistObservation.Member(member, "world", 20.5, 64.06, .5, now, now, ConsistObservation.State.OBSERVED)),
+                    false, ShadowRuntimeTest.completeIntegrity(List.of(member), now));
             return new ShadowRuntime.Inputs(model.graph, states, true, session, session,
                     List.of(new DriverDeskService.Desk(train, driver, lease, "ACTIVE")), List.of(roster), List.of(message));
         }, request -> CompletableFuture.completedFuture("COMPLETED"))) {

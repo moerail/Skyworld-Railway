@@ -1,6 +1,8 @@
 # STCS 4.1.0 — Dynamic point range and RailGraph storage
 
-On 2026-10-09 the maintainer confirmed STCS 4.1.0 testing passed. The complete suite source build against Minecraft/Folia 26.2 passed 82 Java test entry points, including 32 STCS entries. The current companion sources are STF 4.0.5, STA 2.1.1 and SkyPCC 2.0.1; this does not assert live acceptance of every companion feature.
+On 2026-10-09 the maintainer confirmed STCS 4.1.0 testing passed. The initial local suite build against Minecraft/Folia 26.2 passed 82 Java test entry points, including 32 STCS entries. The GitHub updates were then merged, retaining newer TIMS integrity monitoring, dispatcher MA revocation and dual 26.2/26.3 display adapters. Current companion sources are STF 4.0.8, STA 2.1.4 and SkyPCC 2.0.3; the maintainer's earlier test report does not assert live acceptance of the combined newer companion features.
+
+Final merged validation: all four plugins built; **86 Java test entry points passed on 26.2 and 86 on 26.3**. The desktop dispatcher passed 9 Python tests; the RailGraph testbench ran 60 tests with 3 skipped. PCC edge-line and four-language resource checks passed, and local links in 13 README/release files resolved. Dynamic-lock telemetry fixtures explicitly report confirmed integrity so TIMS checks remain active.
 
 ## Dynamic FS point eligibility
 

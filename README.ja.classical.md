@@ -1,5 +1,13 @@
 # SkyRail Suite 鐵道運轉試驗規程
 
+## STCS 四・一・〇版　追補告示
+
+二〇二六年十月九日、管理者ヨリ STCS 四・一・〇ノ試驗合格報告アリ。現源版ハ STF 四・〇・八、STA 二・一・四、SkyPCC 二・〇・三ヲ併載ス。各組件ノ實服驗收ハ別ニ扱フ。
+
+FS 分岐器確保範圍ハ `max(ma.lock-distance-meters, v²/(2a) + v × lead-seconds + buffer-meters)` トス。v ハ米毎秒、既定減速度一米毎秒毎秒、先行五秒、餘裕二十五米ナリ。`ma.dynamic-lock.enabled: false` ニテ固定範圍ニ復ス。探索 `ma.look-ahead-meters` 六百米及ビ MA 上限 `ma.max-authority-distance-meters` 三百米ハ各々ノ設定上限トシ、動的範圍モ一萬米ヲ超エズ。SH/SR ノ規則ハ變更セズ。不明分岐器・占有競合・全編成出清ノ照合ヲ省略セザルモノトス。
+
+RailGraph 第四構造版ハ直線路ヲ壓縮シ、曲線及ビ勾配ノ形狀ヲ保持ス。舊圖ハ置換前ニ備份ス。STF ハ四言語案内詞庫、坡道起動及ビ表示修正、STA ハ TLS 桌上指令臺、SkyPCC ハ Bearer 認證遠隔操作ヲ備フ。[STCS 更新](doc/releases/stcs-v4.1.0-railgraph-storage.md)・[司機案内](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md)・[指令臺](STA/tools/README.md)・[SkyPCC](doc/releases/skypcc-v2.0.1.md)。以下ノ舊版告示ハ履歷トス。
+
 ローカル開発候補 **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3**：TIMS は固定編成、観測時刻、線路経路上の隣接車両間隔を確認します。不明・喪失時は制動保持と在線・MA 保護を継続します。`/st info <列車名>` は現在位置、不確実な場合は最終報告座標と時刻を表示します。`/st drive` は編成両端の最外側車両の乗客のみ使用可能で、forward/backward はその運転端を基準にします。元の編成を復元し全車停止後 `/st tims ack`、TR の場合は `/stcs ma ack`、`/stcs ma release`、MA 再要求の順です。既存保存編成は初回の編成確認が必要です。未公開・実サーバー未検証です。 [4.0.8 開発ノート](doc/releases/suite-v4.0.8.md)
 
 本更新は **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2** です。手動列車の停車後、指令による分岐器転換は車上の停止保持確認、前方予約撤回、転換、MA 再計算の順に実行し、運転士の事前 release は不要です。Web PCC に「MA 取消 → TR」を追加。走行中・停車中とも車上確認後に TR へ移行して制動します。走行中の予約は全車停止確認まで保持し、車両在線は消去しません。この明示的な指令はシャドーチャネルにも適用されます。復帰は停車後 `/stcs ma ack`、`/stcs ma release`、MA 再要求の順です。タイムアウトは実行確認ではありません。導入済みプラグインを一緒に更新し、クライアントを再読込してください。証明書とトークンは継続使用できます。実サーバー検証は未完了です。 [4.0.7 release notes](doc/releases/suite-v4.0.7.md)

@@ -49,10 +49,6 @@
     return window.isSecureContext === true && typeof window.crypto?.randomUUID === 'function';
   }
 
-  function canSendControlRequest() {
-    return window.isSecureContext === true && typeof window.crypto?.randomUUID === 'function';
-  }
-
   const ui = Object.fromEntries([
     'railMap', 'edgeLayer', 'switchLayer', 'nodeLayer', 'labelLayer', 'trainLayer', 'lineFilter',
     'fitButton', 'zoomIn', 'zoomOut', 'fontDecrease', 'fontSizeValue', 'fontIncrease',
