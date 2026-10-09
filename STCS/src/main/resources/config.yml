@@ -24,9 +24,17 @@ ma:
   enabled: true
   # Directed-route search horizon (10..10000 m). Preview does not reserve every edge found.
   look-ahead-meters: 600.0
-  # Allow shadow MA to cross a point only within this route distance (0..10000 m).
+  # Minimum point eligibility distance (0..10000 m); fixed range when dynamic-lock is disabled.
   # Outside the range, stop the shadow EoA one block before the point. NOT a physical lock.
   lock-distance-meters: 150.0
+  dynamic-lock:
+    enabled: true
+    # FS range = max(lock-distance-meters, v^2/(2*a) + v*lead-seconds + buffer-meters).
+    # v is current absolute speed in m/s; a is configured planning deceleration, not a brake command.
+    # Search and MA credit caps below remain independent. SH/SR keep their existing limits.
+    lead-seconds: 5.0             # 0..60; allow for MA refresh and approach processing.
+    deceleration-mps2: 1.0       # 0.01..100; tune to be no greater than the ATP curve deceleration.
+    buffer-meters: 25.0          # 0..1000; additional distance before braking begins.
   # Exact forward MA credit cap (1..10000 m), also capped by look-ahead-meters.
   # If the cap cannot fit the train beyond a throat, wait before entering it.
   max-authority-distance-meters: 300.0

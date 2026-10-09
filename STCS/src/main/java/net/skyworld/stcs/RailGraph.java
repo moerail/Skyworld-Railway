@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 
 final class RailGraph {
+    // Public graph snapshots remain v3 until downstream consumers migrate.
     final int schemaVersion = 3;
     final long revision;
     final String generatedAt;

@@ -23,8 +23,6 @@ final class SrRoute {
         var first = graph.edges.get(start.edge());
         if (first == null || start.offset() < 0 || start.offset() > first.distanceMeters())
             return new Result(List.of(), 0, "POSITION_UNCERTAIN");
-        if (graph.unresolved.contains(target) || graph.unresolved.contains(first.from()))
-            return new Result(List.of(), 0, "GRAPH_GAP");
         if (!requiredPrefix.isEmpty() && !first.id().equals(requiredPrefix.getFirst()))
             return new Result(List.of(), 0, "ROUTE_MISMATCH");
         var queue = new PriorityQueue<Candidate>(Comparator.comparingDouble(Candidate::distance));
@@ -37,11 +35,16 @@ final class SrRoute {
             if (current.distance() > maxDistance + 1e-6) { tooFar = true; continue; }
             if (current.distance() >= best.getOrDefault(current.edge().id(), Double.POSITIVE_INFINITY)) continue;
             best.put(current.edge().id(), current.distance());
+            if (graph.unresolvedAt(current.edge().from(), current.edge().sourcePort())
+                    || graph.unresolvedAt(current.edge().to(), current.edge().targetPort())) {
+                graphGap = true; continue;
+            }
             if (current.edge().to().equals(target) && current.path().size() >= requiredPrefix.size())
                 return new Result(current.path(), current.distance(), "REACHABLE");
             if (current.path().size() >= 256) { tooFar = true; continue; }
             var node = graph.nodes.get(current.edge().to());
-            if (node == null || graph.unresolved.contains(node.id())) { graphGap = true; continue; }
+            if (node == null) { graphGap = true; continue; }
+            if (graph.unresolved.contains(node.id())) graphGap = true;
             for (var next : graph.outgoing.getOrDefault(node.id(), List.of())) {
                 if (next.sourcePort().equals(current.edge().targetPort())) continue;
                 if (current.path().size() < requiredPrefix.size()

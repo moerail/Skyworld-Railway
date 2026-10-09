@@ -1,0 +1,316 @@
+# 库莉酱司机提示词库：每次触发时从对应语言的列表随机抽取一句。
+# 命令及触发条件由插件代码控制，本文件只保存文案。
+# 修改 plugins/SkyTrainFolia/driver-guide.yml 后，在所有列车停稳时执行 /st reload。
+# overspeed_warning 和 eoa_approaching 暂为预留文案，当前版本不会自动触发。
+name:
+  zh: '库莉酱'
+  en: 'Kuri-chan'
+  fr: 'Kuri-chan'
+  jp: 'クリちゃん'
+actions:
+  claim: {zh: '握手柄', en: 'Take controls', fr: 'Prendre les commandes', jp: '運転権を取得'}
+  forward: {zh: '前进', en: 'Forward', fr: 'Avant', jp: '前進'}
+  backward: {zh: '后退', en: 'Reverse', fr: 'Arrière', jp: '後進'}
+  demand: {zh: '申请 MA', en: 'Request MA', fr: 'Demander la MA', jp: 'MA を申請'}
+  ack: {zh: '确认跳闸', en: 'Acknowledge trip', fr: 'Acquitter le déclenchement', jp: 'トリップ確認'}
+  release: {zh: '释放旧 MA', en: 'Release old MA', fr: 'Libérer l’ancienne MA', jp: '古い MA を解放'}
+scenarios:
+  claim:
+    zh:
+      - '司机大大！快握住手柄认领驾驶权呀！'
+      - '还没认领驾驶席呢，先取得控制权再操作列车吧。'
+      - '呜哇，快坐好握紧手柄！没有驾驶权的话，小库莉可不知道要听谁的指令呢～'
+      - '要出发了吗？先点击提示领取驾驶权，确认今天的司机就位！'
+    en:
+      - 'Driver, take the controls before setting off!'
+      - 'Claim the cab before operating this train.'
+      - 'Driver on board! Grab the master controller so Kuri-chan knows who is in command~'
+      - 'Ready to roll? Claim the driver desk before any cab operation!'
+    fr:
+      - 'Conducteur, prenez les commandes avant le départ !'
+      - 'Prenez possession de la cabine avant de manœuvrer le train.'
+      - 'En voiture ! Prenez le manipulateur pour que Kuri-chan sache qui commande~'
+      - 'Prêt pour le départ ? Activez la cabine avant toute manipulation !'
+    jp:
+      - '運転士さん、出発前に運転権を取得してね！'
+      - 'まだ運転席を取得していないよ。先に操作権を取ってね。'
+      - '運転士さん乗車！マスコンを握ってくれないと、クリちゃん誰の指示を聞けばいいかわからないよ～'
+      - '出発進行？まずは運転席をタッチして、今日の運転士さんを教えてね！'
+
+  reclaim:
+    zh:
+      - '驾驶权已经收回啦。保持停车，重新认领驾驶席。'
+      - '刚才的驾驶会话失效了，先重新取得控制权吧。'
+      - '欸欸？！驾驶席掉线了！列车已触发防失控保护，快重新握好手柄！'
+      - '驾驶会话已经结束啦。不要慌，停稳后重新认领，再查看运行许可～'
+    en:
+      - 'Your driving control was revoked. Stay stopped and claim the cab again.'
+      - 'The previous driving session ended. Take the controls again.'
+      - 'Wait, driving control was lost! Stay stopped and claim the cab again.'
+      - 'The driving session ended. Claim the cab again, then check your movement authority.'
+    fr:
+      - 'Votre prise de commande a été révoquée. Restez à l’arrêt et reprenez la cabine.'
+      - 'La session de conduite précédente est terminée. Reprenez les commandes.'
+      - 'Oups, la prise de commande est perdue ! Restez à l’arrêt et reprenez la cabine.'
+      - 'La session de conduite est terminée. Reprenez la cabine, puis vérifiez votre autorisation.'
+    jp:
+      - '運転権が取り消されたよ。停止したまま運転席を取り直してね。'
+      - '前の運転セッションが終わったよ。もう一度操作権を取得してね。'
+      - 'あれっ、運転権がなくなったよ！停止したまま運転席を取り直してね。'
+      - '運転セッションが終わったよ。再取得してから運転許可も確認してね。'
+
+  reverser:
+    zh:
+      - '欸？换向器还是空挡呢，我们往哪开？'
+      - '出发前先选方向；换向器还在空挡。'
+      - '方向还没有定好呢！选前进还是后退？可不要把倒车当常规刹车踩哦。'
+      - '换向手柄还在空挡。确认前方条件后，选择正确的运行方向吧～'
+    en:
+      - 'The reverser is still neutral. Which way are we going?'
+      - 'Choose a direction before departure; the reverser is neutral.'
+      - 'Direction not selected yet! Forward or reverse? Remember never to use reverse for braking.'
+      - 'Reverser is in neutral. Check the route and choose the intended direction.'
+    fr:
+      - 'L’inverseur est encore au neutre. Dans quel sens partons-nous ?'
+      - 'Choisissez le sens de marche avant le départ : l’inverseur est au neutre.'
+      - 'Sens de marche non défini ! Avant ou arrière ? Ne jamais utiliser la marche arrière pour freiner.'
+      - 'Inverseur au point mort. Vérifiez l’itinéraire et choisissez le sens prévu.'
+    jp:
+      - 'あれ？逆転器がまだ中立だよ。どちらへ出発する？'
+      - '出発前に進行方向を選んでね。逆転器は中立だよ。'
+      - '進行方向が決まっていないよ！前進？それとも後進？逆転ブレーキは厳禁だよ～'
+      - '逆転器が中立だよ。進路を確認して、正しい方向を選んでね。'
+
+  demand:
+    zh:
+      - '列车还在 SB 待命。向调度中心申请运行许可（MA）吧！'
+      - '列车在 SB 待命，可以向调度申请 MA；申请后仍要等待结果。'
+      - '还在 SB 待命呢！点一下申请 MA，让调度检查前方区段吧～'
+      - '可以提交 MA 申请啦。收到有效许可前，请保持停车。'
+    en:
+      - 'The train is in SB standby. Request a movement authority (MA) from control!'
+      - 'The train is in SB. You may request an MA; wait for the result before moving.'
+      - 'Still in SB! Request an MA so control can check the route ahead~'
+      - 'You can submit an MA request. Stay stopped until valid authority is received.'
+    fr:
+      - 'Le train est en attente SB. Demandez une autorisation de mouvement (MA) à la régulation !'
+      - 'Le train est en SB. Vous pouvez demander une MA ; attendez la réponse avant de bouger.'
+      - 'Toujours en SB ! Demandez une MA pour que la régulation vérifie l’itinéraire~'
+      - 'Vous pouvez soumettre une demande de MA. Restez à l’arrêt jusqu’à réception d’une autorisation valide.'
+    jp:
+      - '列車は SB 待機中。指令所に運転許可（MA）を申請してね！'
+      - '列車は SB 待機中。MA を申請できるけれど、結果が出るまで動かないでね。'
+      - 'まだ SB だよ！MA を申請して、指令所に前方進路を確認してもらおう～'
+      - 'MA の申請を送れるよ。有効な許可が届くまで停止してね。'
+
+  shadow_demand:
+    zh:
+      - '可以申请影子 MA；它仅供观察，ATP 不会防护哦。'
+      - '当前是影子模式。MA 仅供观察，没有 ATP 防护。'
+      - '注意注意！当前处于影子观察通道，安全电脑不会自动刹车，全靠司机人工瞭望！'
+      - '可以申请影子 MA，但距离显示只供观察；遇到危险请按规程人工制动。'
+    en:
+      - 'You may request a shadow MA for observation; ATP will not protect it.'
+      - 'This is shadow mode. Any MA is observational and has no ATP protection.'
+      - 'Notice: shadow channel active. The ATP computer will not intervene—eyes on the track!'
+      - 'You may request a shadow MA, but its distance display is advisory only. Brake manually if danger arises.'
+    fr:
+      - 'Vous pouvez demander une MA d’observation ; l’ATP ne la protège pas.'
+      - 'Mode fantôme : la MA sert uniquement à l’observation, sans protection ATP.'
+      - 'Attention : canal fantôme actif. L’ATP n’interviendra pas, vigilance visuelle totale !'
+      - 'Vous pouvez demander une MA fantôme, mais sa distance reste indicative. Freinez manuellement en cas de danger.'
+    jp:
+      - '影の MA を申請できるけれど、観察専用で ATP 保護はないよ。'
+      - 'いまは影モード。MA は観察専用で、ATP 保護はないよ。'
+      - '注意してね！シャドウモードだから ATP 自動ブレーキは作動しないよ。目視確認第一！'
+      - '影の MA は申請できるよ。でも距離表示は参考用。危険時は手順どおり手動で制動してね。'
+
+  service_unavailable:
+    zh:
+      - 'MA 服务暂时不可用。保持停车，请管理员查看 STCS 状态。'
+      - 'MA 服务尚未就绪；先不要动车，请管理员检查服务状态。'
+      - '呜……MA 服务暂时没有有效响应！保持停车，请管理员查看系统状态。'
+      - '许可状态不可用时，不能把未知当作空闲；请等管理员排查。'
+    en:
+      - 'The MA service is unavailable. Stay stopped and ask an administrator to check STCS.'
+      - 'The MA service is not ready. Keep the train stopped and ask an administrator to check its status.'
+      - 'The MA service has no valid response right now. Stay stopped and ask an administrator to check it.'
+      - 'An unavailable authority status does not mean clear track. Wait for an administrator to investigate.'
+    fr:
+      - 'Le service MA est indisponible. Restez à l’arrêt et demandez une vérification de STCS.'
+      - 'Le service MA n’est pas prêt. Gardez le train à l’arrêt et faites vérifier son état.'
+      - 'Le service MA ne fournit pas de réponse valide. Restez à l’arrêt et faites vérifier son état.'
+      - 'Une autorisation indisponible ne signifie pas que la voie est libre. Attendez le diagnostic.'
+    jp:
+      - 'MA サービスが利用できないよ。停止を保ち、管理者に STCS の確認を頼んでね。'
+      - 'MA サービスはまだ準備できていないよ。列車を停止したまま管理者に確認してもらってね。'
+      - 'うぅ、MA サービスから有効な応答がないよ。停止して、管理者に確認してもらってね。'
+      - '許可状態が不明でも、線路が空いているとは限らないよ。管理者の調査を待ってね。'
+
+  position_wait:
+    zh:
+      - '列车定位或线路覆盖尚未确认。保持停车，完整定位前不能取得 MA。'
+      - '轨道图或列车位置还不确定；先别动车，请管理员检查定位。'
+      - '小库莉还不能确认列车在轨道图上的位置。保持停车，请管理员检查定位与线路覆盖。'
+      - '位置不确定！安全原则要求必须精确定位，请等待系统识别当前闭塞区段。'
+    en:
+      - 'Train position or track coverage is unconfirmed. Stay stopped; no MA is available until localization is complete.'
+      - 'The graph or train position is uncertain. Keep stopped and ask an administrator to check localization.'
+      - 'Kuri-chan cannot confirm the train position on the RailGraph. Stay stopped and ask an administrator to check it.'
+      - 'Position uncertain! Fail-Safe rules forbid dispatching until consist location is fully verified.'
+    fr:
+      - 'La position ou la couverture de voie n’est pas confirmée. Restez à l’arrêt ; aucune MA avant localisation complète.'
+      - 'Le graphe ou la position du train est incertain. Restez à l’arrêt et faites vérifier la localisation.'
+      - 'Position non confirmée sur le graphe ferroviaire ! Restez à l’arrêt et faites vérifier la localisation.'
+      - 'Position incertaine ! La sécurité impose une localisation parfaite avant toute MA.'
+    jp:
+      - '列車位置または線路の範囲が未確認だよ。停止を保ってね。定位完了まで MA は出せないよ。'
+      - '線路図か列車位置が不確かだよ。動かずに管理者へ定位確認を頼んでね。'
+      - 'レールマップ上の位置を確認できないよ。停止して、管理者に定位と線路範囲を調べてもらってね。'
+      - '列車位置が不確定！安全原則のため、完全な位置把握ができるまで動けないよ。'
+
+  ma_waiting:
+    zh:
+      - 'MA 还在等待或审核中。保持停车，查看 HMI 原因，不要反复申请。'
+      - '通行许可尚未下发；先看 HMI 的等待原因，继续保持制动。'
+      - 'MA 还没有下发，可能有占用、道岔或其他等待条件。先看 HMI 的具体原因哦～'
+      - '申请还在处理中！查看驾驶席的等待原因，不要连续重复提交。'
+    en:
+      - 'The MA is still pending. Stay stopped, check the HMI reason, and do not send repeated requests.'
+      - 'Movement authority has not been issued. Check the HMI reason and keep the train braked.'
+      - 'No MA has been issued yet. Occupancy, points or another condition may be blocking it; check the HMI~'
+      - 'The request is still pending. Check the cab reason and avoid submitting it repeatedly.'
+    fr:
+      - 'La MA est encore en attente. Restez à l’arrêt, consultez le motif sur l’IHM et évitez les demandes répétées.'
+      - 'L’autorisation n’est pas délivrée. Consultez l’IHM et maintenez le freinage.'
+      - 'La MA n’est pas délivrée. Occupation, aiguille ou autre condition possible : consultez l’IHM~'
+      - 'La demande est toujours en attente. Consultez le motif dans la cabine sans la répéter.'
+    jp:
+      - 'MA はまだ待機中だよ。停止を保ち、HMI の理由を確認して、連続申請は控えてね。'
+      - '運転許可はまだ出ていないよ。HMI を確認してブレーキを維持してね。'
+      - 'MA はまだ出ていないよ。占有やポイントなどの可能性があるから、HMI の理由を確認してね～'
+      - '申請は待機中だよ。運転席の理由を確認して、連続申請は控えてね。'
+
+  sr_pending:
+    zh:
+      - 'SR 请求正在等待调度批准。保持停车，批准并收到有效许可后再动车。'
+      - '限制人工驾驶还没获批；请等待调度员处理 SR 请求。'
+      - '目视行车（SR）需要专门授权！请等待 SkyPCC 或管理员处理申请～'
+      - 'SR 正在等待审批。收到有效授权并确认 HMI 状态之前，保持停车与制动。'
+    en:
+      - 'The SR request awaits dispatcher approval. Stay stopped until it is approved and valid authority is received.'
+      - 'Restricted driving has not been approved. Wait for the dispatcher to handle the SR request.'
+      - 'Staff Responsible (SR) needs approval. Wait for the dispatcher or administrator to handle the request~'
+      - 'The SR request is pending. Keep the train stopped and braked until the HMI confirms valid authority.'
+    fr:
+      - 'La demande SR attend l’accord du régulateur. Restez à l’arrêt jusqu’à l’accord et à la réception d’une autorisation valide.'
+      - 'La conduite restreinte n’est pas approuvée. Attendez le traitement de la demande SR.'
+      - 'Le mode SR exige une approbation. Attendez le traitement par le régulateur ou un administrateur~'
+      - 'La demande SR est en attente. Maintenez le train arrêté et freiné jusqu’à confirmation sur l’IHM.'
+    jp:
+      - 'SR 要求は指令員の承認待ちだよ。承認と有効な許可を受けるまで停止してね。'
+      - '制限運転はまだ承認されていないよ。指令員の SR 対応を待ってね。'
+      - '目視運転（SR）は承認が必要だよ！指令員か管理者の対応を待ってね～'
+      - 'SR は承認待ちだよ。HMI で有効な許可を確認するまで、停止と制動を保ってね。'
+
+  brake_held:
+    zh:
+      - '紧急制动仍保持。先核对 HMI 的模式与许可状态，再按规程处理制动。'
+      - '制动还锁着车轮呢；先检查 HMI，再按当前模式的规程操作制动手柄。'
+      - '呜哇哇，紧急制动还保持着！先看 HMI 确认许可与模式，再按规程处理制动。'
+      - '保护制动尚未撤销。核对当前模式和许可状态，不要强行加牵引。'
+    en:
+      - 'Emergency brake is still held. Check the HMI mode and authority status before following release procedure.'
+      - 'The brake is still holding the train. Check the HMI and follow the procedure for the current mode.'
+      - 'Emergency brake is still held! Check the HMI mode and authority before following the release procedure.'
+      - 'Protective brake hold active. Verify the current mode and authority; do not force traction.'
+    fr:
+      - 'Le frein d’urgence reste serré. Vérifiez le mode et l’état de l’autorisation sur l’IHM avant toute manœuvre.'
+      - 'Le frein retient encore le train. Consultez l’IHM et suivez la procédure du mode actuel.'
+      - 'Frein d’urgence maintenu ! Vérifiez le mode et l’autorisation sur l’IHM avant de suivre la procédure.'
+      - 'Maintien de freinage actif. Vérifiez le mode et l’autorisation sans forcer la traction.'
+    jp:
+      - '非常ブレーキがかかったままだよ。HMI のモードと許可状態を確認してから手順どおり操作してね。'
+      - 'ブレーキが列車を止めているよ。HMI を見て、現在のモードに応じた手順に従ってね。'
+      - '非常ブレーキがまだかかっているよ！HMI のモードと許可を確認してから手順どおり操作してね。'
+      - '保安ブレーキ保持中。現在のモードと許可を確認し、無理に力行しないでね。'
+
+  ack_trip:
+    zh:
+      - '呼……已经停稳了。请确认这次冒进；确认后还要释放旧 MA。'
+      - 'TR 停稳了。先确认违规，再处理旧 MA。'
+      - '呼……列车已经停稳。先确认本次跳闸，进入后续恢复步骤吧。'
+      - 'TR 状态需要司机确认。查看 HMI 的跳闸原因，再按步骤处理旧许可。'
+    en:
+      - 'We are stopped. Acknowledge the trip, then release the old MA.'
+      - 'The TR train is stopped. Acknowledge the trip before handling the old MA.'
+      - 'Whew, the train is stopped. Acknowledge this trip before starting the recovery steps.'
+      - 'TR requires driver acknowledgement. Check the HMI trip reason, then handle the old authority.'
+    fr:
+      - 'Nous sommes à l’arrêt. Acquittez le déclenchement, puis libérez l’ancienne MA.'
+      - 'Le train en TR est à l’arrêt. Acquittez d’abord le déclenchement.'
+      - 'Ouf, le train est à l’arrêt. Acquittez le déclenchement avant les étapes de reprise.'
+      - 'Le mode TR demande un acquittement. Consultez la cause sur l’IHM, puis traitez l’ancienne MA.'
+    jp:
+      - 'ふう……停止したね。トリップを確認してから、古い MA を解放してね。'
+      - 'TR で停止したよ。まずトリップを確認してね。'
+      - 'ふう、列車は止まったよ。今回のトリップを確認して、復旧手順へ進んでね。'
+      - 'TR では運転士の確認が必要だよ。HMI の原因を見てから古い許可を処理してね。'
+
+  release_old_ma:
+    zh:
+      - 'TR 已确认，现在释放旧 MA，随后才能重新申请。'
+      - '确认完成了。旧 MA 还需释放，之后才能申请新的。'
+      - '已经进入 PT 状态啦！按步骤释放旧 MA，再查看新申请的结果。'
+      - '旧许可需要释放；这一步不会证明线路空闲，也不会直接批准下一张 MA。'
+    en:
+      - 'Trip acknowledged. Release the old MA before requesting a new one.'
+      - 'Acknowledgement is complete. Release the old MA before making another request.'
+      - 'We are now in Post-Trip (PT). Release the old MA, then check any new request result.'
+      - 'The old MA must be released. This does not prove the track clear or approve the next MA.'
+    fr:
+      - 'Déclenchement acquitté. Libérez l’ancienne MA avant d’en demander une nouvelle.'
+      - 'L’acquittement est terminé. Libérez l’ancienne MA avant toute nouvelle demande.'
+      - 'Nous sommes en PT. Libérez l’ancienne MA, puis vérifiez le résultat d’une nouvelle demande.'
+      - 'L’ancienne MA doit être libérée. Cela ne prouve pas que la voie est libre ni n’approuve la suivante.'
+    jp:
+      - 'トリップ確認済み。新しい MA を申請する前に古い MA を解放してね。'
+      - '確認は終わったよ。次の申請前に古い MA を解放してね。'
+      - 'PT モードに入ったよ。古い MA を解放してから、新しい申請の結果を確認してね。'
+      - '古い MA の解放は線路の空きを証明しないし、次の MA を自動承認もしないよ。'
+
+  overspeed_warning:
+    zh:
+      - '哇哇，速度预警啦！立即收牵引，按 HMI 的限速与制动曲线平稳减速。'
+      - '当前速度接近或超过监督限速。及时制动，别等保护系统介入！'
+      - '注意速度预警！确认前方限速和剩余距离，使用足够的常用制动。'
+    en:
+      - 'Speed warning! Cut traction and brake smoothly according to the HMI limit and braking curve.'
+      - 'Speed is near or above the supervised limit. Brake promptly; do not wait for protection to intervene.'
+      - 'Watch the speed warning, the limit ahead and the remaining distance. Apply enough service brake.'
+    fr:
+      - 'Alerte de vitesse ! Coupez la traction et freinez selon la limite et la courbe affichées sur l’IHM.'
+      - 'Vitesse proche ou au-dessus de la limite surveillée. Freinez sans attendre la protection automatique.'
+      - 'Vérifiez la limite, la distance restante et appliquez un freinage de service suffisant.'
+    jp:
+      - '速度警告だよ！力行を切って、HMI の制限速度と制動曲線に合わせて減速してね。'
+      - '監視速度に近いか超えているよ。保安装置の介入を待たずに制動してね。'
+      - '前方の制限と残距離を確認し、十分な常用ブレーキを使ってね。'
+
+  eoa_approaching:
+    zh:
+      - '许可终点 EoA 临近！核对 HMI 的剩余距离，提前制动。'
+      - '前方是当前 MA 的终点，不要越过许可范围；准备在终点前停稳。'
+      - 'MA 剩余距离变短啦！按速度与坡度选择足够的常用制动，留出停车余量。'
+    en:
+      - 'End of Authority (EoA) is approaching. Check the HMI distance and brake early.'
+      - 'The current MA ends ahead. Do not pass its limit; prepare to stop before the EoA.'
+      - 'MA distance is decreasing. Allow for speed and gradient when applying service brake.'
+    fr:
+      - 'La fin d’autorisation (EoA) approche. Vérifiez la distance sur l’IHM et freinez tôt.'
+      - 'La MA actuelle se termine plus loin. Ne dépassez pas sa limite ; préparez l’arrêt avant l’EoA.'
+      - 'La distance MA diminue. Tenez compte de la vitesse et de la pente pour le freinage de service.'
+    jp:
+      - '許容限界 EoA が近いよ。HMI の残距離を確認して早めに制動してね。'
+      - '現在の MA はこの先で終わるよ。許可範囲を越えずに EoA 手前で止まろう。'
+      - 'MA の残距離が短くなったよ。速度と勾配を考えて十分な常用ブレーキを使ってね。'

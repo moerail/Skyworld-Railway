@@ -140,6 +140,10 @@ settings:
   config-version: 3
   # vehicles/<id>.yml: crh380b, cr400bf, keikyu-n1000, minecraft-comfort
   default-vehicle-profile: minecraft-comfort
+  # Minecraft's one-block ramp is much steeper than a real railway. Limit the
+  # equivalent grade used by force-mode vehicle profiles; distribute it over
+  # the actual cars on slopes. 0.04 means a 4% railway grade per sloped car.
+  max-effective-grade: 0.04
   # Independent server ceiling (km/h). Existing train-specific caps remain in effect.
   server-speed-limit-kmh: 420.0
   tick-interval: 1
@@ -256,6 +260,9 @@ settings:
   switch-occupied-distance: 1.35
   switch-release-distance: 2.25
   cab-refresh-interval-ticks: 5
+  # Kuri-chan gives stationary manual drivers clickable, language-aware next-step hints.
+  driver-guide-enabled: true
+  driver-guide-repeat-seconds: 60
   # Driver-only MA BossBar: full bar at this distance; text always shows actual metres.
   # Display scale only, unrelated to MA allocation or ATP supervision.
   cab-ma-bar-range-meters: 300.0

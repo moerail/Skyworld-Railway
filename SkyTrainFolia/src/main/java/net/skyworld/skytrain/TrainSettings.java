@@ -192,6 +192,10 @@ final class TrainSettings {
 
     double driveDirectionChangeSpeed() { return vehicle.get().reverseSpeed(); }
 
+    double maxEffectiveGrade() {
+        return RailMath.clamp(configuration.get().getDouble("settings.max-effective-grade", 0.04), 0.0, 0.25);
+    }
+
     boolean frontMinecartDetectionEnabled() {
         return configuration.get().getBoolean("settings.front-minecart-detection-enabled", true);
     }

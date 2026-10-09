@@ -1,5 +1,16 @@
 # SkyRail Suite
 
+## Mise à jour : STCS 4.1.0 / STF 4.0.5 / STA 2.1.1 / SkyPCC 2.0.1
+
+2026-10-09 : le mainteneur confirme la réussite des essais STCS 4.1.0. La validation des autres composants reste distincte ; les anciennes versions ci-dessous sont conservées comme historique.
+
+- STCS [4.1.0](doc/releases/stcs-v4.1.0-railgraph-storage.md) : portée des aiguilles en FS selon la vitesse, compression des voies droites dans RailGraph v4, sauvegarde des anciens graphes et géométrie complète des courbes et rampes. Les services exposent toujours les chemins complets.
+- STF : [guidage en quatre langues](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md), phrases aléatoires modifiables dans `driver-guide.yml`, corrections de pente équivalente, démarrage à l'arrêt, géométrie après rechargement et affichage des véhicules. Recharger à l'arrêt.
+- STA [2.1.1](doc/releases/sta-v2.1.1-dispatcher-map.md) : poste de régulation TLS avec occupations/réservations, directions des aiguilles et détails des trains. Écoute désactivée par défaut. [Installation](STA/tools/README.md).
+- SkyPCC [2.0.1](doc/releases/skypcc-v2.0.1.md) : commandes distantes des aiguilles et approbation SR avec jeton Bearer valide ; écoute locale par défaut.
+
+Portée FS : `max(ma.lock-distance-meters, v²/(2a) + v × lead-seconds + buffer-meters)`, avec v en m/s. Valeurs par défaut : a=1 m/s², anticipation 5 s, marge 25 m. `ma.dynamic-lock.enabled: false` rétablit la portée fixe ; SH/SR ne changent pas. `ma.look-ahead-meters` (600 m) et `ma.max-authority-distance-meters` (300 m) restent des plafonds indépendants. La portée dynamique est plafonnée à 10000 m. À 420 km/h, ces paramètres donnent environ 7414 m ; la MA nécessaire dépend encore de la courbe ATP. Les états inconnus, conflits et vérifications de dégagement complet restent bloquants.
+
 **Joueurs : commencez par le [manuel de conduite](doc/driver/README.fr.md)** pour la montée à bord, la prise de conduite, la barre rapide, la MA fantôme et l'arrêt.
 
 ## 4.0.2 : Alertes et rétablissement du service

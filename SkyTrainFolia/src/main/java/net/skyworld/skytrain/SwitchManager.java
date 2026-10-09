@@ -1098,13 +1098,14 @@ final class SwitchManager {
         BlockFace mountFace = signMount.attachedFace();
 
         // A ceiling hanging sign is attached to the underside of the rail support block.
+        // Treat the direction behind its front as the virtual wall attachment side,
+        // so left/right has the same meaning as on a side-mounted wall sign.
         if (signMount.hangingBelowTrack()) {
             Block pivot = support.getRelative(BlockFace.UP);
             if (pivot.getType() != Material.RAIL || !(pivot.getBlockData() instanceof Rail)) {
                 throw new IllegalArgumentException("悬挂告示牌上方必须依次是承载方块和道岔尖轨。");
             }
-            BlockFace common = front.getOppositeFace();
-            return new SwitchLayout(pivot, common, front, geometry.divergingFace(front));
+            return sideMountedLayout(pivot, front.getOppositeFace(), geometry);
         }
 
         Block sidePivot = support.getRelative(BlockFace.UP);

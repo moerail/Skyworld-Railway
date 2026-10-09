@@ -1,5 +1,16 @@
 # SkyRail Suite
 
+## Huidige update: STCS 4.1.0 / STF 4.0.5 / STA 2.1.1 / SkyPCC 2.0.1
+
+2026-10-09: de beheerder bevestigt dat STCS 4.1.0 de tests heeft doorstaan. Acceptatie van andere onderdelen blijft afzonderlijk; oudere versies hieronder zijn historisch.
+
+- STCS [4.1.0](doc/releases/stcs-v4.1.0-railgraph-storage.md): snelheidsafhankelijk wisselbereik in FS en compact opgeslagen rechte paden in RailGraph v4. Oude grafen worden geback-upt; bochten en hellingen en de volledige servicepaden blijven behouden.
+- STF: [bestuurdershulp in vier talen](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md), bewerkbare willekeurige teksten in `driver-guide.yml`, verbeteringen aan effectieve helling, wegrijden, herladen van geometrie en voertuigweergave. Alleen stilstaand herladen.
+- STA [2.1.1](doc/releases/sta-v2.1.1-dispatcher-map.md): TLS-desktopbediening met bezetting/reserveringen, wisselrichtingen en treindetails; standaard uitgeschakeld. [Installatie](STA/tools/README.md).
+- SkyPCC [2.0.1](doc/releases/skypcc-v2.0.1.md): wisselbediening op afstand en SR-goedkeuring met een geldig Bearer-token; standaard alleen lokaal bereikbaar.
+
+FS-wisselbereik: `max(ma.lock-distance-meters, v²/(2a) + v × lead-seconds + buffer-meters)`, met v in m/s. Standaard a=1 m/s², 5 s vooruitlooptijd en 25 m marge. `ma.dynamic-lock.enabled: false` herstelt het vaste bereik; SH/SR blijven gelijk. `ma.look-ahead-meters` (600 m) en `ma.max-authority-distance-meters` (300 m) blijven onafhankelijke harde grenzen. Dynamisch bereik is maximaal 10000 m. Bij 420 km/h leveren deze parameters ongeveer 7414 m op; de benodigde MA hangt nog af van de ATP-curve. Onbekende wissels, conflicten en volledige uitrijruimte worden nog steeds gecontroleerd.
+
 **Voor spelers:** de bestuurdershandleiding is beschikbaar in [Engels](doc/driver/README.en.md), [Chinees](doc/driver/README.zh.md), [Frans](doc/driver/README.fr.md) en [Japans](doc/driver/README.ja.md).
 
 ## 4.0.2: Waarschuwingen en serviceherstel

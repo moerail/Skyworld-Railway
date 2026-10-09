@@ -1,5 +1,16 @@
 # SkyRail Suite
 
+## Current update: STCS 4.1.0 / STF 4.0.5 / STA 2.1.1 / SkyPCC 2.0.1
+
+Updated 2026-10-09. The maintainer confirmed STCS 4.1.0 testing passed; acceptance of other components remains separate. Older version sections below are historical.
+
+- STCS [4.1.0](doc/releases/stcs-v4.1.0-railgraph-storage.md): speed-dependent FS point eligibility and RailGraph v4 straight-path compression, with legacy backups and full curve/slope geometry. Service responses still expose full paths.
+- STF [driver guidance](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md): four languages, editable random phrases in `driver-guide.yml`, effective-grade and parked-launch fixes, reload geometry and member display corrections. Reload only while stopped.
+- STA [2.1.1 desktop dispatch](doc/releases/sta-v2.1.1-dispatcher-map.md): live occupancy/reservations, switch directions and train arrows/details. The TLS admin listener remains disabled by default. [Tool setup](STA/tools/README.md).
+- SkyPCC [2.0.1](doc/releases/skypcc-v2.0.1.md): remote point control and SR approval using a valid Bearer token; loopback binding remains the default.
+
+FS point range is `max(ma.lock-distance-meters, v²/(2a) + v × lead-seconds + buffer-meters)`, using current absolute speed in m/s. Defaults: a=1 m/s², lead=5 s, buffer=25 m. Set `ma.dynamic-lock.enabled: false` for the old fixed range; SH/SR are unchanged. Search (`ma.look-ahead-meters`, default 600 m) and MA credit (`ma.max-authority-distance-meters`, default 300 m) remain independent hard caps. Dynamic point range is capped at 10000 m. At 420 km/h the default planning parameters give about 7414 m; actual MA needs still depend on the onboard ATP curve. Unknown points, conflicts and whole-train exit clearance checks still apply.
+
 **Players: start with the [Driver Manual](doc/driver/README.en.md)** for boarding, driving control, hotbar, shadow MA and stopping.
 
 ## 4.0.2: Warnings and Service Recovery

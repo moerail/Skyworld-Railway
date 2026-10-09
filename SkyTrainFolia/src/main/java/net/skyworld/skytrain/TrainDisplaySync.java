@@ -126,6 +126,20 @@ final class TrainDisplaySync implements Listener, AutoCloseable {
         return true;
     }
 
+    java.util.Optional<MemberVisualPose> visualPose(UUID memberId) {
+        Member member = members.get(memberId);
+        if (member == null) return java.util.Optional.empty();
+        TrainDisplayFrame frame = frames.get(member.train());
+        if (!isFresh(frame, System.nanoTime())) return java.util.Optional.empty();
+        for (TrainDisplayFrame.Cart cart : frame.carts()) {
+            if (cart.uuid().equals(memberId)) {
+                return java.util.Optional.of(new MemberVisualPose(memberId, cart.world(), cart.x(), cart.y(), cart.z(),
+                        cart.yaw(), cart.pitch(), frame.createdNanos()));
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
     void forget(UUID uuid) {
         Member old = members.remove(uuid);
         if (old != null) frames.remove(old.train);

@@ -60,6 +60,8 @@ final class RailGraphManager {
     private final AtomicBoolean saveQueued = new AtomicBoolean();
     private final Object ioLock = new Object();
     private volatile RailGraph graph;
+    private volatile boolean legacyGraphLoaded;
+    private volatile long legacyRevision = -1L;
     private final SkyTrainSwitchBridge switchBridge;
     private final SkyTrainStationBridge stationBridge;
     private volatile boolean shuttingDown;
@@ -164,7 +166,14 @@ final class RailGraphManager {
             rebuildGraph();
             return;
         }
-        if (graph.revision == 0L && !markers.isEmpty()) {
+        if (legacyGraphLoaded && graph.revision != 0L && markers.isEmpty()
+                && switchBridge.snapshots().isEmpty() && stationBridge.snapshots().isEmpty()
+                && !graph.nodes.isEmpty()) {
+            plugin.getLogger().warning("Legacy RailGraph retained: no infrastructure is available for a safe rescan.");
+            return;
+        }
+        if (legacyGraphLoaded || (graph.revision == 0L && !markers.isEmpty())) {
+            if (legacyGraphLoaded) plugin.getLogger().info("Legacy RailGraph detected; rebuilding from loaded world rails.");
             rebuildGraph();
         }
     }
@@ -810,6 +819,8 @@ final class RailGraphManager {
     private void exportGraphNow(RailGraph snapshot) {
         synchronized (ioLock) {
             if (!currentExport(snapshot.revision, graph.revision)) return;
+            // Keep the old file until a world scan has actually produced a new revision.
+            if (legacyGraphLoaded && snapshot.revision == legacyRevision) return;
             try {
                 plugin.getDataFolder().mkdirs();
                 File temporary = new File(graphFile.getParentFile(), graphFile.getName() + ".tmp");
@@ -817,7 +828,11 @@ final class RailGraphManager {
                         ? new GsonBuilder().setPrettyPrinting().serializeNulls().create()
                         : new GsonBuilder().serializeNulls().create();
                 try (Writer writer = Files.newBufferedWriter(temporary.toPath(), StandardCharsets.UTF_8)) {
-                    gson.toJson(snapshot, writer);
+                    gson.toJson(RailGraphStorage.encode(snapshot), writer);
+                }
+                if (legacyGraphLoaded && graphFile.isFile()) {
+                    File backup = new File(graphFile.getParentFile(), graphFile.getName() + ".legacy.bak");
+                    if (!backup.exists()) Files.copy(graphFile.toPath(), backup.toPath());
                 }
                 try {
                     Files.move(temporary.toPath(), graphFile.toPath(),
@@ -825,6 +840,8 @@ final class RailGraphManager {
                 } catch (AtomicMoveNotSupportedException ex) {
                     Files.move(temporary.toPath(), graphFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
                 }
+                legacyGraphLoaded = false;
+                legacyRevision = -1L;
             } catch (IOException ex) {
                 plugin.getLogger().log(Level.SEVERE, "Failed to export STCS RailGraph", ex);
             }
@@ -836,12 +853,18 @@ final class RailGraphManager {
             return;
         }
         try (Reader reader = Files.newBufferedReader(graphFile.toPath(), StandardCharsets.UTF_8)) {
-            RailGraph stored = new Gson().fromJson(reader, RailGraph.class);
+            StringBuilder json = new StringBuilder();
+            char[] buffer = new char[8192];
+            for (int n; (n = reader.read(buffer)) != -1;) json.append(buffer, 0, n);
+            RailGraphStorage.Decoded decoded = RailGraphStorage.decode(json.toString());
+            RailGraph stored = decoded.graph();
             if (stored != null && stored.nodes != null && stored.edges != null && stored.unresolved != null) {
                 graph = new RailGraph(stored.revision, stored.maxScanDistanceMeters,
                         stored.blocksPerMeter, stored.nodes, stored.edges, stored.unresolved,
                         stored.lineDefinitions == null ? lineDefinitions(markers.values()) : stored.lineDefinitions);
                 buildSequence.accumulateAndGet(stored.revision, Math::max);
+                legacyGraphLoaded = decoded.legacy();
+                legacyRevision = decoded.legacy() ? stored.revision : -1L;
             }
         } catch (IOException | RuntimeException ex) {
             plugin.getLogger().log(Level.WARNING, "Failed to restore the previous STCS RailGraph; it will be rebuilt.", ex);

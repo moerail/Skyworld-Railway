@@ -1,5 +1,33 @@
 # Updates / 更新说明
 
+## Current source snapshot — 2026-10-09
+
+STCS **4.1.0**, SkyTrainFolia **4.0.5**, STA **2.1.1**, SkyPCC **2.0.1**. The maintainer confirmed STCS 4.1.0 testing passed. A complete build against Minecraft/Folia 26.2 passed all **82 Java test entry points**. Other components retain their individual live-acceptance status; the historical suite 4.0.2 release is not renamed.
+
+- STCS FS point eligibility now uses `max(lock-distance-meters, v²/(2a) + v*lead-seconds + buffer-meters)` from fresh telemetry. Default planning parameters are 1 m/s², 5 s and 25 m. `ma.dynamic-lock.enabled: false` restores fixed eligibility. Search and MA credit remain independently configured, SH/SR retain their limits, and point-state/conflict/whole-train clearance checks still apply.
+- RailGraph schema v4 stores contiguous axis-aligned straight paths compactly, retaining full curves/slopes and full service geometry. Legacy v2/v3 files are backed up before successful migration. Includes directed SR unresolved-port checks and attended shadow-ledger reset support.
+- SkyTrainFolia includes multilingual driver guidance and an editable word bank, retained launch direction, consist-aware effective grade, reload geometry and visual pose corrections. `settings.max-effective-grade` defaults to 0.04 for force-mode profiles. Ledger reset requires the matching STF challenge support.
+- STA adds the disabled-by-default TLS administrator desk, current occupancy/reservation layers, switch/train directions and selected-train details. SkyPCC allows remote Bearer-token control while requiring a secure browser context for control requests; default bind remains loopback.
+- Update all seven root READMEs, four driver READMEs and desktop-tool instructions. Publish the existing incident reports and the explicitly unimplemented SkyATO design draft as documentation.
+
+[STCS 4.1.0](doc/releases/stcs-v4.1.0-railgraph-storage.md) · [Dynamic lock configuration](doc/STCS-DYNAMIC-SWITCH-LOCK.zh.md) · [Desktop tools](STA/tools/README.md)
+
+## SkyTrainFolia v4.0.5 candidate / 多语言司机引导词库
+
+- Move Kuri-chan's driver guidance into editable `plugins/SkyTrainFolia/driver-guide.yml`. Each scenario and language has a list; one phrase is selected randomly when shown. Add localization/service wait, MA wait, SR approval wait, reclaimed driver control, and held emergency brake hints. Commands stay fixed in Java and retain state checks.
+- [Release notes / 更新说明](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md).
+
+## SkyTrainFolia v4.0.4 candidate / 库莉酱司机引导
+
+- Add four-language, clickable driver hints for cab claim, neutral reverser, fresh SB MA request, stopped Trip acknowledgement, and PT release. Hints are state-gated and throttled; they never operate the train automatically.
+- [Release notes / 更新说明](doc/releases/skytrainfolia-v4.0.4-driver-guide.md).
+
+## SkyPCC v2.0.1 candidate / 小版本候选
+
+- Accept remote switch-control and SR-approval POST requests when `web.control-enabled` is true and the request has the configured Bearer token. The old loopback and localhost Origin/Host checks are removed; POST and JSON requirements remain. No STA/STCS protocol change.
+- 默认仍监听 `127.0.0.1`。远程访问可使用 HTTPS 反向代理，或由管理员显式配置监听地址与传输层保护。错误令牌继续拒绝，返回 `CONTROL_AUTH_REQUIRED`。
+- [Release notes / 更新说明](doc/releases/skypcc-v2.0.1.md). Production validation pending / 尚待生产服验证。
+
 ## Suite v4.0.2 pre-release / 预发布
 
 STF/STCS 4.0.2, STA/SkyPCC 2.0.0. [Release notes / 发布说明](doc/releases/suite-v4.0.2.md). Live-server acceptance pending / 尚待服务器验收。

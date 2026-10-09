@@ -1,5 +1,9 @@
 # SkyRail Driver Manual
 
+## Current update: STF 4.0.5 / STCS 4.1.0
+
+STA is now 2.1.1 and SkyPCC 2.0.1. The maintainer confirmed STCS 4.1.0 testing passed. Kuri-chan gives language-aware hints to stopped manual drivers, including localisation, MA and SR waiting states; editable phrases never operate the train. FS checks points earlier as speed rises, but driving still requires a current valid MA. Conflicts, unknown states and MA caps still apply. The older baseline below is historical. [Version overview](../../README.en.md).
+
 [中文](README.zh.md) | [English](README.en.md) | [Français](README.fr.md) | [日本語](README.ja.md) · [Project home](../../README.md)
 
 For ordinary players aboard a manual train. Baseline: STF/STCS 4.0.2, STA/SkyPCC 2.0.0. Administrators handle train creation, track construction and plugin configuration.

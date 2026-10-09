@@ -4,6 +4,7 @@ import net.skyworld.suite.SuiteCommandUi;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class StaPlugin extends JavaPlugin {
+    private StaRemoteServer remote;
     @Override public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command command, String label, String[] args) {
         if (!SuiteCommandUi.handle(this, sender, "sta", args))
             SuiteCommandUi.handle(this, sender, "sta", new String[]{"help"});
@@ -17,9 +18,17 @@ public final class StaPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        saveDefaultConfig();
         getServer().getServicesManager().register(net.skyworld.sta.api.v3.RailwayEventService.class,
                 new net.skyworld.sta.api.v3.RailwayEventLog(500), this, org.bukkit.plugin.ServicePriority.Normal);
+        if (getConfig().getBoolean("remote.enabled", false)) {
+            try { remote = StaRemoteServer.start(this); }
+            catch (Exception ex) { getLogger().severe("STA Remote disabled: " + ex.getMessage()); }
+        }
         getLogger().info("Skyworld Train API: STA protocol v5 available; legacy v2/v4 services are not supported.");
     }
-    @Override public void onDisable() { getServer().getServicesManager().unregisterAll(this); }
+    @Override public void onDisable() {
+        if (remote != null) remote.close();
+        getServer().getServicesManager().unregisterAll(this);
+    }
 }

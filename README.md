@@ -1,5 +1,20 @@
 # SkyRail Suite
 
+## 当前源码更新 / Current source update — 2026-10-09
+
+**STCS 4.1.0 / SkyTrainFolia 4.0.5 / STA 2.1.1 / SkyPCC 2.0.1。** STCS 4.1.0 已由维护者确认测试通过；其他组件的实服验收状态以各自更新说明为准。下方 4.0.2 发布记录保留作历史基线，并非当前源码版本。
+
+**Current source versions:** STCS 4.1.0, SkyTrainFolia 4.0.5, STA 2.1.1 and SkyPCC 2.0.1. The maintainer confirmed STCS 4.1.0 testing passed; other components retain their own acceptance status. The 4.0.2 release entries below are historical.
+
+- **STCS:** FS 道岔锁定范围随实时车速调整；RailGraph v4 压缩直线路径，保留弯道和坡道完整几何，旧图迁移前备份。/ FS point eligibility follows speed; RailGraph v4 compresses straight paths and backs up legacy graphs. [4.1.0](doc/releases/stcs-v4.1.0-railgraph-storage.md) · [动态锁定配置](doc/STCS-DYNAMIC-SWITCH-LOCK.zh.md)
+- **SkyTrainFolia:** 库莉酱四语言司机提示与可编辑随机词库；坡道等效坡度、停车起步方向、重载几何及车体显示修复。/ Four-language driver hints, editable phrases, effective-grade and parked-launch fixes, reload geometry and member display corrections. [司机引导 / Driver guidance](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md)
+- **STA:** 可选 TLS 管理员桌面调度台，增加实时占用/预约、道岔方向、列车箭头和详情。默认关闭。/ Optional TLS desktop dispatch with live occupancy, reservations, switch directions and train details; disabled by default. [2.1.1](doc/releases/sta-v2.1.1-dispatcher-map.md) · [工具说明 / Tools](STA/tools/README.md)
+- **SkyPCC:** 正确的 Bearer token 可授权远程道岔操作与 SR 审批，默认仍监听本机。/ Bearer-token authorization for remote point control and SR approval; loopback binding remains the default. [2.0.1](doc/releases/skypcc-v2.0.1.md)
+
+FS 锁定距离 / FS point range: `max(ma.lock-distance-meters, v²/(2a) + v × lead-seconds + buffer-meters)`，v 为 m/s；默认 a=1、提前 5 秒、余量 25 米，可通过 `ma.dynamic-lock.enabled: false` 恢复固定距离。搜索 `ma.look-ahead-meters`（默认 600 米）和 MA 上限 `ma.max-authority-distance-meters`（默认 300 米）仍独立限制 MA；动态范围最高 10000 米，不绕过冲突或道岔检查。SH/SR 保持原有范围。
+
+The default dynamic parameters are 1 m/s², 5 seconds and 25 metres; disable `ma.dynamic-lock.enabled` to restore a fixed range. Search (600 m by default) and MA credit (300 m) remain independent configured caps. Dynamic range is capped at 10000 m; conflicts and point checks still apply, and SH/SR keep their existing limits. At 420 km/h these planning parameters give about 7414 m of point range, not a guarantee of full-speed ATP clearance.
+
 <p align="center">
   <img src="logo.png" alt="SkyRail Suite" width="64" height="64">
 </p>
@@ -17,6 +32,8 @@
 从上车、取得驾驶权到手柄控制、MA 申请与停车交接；面向普通玩家，无需阅读管理员配置章节。
 
 From boarding and claiming control to notches, MA requests and handover, without the administrator configuration chapters.
+
+**SkyTrainFolia 4.0.5 candidate:** 库莉酱（クリちゃん）会按玩家语言给停稳的手动列车司机发送下一步提示；文案从独立词库随机选择。详见 [司机引导词库更新说明](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md)。
 
 **趣味别册 / Just for fun:** [鐵道運轉試驗規程 · 舊式技術訓令體](README.ja.classical.md)
 
@@ -41,6 +58,12 @@ Minecraft is both the live operating environment and an interactive railway-syst
 ## 破坏性协议升级 / Breaking Protocol Upgrade
 
 **当前为预发布 / Current pre-release: [`suite-v4.0.2`](https://github.com/moerail/Skyworld-Railway/releases/tag/suite-v4.0.2)。** 自动检查已通过，最近修复尚待服务器复测。Automated checks passed; the latest fixes still await live-server retesting.
+
+SkyPCC 另有 **2.0.1 小版本候选**：远程道岔操作与 SR 审批可通过正确的 Bearer token 授权；默认仍仅监听 `127.0.0.1`。详见 [SkyPCC 2.0.1 更新说明](doc/releases/skypcc-v2.0.1.md)。
+
+STA 另有 **2.1.0 测试候选**：可选 TLS/TCP 管理员调度入口及复用 RailGraph testbench 几何的 Python 桌面客户端。默认关闭，须在测试服完成证书、鉴权与实车验收。详见 [STA 2.1.0 说明](doc/releases/sta-v2.1.0-remote-dispatcher.md)。
+
+STA **2.1.1 桌面调度台候选**补充实时占用/预约图层、道岔方向和列车箭头、线路线型及列车详情侧栏；需搭配 2.1.1 服务端。详见 [STA 2.1.1 说明](doc/releases/sta-v2.1.1-dispatcher-map.md)。
 
 **4.0.2 更新 / Changes:** 低速预警在 ATP 限速 ≤40 km/h 时提前 5 km/h 触发、低于限速 8 km/h 时解除；普通档新默认 15 / 18 km/h，已有设置保留。新增管理员 MA 服务恢复指令，保留占用，不自动缓解制动。详见 [更新说明](doc/releases/suite-v4.0.2.md)。
 
@@ -79,7 +102,7 @@ This update corrects SH/SR mode-speed braking, TR overrun feedback and distant S
 | [SkyTrainFolia (STF)](SkyTrainFolia/) | 4.0.2 | 列车运动、编组、驾驶控制、车型、牌子、实体道岔执行与驾驶室 HMI。<br>Train motion, consists, driving control, vehicle profiles, signs, physical point actuation and cab HMI. |
 | [Skyworld Train Control System (STCS)](STCS/) | 4.0.2 | RailGraph、线路归属、定位、保留占用与实验性 MA/EoA 分配。<br>RailGraph, line attribution, localisation, retained occupancy and experimental MA/EoA allocation. |
 | [SkyworldTrainAPI (STA)](STA/) | 2.0.0 | 插件之间的版本化进程内服务契约、遥测与行车事件。<br>Versioned in-process service contracts, telemetry and railway events between plugins. |
-| [SkyPCC](SkyPCC/) | 2.0.0 | HTTP/SSE 调度显示、基础设施详情、事件日志与经过身份验证的道岔操作、SR 审批。<br>HTTP/SSE dispatch display, inspectors, event log, authenticated turnout control and SR approval. |
+| [SkyPCC](SkyPCC/) | 2.0.1 | HTTP/SSE 调度显示、基础设施详情、事件日志与经过身份验证的道岔操作、SR 审批。<br>HTTP/SSE dispatch display, inspectors, event log, authenticated turnout control and SR approval. |
 
 [shared/](shared/) 包含编译进各插件的共通指令、帮助与版本界面代码，并非第五个运行时插件。STA 是进程内 Java API，而不是通用的 Python 网络协议。
 

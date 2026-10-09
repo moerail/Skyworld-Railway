@@ -35,6 +35,13 @@ public final class SrRouteTest {
         var gap = new ShadowGraph(new RailGraph(1, 256, 1, List.of(a, b, c, target),
                 List.of(ab, bc, ct), List.of(new RailGraph.Issue("c", "east", "chunk_not_loaded", 0))));
         assert SrRoute.find(gap, start, target.id(), 5000).reason().equals("GRAPH_GAP");
+        var unrelatedPortGap = new ShadowGraph(new RailGraph(1, 256, 1, List.of(a, b, c, target),
+                List.of(ab, bc, ct), List.of(new RailGraph.Issue("a", "west", "chunk_not_loaded", 0),
+                        new RailGraph.Issue("target", "east", "chunk_not_loaded", 0))));
+        assert SrRoute.find(unrelatedPortGap, start, target.id(), 5000).reachable();
+        var targetEntryGap = new ShadowGraph(new RailGraph(1, 256, 1, List.of(a, b, c, target),
+                List.of(ab, bc, ct), List.of(new RailGraph.Issue("target", "west", "chunk_not_loaded", 0))));
+        assert SrRoute.find(targetEntryGap, start, target.id(), 5000).reason().equals("GRAPH_GAP");
         assert SrRoute.find(ShadowPlannerTest.graph(List.of(a, b, c, target), List.of(ab, bc)),
                 start, target.id(), 5000).reason().equals("TARGET_UNREACHABLE");
         System.out.println("SR target topology, local grant window, branch and graph-gap checks passed");

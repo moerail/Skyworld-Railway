@@ -11,6 +11,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from railgraph_simulation import Graph, Simulation
+from railgraph_geometry import fit_transform, edge_screen_coords
 from occupancy_audit import audit
 
 BG, PANEL, TEXT, MUTED = "#14181b", "#202629", "#eef3f3", "#a8b4b9"
@@ -276,14 +277,11 @@ class Testbench:
                 if self.sim.graph.nodes[e.source]["rail"]["world"] == self.world.get()]
 
     def fit(self):
-        pts = [p for e in self.visible_edges() for p in e.points]
-        if not pts:
+        transform = fit_transform(self.visible_edges(), max(100, self.canvas.winfo_width()),
+                                  max(100, self.canvas.winfo_height()))
+        if transform is None:
             return
-        x0, x1 = min(p[1] for p in pts), max(p[1] for p in pts)
-        z0, z1 = min(p[3] for p in pts), max(p[3] for p in pts)
-        w, h = max(100, self.canvas.winfo_width()), max(100, self.canvas.winfo_height())
-        self.scale = min((w - 100) / max(1, x1 - x0), (h - 120) / max(1, z1 - z0))
-        self.tx, self.ty = w / 2 - (x0 + x1) / 2 * self.scale, h / 2 - (z0 + z1) / 2 * self.scale
+        self.scale, self.tx, self.ty = transform
         self.draw()
 
     def zoom(self, x, y, factor):
@@ -303,11 +301,9 @@ class Testbench:
             self.draw()
 
     def line(self, edge, color, width, dash=None, start=0, end=None):
-        end = edge.length if end is None else end
-        if end <= start:
+        coords = edge_screen_coords(edge, self.screen, start, end)
+        if not coords:
             return
-        points = [edge.point(start)] + [p[1:] for p in edge.points if start < p[0] < end] + [edge.point(end)]
-        coords = [value for p in points for value in self.screen(p)]
         self.canvas.create_line(*coords, fill=color, width=width, dash=dash, joinstyle="round")
 
     def draw(self):

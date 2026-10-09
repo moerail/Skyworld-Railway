@@ -1,5 +1,16 @@
 # SkyRail Suite
 
+## 現在の更新：STCS 4.1.0 / STF 4.0.5 / STA 2.1.1 / SkyPCC 2.0.1
+
+2026-10-09：管理者から STCS 4.1.0 の試験合格が報告されました。他の構成要素の実サーバー受入れは別です。以下の旧版記録は履歴として残します。
+
+- STCS [4.1.0](doc/releases/stcs-v4.1.0-railgraph-storage.md)：速度に応じた FS 分岐器の確保範囲と RailGraph v4 の直線経路圧縮。旧図をバックアップし、曲線・勾配の形状とサービスの完全な経路を維持します。
+- STF：[四言語の運転士案内と編集可能なランダム文例](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md)。`driver-guide.yml` を使用。等価勾配、停車からの起動方向、再読込時の形状、車体表示も修正。再読込は停車中に行います。
+- STA [2.1.1](doc/releases/sta-v2.1.1-dispatcher-map.md)：TLS デスクトップ指令台に在線・予約、分岐器方向、列車矢印と詳細を追加。接続受付は既定で無効。[導入方法](STA/tools/README.md)。
+- SkyPCC [2.0.1](doc/releases/skypcc-v2.0.1.md)：有効な Bearer トークンで遠隔分岐器操作と SR 承認。既定の待受はローカルです。
+
+FS 範囲は `max(ma.lock-distance-meters, v²/(2a) + v × lead-seconds + buffer-meters)`。v は現在速度の絶対値（m/s）、既定 a=1 m/s²、先行時間 5 秒、余裕 25 m。`ma.dynamic-lock.enabled: false` で固定範囲に戻り、SH/SR は従来どおりです。探索 `ma.look-ahead-meters`（600 m）と MA 上限 `ma.max-authority-distance-meters`（300 m）は独立した上限です。動的範囲は最大 10000 m。420 km/h では約 7414 m ですが、必要な MA は車上 ATP 曲線にも依存します。不明な分岐器、競合、編成全体の咽喉通過確認は引き続き許可を制限します。
+
 **一般プレイヤー向け：[運転士マニュアル](doc/driver/README.ja.md)**。乗車、運転権取得、ホットバー、影方式 MA、停止手順を説明します。
 
 ## 4.0.2：警報とサービス復旧

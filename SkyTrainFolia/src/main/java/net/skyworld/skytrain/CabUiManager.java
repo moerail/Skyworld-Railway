@@ -32,6 +32,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 
@@ -239,6 +240,7 @@ final class CabUiManager implements Listener {
                             existing.sidebar.hide(player);
                         }
                         renderSidebar(session, player, train);
+                        announceDriverGuide(session, player, train);
                         renderInventory(session.inventory, player, train);
                         if (openInventory) {
                             player.openInventory(session.inventory);
@@ -571,7 +573,7 @@ final class CabUiManager implements Listener {
         // A delayed cleanup from a pre-reload session must not remove the new sidebar objective.
         return new CabSession(player.getUniqueId(), train.id(),
                 new CabSidebar(UUID.randomUUID()), inventory, new MaBossBar(), new ShadowSpeedNotice(),
-                new AtpDriverFeedback());
+                new AtpDriverFeedback(), new DriverGuide());
     }
 
     void announceStationBraking(Train train, AutomaticRun run) {
@@ -631,6 +633,7 @@ final class CabUiManager implements Listener {
                                 return;
                             }
                             renderSidebar(session, player, train);
+                            announceDriverGuide(session, player, train);
                             if (player.getOpenInventory().getTopInventory().getHolder() instanceof CabInventoryHolder holder
                                     && holder.trainId.equals(train.id())) {
                                 renderInventory(player.getOpenInventory().getTopInventory(), player, train);
@@ -657,6 +660,83 @@ final class CabUiManager implements Listener {
                         sessions.remove(session.playerId, session);
                     });
         }
+    }
+
+    private void announceDriverGuide(CabSession session, Player player, Train train) {
+        if (!plugin.getConfig().getBoolean("settings.driver-guide-enabled", true)
+                || !(player.getVehicle() instanceof Minecart cart) || manager.trainForCart(cart) != train) return;
+        boolean driver = manager.isDriver(player, train);
+        boolean stopped = train.currentSpeed() <= .001 && train.maxMemberSpeed() <= .001;
+        boolean serviceAvailable = false;
+        boolean positionKnown = train.trackPath() != null
+                && train.trackPath().activeLeaderTrackPosition(train.reversed) != null;
+        boolean mayDemand = false;
+        String authorityReason = "STALE";
+        if (driver && stopped && train.operatingMode == OperatingMode.SB
+                && train.reverser != Reverser.NEUTRAL && plugin.telemetrySink() != null) {
+            var stcs = Bukkit.getPluginManager().getPlugin("STCS");
+            if (stcs != null && stcs.isEnabled()) {
+                var view = plugin.telemetrySink().cabAuthority(train.id(),
+                        plugin.driverDesks().stream().filter(d -> d.trainId().equals(train.id())
+                                && d.driverId().equals(player.getUniqueId()))
+                                .map(DriverDeskSnapshot::leaseId).findFirst().orElse(null),
+                        System.currentTimeMillis());
+                serviceAvailable = view.live();
+                authorityReason = view.reason();
+                if (Set.of("POSITION_UNCERTAIN", "OUTSIDE_COVERAGE", "AWAITING_COVERAGE",
+                        "GRAPH_GAP", "FLEET_UNCERTAIN", "UNLOCATED").contains(authorityReason))
+                    positionKnown = false;
+                mayDemand = serviceAvailable && positionKnown && player.hasPermission("stcs.ma")
+                        && view.remainingMeters() == null
+                        && Set.of("IDLE", "RELEASED", "NO_DRIVER", "LEASE_CHANGED", "CHANNEL_CHANGED")
+                                .contains(view.reason());
+            }
+        }
+        var state = new DriverGuide.State(train.properties().conductionMode == ConductionMode.MANUAL,
+                stopped, driver, manager.driverName(train) != null && !driver,
+                train.reverser, train.operatingMode, train.protectionMode,
+                player.getUniqueId().equals(train.lastManualDriver), serviceAvailable,
+                positionKnown, mayDemand, authorityReason, train.emergencyBrake);
+        long repeat = Math.max(15, Math.min(600,
+                plugin.getConfig().getLong("settings.driver-guide-repeat-seconds", 60))) * 1000L;
+        DriverGuide.Hint hint = session.guide().next(state, System.currentTimeMillis(), repeat);
+        if (hint == DriverGuide.Hint.NONE) return;
+        UiLanguage language = ui.language(player);
+        DriverGuideLexicon lexicon = plugin.driverGuideLexicon();
+        Component message = Component.text("[" + lexicon.name(language) + "] ", NamedTextColor.GOLD)
+                .append(Component.text(lexicon.phrase(hint, language), NamedTextColor.WHITE));
+        if (hint == DriverGuide.Hint.REVERSER) {
+            message = message.append(Component.text(" 👉 ", NamedTextColor.WHITE))
+                    .append(guideAction(lexicon, language, DriverGuideLexicon.Action.FORWARD, "/st forward"))
+                    .append(Component.text(" / ", NamedTextColor.GRAY))
+                    .append(guideAction(lexicon, language, DriverGuideLexicon.Action.BACKWARD, "/st backward"));
+        } else {
+            DriverGuideLexicon.Action action = switch (hint) {
+                case CLAIM, RECLAIM -> DriverGuideLexicon.Action.CLAIM;
+                case DEMAND, SHADOW_DEMAND -> DriverGuideLexicon.Action.DEMAND;
+                case ACK_TRIP -> DriverGuideLexicon.Action.ACK;
+                case RELEASE_OLD_MA -> DriverGuideLexicon.Action.RELEASE;
+                default -> null;
+            };
+            if (action != null) {
+                String command = switch (action) {
+                    case CLAIM -> "/st drive";
+                    case DEMAND -> "/stcs ma demand";
+                    case ACK -> "/stcs ma ack";
+                    case RELEASE -> "/stcs ma release";
+                    default -> throw new IllegalStateException("Unexpected driver guide action");
+                };
+                message = message.append(Component.text(" 👉 ", NamedTextColor.WHITE))
+                        .append(guideAction(lexicon, language, action, command));
+            }
+        }
+        player.sendMessage(message);
+    }
+
+    private Component guideAction(DriverGuideLexicon lexicon, UiLanguage language,
+            DriverGuideLexicon.Action action, String command) {
+        return Component.text("[" + lexicon.action(action, language) + " " + command + "]", NamedTextColor.AQUA)
+                .decorate(TextDecoration.BOLD).clickEvent(ClickEvent.runCommand(command));
     }
 
     private void renderSidebar(CabSession session, Player player, Train train) {
@@ -1068,6 +1148,6 @@ final class CabUiManager implements Listener {
     }
 
     private record CabSession(UUID playerId, UUID trainId, CabSidebar sidebar, Inventory inventory, MaBossBar maBar,
-            ShadowSpeedNotice speedNotice, AtpDriverFeedback atpFeedback) {
+            ShadowSpeedNotice speedNotice, AtpDriverFeedback atpFeedback, DriverGuide guide) {
     }
 }

@@ -1,0 +1,10 @@
+remote:
+  # STA Remote/1 is a TLS-only, line-delimited JSON control channel. Disabled until configured.
+  enabled: false
+  bind-address: 127.0.0.1
+  port: 8766
+  # Relative to plugins/SkyworldTrainAPI/. PKCS#12 private keys must never be committed.
+  keystore: remote-server.p12
+  keystore-password-env: SKYRAIL_STA_KEYSTORE_PASSWORD
+  # SHA-256 hex digests of independently generated, 32+ character administrator tokens.
+  admins: {}

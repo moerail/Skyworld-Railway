@@ -35,6 +35,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
     private final Path file;
     private ScheduledTask task;
     private final MaSettings settings;
+    private final DynamicSwitchLock dynamicLock;
     private ShadowGraph model;
     private long sequence;
     private String persisted="";
@@ -95,6 +96,9 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                 + ", point-lock eligibility=" + settings.lockDistanceMeters()
                 + ", max-authority=" + settings.maxAuthorityDistanceMeters() + ", margin=" + settings.marginMeters()
                 + "; no ATP or physical point interlocking.");
+        plugin.getLogger().info("FS dynamic point eligibility: enabled=" + dynamicLock.enabled()
+                + ", lead-seconds=" + dynamicLock.leadSeconds() + ", deceleration-mps2=" + dynamicLock.decelerationMps2()
+                + ", buffer-metres=" + dynamicLock.bufferMeters() + "; search and MA caps still apply.");
         if (plugin.getConfig().contains("ma.horizon-meters", true))
             plugin.getLogger().info("Legacy ma.horizon-meters supplies missing distance settings; explicit new keys take priority.");
         var services=plugin.getServer().getServicesManager();
@@ -139,6 +143,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
             java.util.function.Supplier<Inputs> source, PointControl control) throws java.io.IOException {
         this.plugin=plugin;this.manager=manager;this.file=file;this.inputSource=source;this.pointControl=control;
         this.settings=Objects.requireNonNull(settings);
+        this.dynamicLock=plugin==null?DynamicSwitchLock.DEFAULT:DynamicSwitchLock.load(plugin.getConfig());
         retained.putAll(ShadowOccupancyStore.load(file));
         retained.forEach((id,record)->{occupied.put(id,record.resources());uncertain.add(id);});
         latest=new ShadowAuthorityService.Snapshot(5,true,false,session,0,System.currentTimeMillis(),0,"STARTING",List.of(),List.of());
@@ -481,7 +486,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                     obstacles.addAll(pendingCrossings);
                     occupied.forEach((other,rs)->{if(!other.equals(id))obstacles.addAll(rs);});
                     reserved.forEach((other,rs)->{if(!other.equals(id))obstacles.addAll(rs);});
-                    MaSettings routeSettings=settings;
+                    MaSettings routeSettings=dynamicLock.forSpeed(settings,m.physical().state().speedMetersPerSecond());
                     if(!intent.mode().equals("FS")) {
                         double distance=setting(intent.mode().equals("SH")
                                 ? "ma.sh.look-ahead-meters" : "ma.sr.max-distance-meters",120,10,10000);

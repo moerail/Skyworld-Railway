@@ -31,6 +31,10 @@ public final class TrainDisplayConnectionTest {
         drain(channel);
         var first = frame(train, world, a, b, now, 0.4, false);
         sync.frames.put(train, first);
+        var visual = sync.visualPose(a).orElseThrow();
+        check(visual.memberId().equals(a) && visual.worldId().equals(world)
+                && Math.abs(visual.x() - first.carts().getFirst().x()) < 1e-9,
+                "public member pose must match the client display frame");
         connection.pulse(now);
         List<Object> out = drain(channel);
         check(out.size() == 1 && out.getFirst() instanceof ClientboundBundlePacket, "whole train must use one bundle");

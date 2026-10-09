@@ -1,5 +1,9 @@
 # Manuel de conduite SkyRail
 
+## Mise à jour : STF 4.0.5 / STCS 4.1.0
+
+STA est en version 2.1.1 et SkyPCC en 2.0.1. Le mainteneur confirme les essais STCS 4.1.0. Kuri-chan guide les conducteurs manuels à l'arrêt dans leur langue et explique les attentes de localisation, MA et SR ; les phrases modifiables ne commandent jamais le train. En FS, la vitesse augmente la portée de vérification des aiguilles, mais seule une MA valide permet de circuler. Conflits, états inconnus et plafonds restent applicables. L'ancienne base ci-dessous est historique. [Versions](../../README.fr.md).
+
 [中文](README.zh.md) | [English](README.en.md) | [Français](README.fr.md) | [日本語](README.ja.md) · [Accueil du projet](../../README.md)
 
 Pour les joueurs à bord d'un train manuel. Versions : STF/STCS 4.0.2, STA/SkyPCC 2.0.0. La création des trains, les voies et la configuration relèvent des administrateurs.

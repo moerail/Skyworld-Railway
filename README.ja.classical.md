@@ -1,5 +1,13 @@
 # SkyRail Suite 鐵道運轉試驗規程
 
+## STCS 四・一・〇版　追補告示
+
+二〇二六年十月九日、管理者ヨリ STCS 四・一・〇ノ試驗合格報告アリ。現源版ハ STF 四・〇・五、STA 二・一・一、SkyPCC 二・〇・一ヲ併載ス。各組件ノ實服驗收ハ別ニ扱フ。
+
+FS 分岐器確保範圍ハ `max(ma.lock-distance-meters, v²/(2a) + v × lead-seconds + buffer-meters)` トス。v ハ米毎秒、既定減速度一米毎秒毎秒、先行五秒、餘裕二十五米ナリ。`ma.dynamic-lock.enabled: false` ニテ固定範圍ニ復ス。探索 `ma.look-ahead-meters` 六百米及ビ MA 上限 `ma.max-authority-distance-meters` 三百米ハ各々ノ設定上限トシ、動的範圍モ一萬米ヲ超エズ。SH/SR ノ規則ハ變更セズ。不明分岐器・占有競合・全編成出清ノ照合ヲ省略セザルモノトス。
+
+RailGraph 第四構造版ハ直線路ヲ壓縮シ、曲線及ビ勾配ノ形狀ヲ保持ス。舊圖ハ置換前ニ備份ス。STF ハ四言語案内詞庫、坡道起動及ビ表示修正、STA ハ TLS 桌上指令臺、SkyPCC ハ Bearer 認證遠隔操作ヲ備フ。[STCS 更新](doc/releases/stcs-v4.1.0-railgraph-storage.md)・[司機案内](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md)・[指令臺](STA/tools/README.md)・[SkyPCC](doc/releases/skypcc-v2.0.1.md)。以下ノ舊版告示ハ履歷トス。
+
 第四・〇・二版附記：制限速度四十粁毎時以下ニ於テハ、五粁手前ニ警報ヲ發シ、八粁下ニ解除ス。超速警報及ビ制動規則ハ變更セズ。臺帳入出力障害ノ後、管理者ハ `/stcs admin ma restart` ニテ復舊ヲ試ミ得ルモ、占有ヲ消去セズ、制動ヲ緩解セズ。運轉士ハ MA ヲ再要求スベシ。
 
 ## M3 手動列車保護　追補告示
