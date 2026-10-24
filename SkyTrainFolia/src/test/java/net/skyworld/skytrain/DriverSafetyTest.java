@@ -17,6 +17,25 @@ public final class DriverSafetyTest {
         assert DriverSafety.sameSession(firstRide, firstRide);
         assert !DriverSafety.sameSession(firstRide, secondRide) : "Old retirement callback must not revoke a new ride";
         assert !DriverSafety.sameSession(firstRide, null) : "Duplicate callback cannot revoke twice";
+        for (OperatingMode previous : OperatingMode.values()) {
+            var handedOver = new Train(UUID.randomUUID(), "handover", .4, 1, 1.1);
+            UUID oldLease = UUID.randomUUID(), controlSession = UUID.randomUUID();
+            handedOver.activeAtp.evaluate(new OperationalPermission(UUID.randomUUID(), oldLease,
+                    controlSession, "FS", 100, 20, 2, "VALID"), oldLease, OperatingMode.SB,
+                    true, false, "FORWARD", 0, 7, 1000,
+                    new ActiveAtpState.Settings(1, 5, 5 / 3.6, 1, 1, 10 / 3.6, 10000, 5000));
+            handedOver.operatingMode = previous;
+            handedOver.activeAtpLimitMps = 20.; handedOver.activeAtpBrakeLevel = 7;
+            handedOver.seedCurrentSpeed(.4);
+            DriverSafety.revokeAuthority(handedOver);
+            assert handedOver.operatingMode == OperatingMode.SB : "Driver loss must reset " + previous;
+            assert handedOver.activeAtp.remainingMeters() == null : "Old MA must not survive driver loss";
+            assert handedOver.activeAtpLimitMps == null && handedOver.activeAtpBrakeLevel == 0;
+            assert handedOver.driverEmergencyHold && handedOver.emergencyBrake && handedOver.powerNotch == 0;
+            assert handedOver.currentSpeed() == .4 : "Returning to SB must still brake through physics";
+            DriverSafety.revokeAuthority(handedOver);
+            assert handedOver.operatingMode == OperatingMode.SB : "Repeated driver loss is harmless";
+        }
         var train = new Train(UUID.randomUUID(), "driver-loss", .4, 1, 1.1);
         train.seedCurrentSpeed(.4); train.powerNotch = 4; train.brakeNotch = 0;
         train.pauseUntilMillis = Long.MAX_VALUE;

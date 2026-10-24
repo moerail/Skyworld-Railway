@@ -15,6 +15,7 @@ public final class ShadowRuntimeTest {
     static boolean hasDriver=true,available=true,reverse=false,stale=false;
     static String mode="SHADOW";
     static TrainMode trainMode=TrainMode.MANUAL;
+    static double speed=0;
     static ConsistObservation.State memberState=ConsistObservation.State.OBSERVED;
     static TrainIntegrity completeIntegrity(List<UUID> members,long at) {
         return new TrainIntegrity(TrainIntegrity.State.COMPLETE,"CONFIRMED",at,at,members,List.of(),false);
@@ -23,10 +24,15 @@ public final class ShadowRuntimeTest {
         long now=System.currentTimeMillis(),at=now-(stale?10000:0);
         var desk=new DriverDeskService.Desk(train,driver,lease,mode);
         var observation=new ConsistObservation(session,1,train,"T",at,List.of(member),List.of(
-                new ConsistObservation.Member(member,"world",20.5,64.06,.5,at,at,memberState)),false,completeIntegrity(List.of(member),at));
-        var physical=new TrainTelemetrySnapshot(train,"T",1,at,"world",20,64,0,20.5,64.06,.5,1,0,0,
-                0,1,1,false,reverse,trainMode,"Name is not a lease");
-        var position=new TrackPositionSnapshot(graph.revision,"a-b","a","b",20.,100.,"L",20.,at,true,false);
+                new ConsistObservation.Member(member,"world",20.5,64.06,.5,at,at,memberState)),false,
+                memberState==ConsistObservation.State.OBSERVED?completeIntegrity(List.of(member),at)
+                        :new TrainIntegrity(TrainIntegrity.State.UNKNOWN,"MEMBER_UNAVAILABLE",at,0,
+                                List.of(member),List.of(member),true));
+        var physical=new TrainTelemetrySnapshot(train,"T",1,at,"world",20,64,0,20.5,64.06,.5,reverse?-1:1,0,0,
+                speed,1,1,false,reverse,trainMode,"Name is not a lease");
+        boolean reverseEdge=reverse && graph.edges.stream().anyMatch(e -> e.id().equals("b-a"));
+        var position=new TrackPositionSnapshot(graph.revision,reverseEdge?"b-a":"a-b",
+                reverseEdge?"b":"a",reverseEdge?"a":"b",reverseEdge?80.:20.,100.,"L",20.,at,true,false);
         var message=new StaMessage(new StaMessage.Header(StaMessage.VERSION,StaMessage.Kind.TRACK_REPORT,StaMessage.Source.STCS,
                 session,2,now,train),new StaMessage.Physical(physical,1),new StaMessage.Tracking(session,1,at,now,15000,60000,
                 graph.revision,StaMessage.Quality.VALID,position,"test"));
@@ -120,6 +126,33 @@ public final class ShadowRuntimeTest {
                     assert !runtime.acknowledgeGrant(train,UUID.randomUUID(),grant.id(),graph.revision);
                     assert runtime.acknowledgeGrant(train,lease,grant.id(),graph.revision);
                     assert !runtime.acknowledgeGrant(train,lease,grant.id(),graph.revision+1);
+                    speed=2;hasDriver=false;runtime.tick();
+                    assert runtime.operationalSnapshot().grants().isEmpty() : "Dismount revokes the executable MA";
+                    assert !runtime.acknowledgeGrant(train,lease,grant.id(),graph.revision)
+                            : "A revoked MA cannot be acknowledged by the old driver";
+                    assert runtime.snapshot().sections().stream().anyMatch(s -> s.reservations().contains(train))
+                            : "Forward protection is retained while braking";
+                    hasDriver=true;lease=UUID.randomUUID();
+                    assert runtime.command(driver,"sr").equals("DRIVER_RELEASE_PENDING")
+                            : "Reboarding cannot inherit or replace an MA while the old protection is pending";
+                    speed=0;memberState=ConsistObservation.State.UNLOADED;runtime.tick();
+                    assert runtime.snapshot().sections().stream().anyMatch(s -> s.reservations().contains(train))
+                            : "Unknown integrity cannot clear forward protection";
+                    memberState=ConsistObservation.State.OBSERVED;runtime.tick();
+                    assert runtime.snapshot().sections().stream().allMatch(s -> s.reservations().isEmpty());
+                    assert runtime.snapshot().sections().stream().anyMatch(s -> s.occupants().contains(train))
+                            : "Automatic release never clears body occupancy";
+                    assert runtime.operationalSnapshot().grants().isEmpty() : "Reboarding requires a new request";
+                    assert runtime.command(driver,"sr").equals("SR_PENDING") : "Next driver needs no manual release";
+                    runtime.command(driver,"release");
+                    runtime.command(driver,"request");
+                    grant=runtime.operationalSnapshot().grants().getFirst();
+                    lease=UUID.randomUUID();runtime.tick();
+                    assert runtime.operationalSnapshot().grants().isEmpty() : "Direct lease replacement revokes MA";
+                    assert !runtime.acknowledgeGrant(train,grant.driverLeaseId(),grant.id(),graph.revision);
+                    assert runtime.command(driver,"sr").equals("SR_PENDING") : "No stale FS grant may cause RELEASE_FIRST";
+                    runtime.command(driver,"release");
+                    runtime.command(driver,"request");
                     runtime.revokeForChannelChange(train);
                     assert runtime.operationalSnapshot().grants().isEmpty()
                             : "old executable grant must disappear immediately";
@@ -151,6 +184,53 @@ public final class ShadowRuntimeTest {
                             : "active MA loss must warn once, not every poll: " + activeEvents;
                     available=true;
                 }
+                var shLeft=ShadowPlannerTest.node("left","end",-100,0);
+                var shA=ShadowPlannerTest.node("a","balise",0,0);
+                var shB=ShadowPlannerTest.node("b","balise",100,0);
+                var shRight=ShadowPlannerTest.node("right","end",200,0);
+                graph=ShadowPlannerTest.graph(List.of(shLeft,shA,shB,shRight),List.of(
+                        ShadowPlannerTest.edge(shLeft,shA,"east","west"),
+                        ShadowPlannerTest.edge(shA,shLeft,"west","east"),
+                        ShadowPlannerTest.edge(shA,shB,"east","west"),
+                        ShadowPlannerTest.edge(shB,shA,"west","east"),
+                        ShadowPlannerTest.edge(shB,shRight,"east","west"),
+                        ShadowPlannerTest.edge(shRight,shB,"west","east"))).graph;
+                Path shFile=activeDir.resolve("sh.json");
+                try(var runtime=new ShadowRuntime(null,null,shFile,600,2,
+                        ShadowRuntimeTest::input,r->CompletableFuture.completedFuture("COMPLETED"))) {
+                    assert runtime.command(driver,"sh").equals("REQUESTED_ACTIVE");
+                    var forwardGrant=runtime.operationalSnapshot().grants().getFirst();
+                    assert forwardGrant.path().getFirst().edgeId().equals("a-b");
+                    assert runtime.acknowledgeGrant(train,lease,forwardGrant.id(),graph.revision);
+                    reverse=true;runtime.tick();
+                    var reverseGrant=runtime.operationalSnapshot().grants().getFirst();
+                    assert reverseGrant.mode().equals("SH") && reverseGrant.executable();
+                    assert !reverseGrant.id().equals(forwardGrant.id());
+                    assert reverseGrant.path().getFirst().edgeId().equals("b-a")
+                            && reverseGrant.remainingMeters()==118 : "SH automatically replans with the existing 2 m margin: "+reverseGrant;
+                    assert runtime.snapshot().sections().stream().anyMatch(s -> s.edgeId().equals("b-right")
+                            && s.reservations().contains(train)) : "Retain previous forward reservation until receipt";
+                    assert runtime.acknowledgeGrant(train,lease,reverseGrant.id(),graph.revision);
+                    runtime.tick();
+                    assert runtime.snapshot().sections().stream().noneMatch(s -> s.edgeId().equals("b-right")
+                            && s.reservations().contains(train)) : "Receipt releases obsolete forward reservations";
+                    reverse=false;runtime.tick();
+                    assert runtime.operationalSnapshot().grants().getFirst().path().getFirst().edgeId().equals("a-b")
+                            : "Repeated stopped SH reversal needs no command";
+                    reverse=true;speed=1;runtime.tick();
+                    assert runtime.operationalSnapshot().grants().isEmpty()
+                            && authority(runtime).reason().equals("DIRECTION_CHANGED")
+                            : "SH must not accept an in-motion reversal";
+                    speed=0;runtime.tick();assert runtime.operationalSnapshot().grants().isEmpty();
+                    runtime.command(driver,"sh");
+                    memberState=ConsistObservation.State.PLAYER_QUIT;runtime.tick();
+                    memberState=ConsistObservation.State.OBSERVED;runtime.tick();
+                    assert runtime.operationalSnapshot().grants().isEmpty()
+                            : "SH exception must not revive a demand cancelled by integrity loss";
+                } finally {
+                    speed=0;reverse=false;memberState=ConsistObservation.State.OBSERVED;
+                    Files.deleteIfExists(shFile);Files.deleteIfExists(shFile.resolveSibling("sh.json.tmp"));
+                }
                 var srA=ShadowPlannerTest.node("a","balise",0,0);
                 var srB=ShadowPlannerTest.node("b","balise",100,0);
                 var srC=ShadowPlannerTest.node("c","balise",200,0);
@@ -168,9 +248,14 @@ public final class ShadowRuntimeTest {
                     assert granted.size()==1 && granted.getFirst().mode().equals("SR")
                             && granted.getFirst().remainingMeters()>0 && granted.getFirst().remainingMeters()<=120
                             : "Distant SR target needs a short, locally verified initial MA: "+granted;
+                    reverse=true;runtime.tick();
+                    assert runtime.operationalSnapshot().grants().isEmpty()
+                            && authority(runtime).reason().equals("DIRECTION_CHANGED")
+                            : "SR direction change still requires a new request and approval";
+                    reverse=false;
                 } finally {Files.deleteIfExists(srFile);Files.deleteIfExists(srFile.resolveSibling("sr.json.tmp"));}
             } finally {Files.deleteIfExists(activeFile);Files.deleteIfExists(activeFile.resolveSibling("shadow.json.tmp"));Files.deleteIfExists(activeDir);}
         } finally {Files.deleteIfExists(file);Files.deleteIfExists(file.resolveSibling("shadow.json.tmp"));Files.deleteIfExists(dir);}
-        System.out.println("PASS driver lease, stopped request, loss/reacquire, release, modes, stale/quit/rebuild and restart retention");
+        System.out.println("PASS driver lease, stopped SH reversal/receipt, FS/SR direction gates, loss/reacquire, release, stale/quit/rebuild and restart retention");
     }
 }

@@ -36,6 +36,30 @@ public final class StaOperationalIntegrationTest {
                 3, "AVAILABLE", List.of(nonExecutable), List.of());
         assert !StaOperationalIntegration.select(pending, train, lease, 3, 1100,
                 session, List.of(source), false, "FORWARD").available();
+        var shGrant = new OperationalAuthorityService.Grant(UUID.randomUUID(), train, lease, session,
+                7, "SH", true, 3, "edge", 31, 30, 40, List.of(segment), 1003, 1015);
+        var shSnapshot = new OperationalAuthorityService.Snapshot(6, snapshot.session(), 2, 1000,
+                3, "AVAILABLE", List.of(shGrant), List.of());
+        assert StaOperationalIntegration.select(shSnapshot, train, lease, 3, 1100,
+                session, List.of(source), false, "NEUTRAL").available()
+                : "SH neutral handle keeps the same-direction grant";
+        assert !StaOperationalIntegration.select(shSnapshot, train, lease, 3, 1100,
+                session, List.of(source), true, "BACKWARD").available()
+                : "An old forward SH grant cannot authorise reverse travel";
+        var reverseSource = new TrainTelemetrySnapshot(train, "test", 8, 1100, "world", 0, 0, 0,
+                0, 0, 0, -1, 0, 0, 0, 10, 2, false, true, TrainMode.MANUAL, "driver",
+                new TrainTelemetrySnapshot.CabState("ACTIVE", "BACKWARD", 0, 7, false, false));
+        assert !StaOperationalIntegration.select(shSnapshot, train, lease, 3, 1100,
+                session, List.of(source, reverseSource), false, "FORWARD").available()
+                : "A later direction change invalidates old telemetry provenance";
+        var reverseGrant = new OperationalAuthorityService.Grant(UUID.randomUUID(), train, lease, session,
+                8, "SH", true, 3, "reverse-edge", 20, 20, 40,
+                List.of(new OperationalAuthorityService.Segment("reverse-edge", 0, 20)), 1003, 1015);
+        var reverseSnapshot = new OperationalAuthorityService.Snapshot(6, snapshot.session(), 3, 1100,
+                3, "AVAILABLE", List.of(reverseGrant), List.of());
+        assert StaOperationalIntegration.select(reverseSnapshot, train, lease, 3, 1150,
+                session, List.of(source, reverseSource), true, "BACKWARD").available()
+                : "Fresh reverse SH grant resumes without a driver demand";
         System.out.println("STA v6 permission freshness, provenance, lease, direction and executable gate passed");
     }
 }

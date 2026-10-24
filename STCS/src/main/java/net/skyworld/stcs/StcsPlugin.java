@@ -287,7 +287,7 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
                 if (!(sender instanceof Player player) || !sender.hasPermission("stcs.ma")) {
                     send(sender, "&c" + protectionText(sender, "ma.usage")); return true;
                 }
-                if (args.length != 2 || !List.of("demand", "sh", "sr", "release", "ack").contains(args[1].toLowerCase(java.util.Locale.ROOT))) {
+                if (args.length != 2 || !List.of("fs", "demand", "sh", "sr", "release", "ack").contains(args[1].toLowerCase(java.util.Locale.ROOT))) {
                     send(sender, "&e" + protectionText(sender, "ma.usage")); return true;
                 }
                 var driver = player.getUniqueId(); String driverName = player.getName(); String action = args[1].toLowerCase(java.util.Locale.ROOT);
@@ -328,7 +328,7 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
                     return true;
                 }
                 Bukkit.getAsyncScheduler().runNow(this, task -> {
-                    String result = shadow == null ? "UNAVAILABLE" : shadow.command(driver, action.equals("demand") ? "request" : action, driverName);
+                    String result = shadow == null ? "UNAVAILABLE" : shadow.command(driver, action.equals("fs") || action.equals("demand") ? "request" : action, driverName);
                     var diagnostics = shadow == null ? null : shadow.diagnostics();
                     player.getScheduler().run(this, reply -> {
                         if (player.isOnline()) {
@@ -484,8 +484,8 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
         if (args.length == 2 && args[0].equalsIgnoreCase("ma")) return (sender instanceof org.bukkit.command.ConsoleCommandSender
                 ? List.of("status", "clear", "reset-ledger")
                 : sender instanceof Player && hasAdminPermission(sender)
-                ? List.of("demand", "sh", "sr", "ack", "release", "status", "reset-ledger")
-                : List.of("demand", "sh", "sr", "ack", "release")).stream()
+                ? List.of("fs", "sh", "sr", "ack", "release", "status", "reset-ledger")
+                : List.of("fs", "sh", "sr", "ack", "release")).stream()
                 .filter(s -> s.startsWith(args[1].toLowerCase(java.util.Locale.ROOT))).toList();
         if (args.length == 4 && args[0].equalsIgnoreCase("ma") && args[1].equalsIgnoreCase("reset-ledger")
                 && (sender instanceof org.bukkit.command.ConsoleCommandSender

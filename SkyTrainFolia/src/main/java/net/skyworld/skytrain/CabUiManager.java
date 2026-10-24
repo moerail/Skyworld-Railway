@@ -756,7 +756,7 @@ final class CabUiManager implements Listener {
             if (action != null) {
                 String command = switch (action) {
                     case CLAIM -> "/st drive";
-                    case DEMAND -> "/stcs ma demand";
+                    case DEMAND -> "/stcs ma fs";
                     case ACK -> "/stcs ma ack";
                     case RELEASE -> "/stcs ma release";
                     default -> throw new IllegalStateException("Unexpected driver guide action");

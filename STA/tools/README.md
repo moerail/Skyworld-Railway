@@ -2,9 +2,9 @@
 
 ## 当前源码版本 — 2026-10-09
 
-当前为 **STA/桌面调度台 2.1.4、STF 4.0.8、STCS 4.1.0、SkyPCC 2.0.3**。保留原 TLS 证书、管理员令牌及连接配置；桌面安装方式仍可沿用下方步骤，构建包名使用 2.1.4。STCS 4.1.0 新增动态 FS 道岔锁定和 RailGraph v4 存储，网络图接口仍提供完整路径。新组合保留 TIMS 完整性检查、停车转岔握手和调度撤销 MA。[STCS 更新](../../doc/releases/stcs-v4.1.0-railgraph-storage.md) · [完整性监测说明](../../doc/releases/suite-v4.0.8.md)。下方 2.1.3 版本说明作为历史记录与配置参考。
+当前为 **STA/桌面调度台 2.1.4、STF 4.0.8、STCS 4.1.0、SkyPCC 2.0.3**。保留原 TLS 证书、管理员令牌及连接配置；桌面安装方式仍可沿用下方步骤，构建包名使用 2.1.4。STCS 4.1.0 新增动态 FS 道岔锁定和 RailGraph v4 存储，网络图接口仍提供完整路径。新组合保留 TIMS 完整性检查、停车转岔握手和调度撤销 MA。[STCS 更新](../../Common/doc/releases/stcs-v4.1.0-railgraph-storage.md) · [完整性监测说明](../../Common/doc/releases/suite-v4.0.8.md)。下方 2.1.3 版本说明作为历史记录与配置参考。
 
-本次小版本为 **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**，Python 调度台为 **2.1.3**。停车后，调度转岔会先取得车端停车保持确认，再释放相关 MA 预约、转岔并重算 MA，司机无需先 release。网页和 Python 均新增“撤销所选列车 MA → TR”：手动列车运行或停车都进入 TR 并制动；运行中的旧预约保留到全列确认停稳，车身占用始终保留。影子通道也执行此项主动调度停车命令。司机停稳后执行 `/stcs ma ack`、`/stcs ma release`，再重新申请 MA。失败／超时不代表撤销完成。需配套更新已安装插件并刷新客户端，保留原证书和令牌；实服验收待完成。 [更新说明](../../doc/releases/suite-v4.0.7.md)
+本次小版本为 **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**，Python 调度台为 **2.1.3**。停车后，调度转岔会先取得车端停车保持确认，再释放相关 MA 预约、转岔并重算 MA，司机无需先 release。网页和 Python 均新增“撤销所选列车 MA → TR”：手动列车运行或停车都进入 TR 并制动；运行中的旧预约保留到全列确认停稳，车身占用始终保留。影子通道也执行此项主动调度停车命令。司机停稳后执行 `/stcs ma ack`、`/stcs ma release`，再重新申请 MA。失败／超时不代表撤销完成。需配套更新已安装插件并刷新客户端，保留原证书和令牌；实服验收待完成。 [更新说明](../../Common/doc/releases/suite-v4.0.7.md)
 
 适用于 STA 2.1.3 桌面调度台、Windows 服务端和 `run.bat` 启动方式。下面以服务端目录 `D:\Skyworld\Skyworld\2-MainServer` 为例；如果你的目录不同，请替换为实际路径。
 
@@ -290,4 +290,4 @@ IP 改变时更新客户端 JSON 的 `host`。端口改变时还需停服修改�
 
 本次工具已通过调度台单元与界面测试、PYZ 打包启动检查，以及临时 Windows 服务端目录中的配置、备份、证书指纹、启动退出码和重复执行保护检查。正式网络连通性及实际调度操作需在自己的服务端验证。
 
-更多背景：[STA 一键配置说明](../../doc/STA-REMOTE-ONE-CLICK.md)、[STA 2.1.2 调度台说明](../../doc/releases/sta-v2.1.2-dispatcher-map.md)。
+更多背景：[STA 一键配置说明](../../Common/doc/STA-REMOTE-ONE-CLICK.md)、[STA 2.1.2 调度台说明](../../Common/doc/releases/sta-v2.1.2-dispatcher-map.md)。

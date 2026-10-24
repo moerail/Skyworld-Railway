@@ -28,11 +28,14 @@ final class StaOperationalIntegration {
         if (source == null || !source.trainId().equals(train) || source.mode() != TrainMode.MANUAL
                 || now < source.observedAtMillis() || now - source.observedAtMillis() > 1500)
             return OperationalPermission.unavailable("SOURCE_UNAVAILABLE", graphRevision, controlSession);
+        boolean shunting=grant.mode().equals("SH");
+        // SH may pass through neutral without a new demand. Actual travel-direction
+        // changes still require a fresh grant based on telemetry in that direction.
         if (source.reversed() != reversed || source.cab() == null
-                || !source.cab().reverser().equals(reverser)
+                || (!shunting && !source.cab().reverser().equals(reverser))
                 || history.stream().anyMatch(s -> s.sequence() > source.sequence()
                         && (s.reversed() != reversed || !s.world().equals(source.world())
-                            || s.cab() == null || !s.cab().reverser().equals(reverser))))
+                            || s.cab() == null || (!shunting && !s.cab().reverser().equals(reverser)))))
             return OperationalPermission.unavailable("DIRECTION_CHANGED", graphRevision, controlSession);
         if (grant.path().isEmpty() || !grant.path().getLast().edgeId().equals(grant.eoaEdgeId())
                 || grant.ceilingKmh() <= 0 || !Double.isFinite(grant.remainingMeters()))

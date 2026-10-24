@@ -20,6 +20,14 @@ final class DriverSafety {
         train.manualReleaseConfirmed = false;
         maintainBrake(train);
     }
+    static void revokeAuthority(Train train) {
+        brake(train);
+        train.operatingMode = OperatingMode.SB;
+        train.activeAtp.clear();
+        train.activeAtpLimitMps = null;
+        train.activeAtpBrakeLevel = 0;
+        train.activeAtpReason = "NO_DRIVER";
+    }
     static void maintainBrake(Train train) {
         train.automaticRun = null;
         train.driveControlEnabled = true;

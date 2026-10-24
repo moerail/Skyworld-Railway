@@ -28,7 +28,7 @@ public final class SuiteCommandUiTest {
                 }
                 assert all.stream().anyMatch(s -> s.contains("version"));
                 if (root.equals("st")) assert all.stream().anyMatch(s -> s.contains("syncstatus"));
-                if (root.equals("stcs")) assert all.stream().anyMatch(s -> s.contains("ma demand|release"));
+                if (root.equals("stcs")) assert all.stream().anyMatch(s -> s.contains("ma fs|release"));
             }
         }
         assert SuiteCommandUi.normalize("jp").equals("ja");

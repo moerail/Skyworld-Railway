@@ -7,7 +7,7 @@ import zipapp
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DESTINATION = ROOT / "dist" / "SkyRail-Dispatcher-2.1.4.pyz"
+DESTINATION = ROOT / "Common" / "dist" / "SkyRail-Dispatcher-2.1.4.pyz"
 SOURCES = (
     ROOT / "STA" / "tools" / "sta_dispatcher.py",
     ROOT / "STA" / "tools" / "dispatcher_profile.py",
@@ -16,13 +16,14 @@ SOURCES = (
     ROOT / "STCS" / "tools" / "testbench" / "railgraph_simulation.py",
     ROOT / "STCS" / "tools" / "testbench" / "railgraph_geometry.py",
     ROOT / "STCS" / "tools" / "testbench" / "solver.py",
-    ROOT / "LICENSE",
+    ROOT / "Common" / "LICENSE",
 )
 
 
 def main():
     DESTINATION.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=ROOT / "target") as temporary:
+    (ROOT / "Common" / "target").mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=ROOT / "Common" / "target") as temporary:
         stage = Path(temporary)
         for source in SOURCES:
             shutil.copy2(source, stage / source.name)

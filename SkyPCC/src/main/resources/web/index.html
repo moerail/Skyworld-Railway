@@ -30,6 +30,9 @@
       </div>
       <label class="field-label" for="lineFilter" data-i18n="Line">Line</label>
       <select id="lineFilter"><option value="" data-i18n="All lines">All lines</option></select>
+      <label class="field-label" for="areaFilter" data-i18n="Station area">Station area</label>
+      <select id="areaFilter"><option value="" data-i18n="Hide station areas">Hide station areas</option></select>
+      <p id="areaStatus" class="area-status" role="status"></p>
       <div class="section-title"><span data-i18n="Rolling stock">Rolling stock</span><span id="activeCount">0 active</span></div>
       <div id="trainList" class="train-list"></div>
       <div id="srControls" class="sr-controls" hidden>
@@ -41,6 +44,7 @@
     <section class="map-shell" aria-label="Live railway map" data-i18n-aria="Live railway map">
       <svg id="railMap" role="img" aria-label="STCS RailGraph with live train positions" data-i18n-aria="STCS RailGraph with live train positions">
         <g id="edgeLayer"></g>
+        <g id="areaLayer"></g>
         <g id="switchLayer"></g>
         <g id="nodeLayer"></g>
         <g id="labelLayer"></g>

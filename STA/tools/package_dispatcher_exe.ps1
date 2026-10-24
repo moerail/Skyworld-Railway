@@ -7,8 +7,8 @@ $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $arguments = @()
 if ($Python -eq 'py') { $arguments += $PythonVersion }
-$buildDirectory = Join-Path $root 'target\pyinstaller-build'
-$specDirectory = Join-Path $root 'target\pyinstaller-spec'
+$buildDirectory = Join-Path $root 'Common\target\pyinstaller-build'
+$specDirectory = Join-Path $root 'Common\target\pyinstaller-spec'
 New-Item -ItemType Directory -Force -Path $buildDirectory, $specDirectory | Out-Null
 
 & $Python @arguments -c 'import tkinter as tk; root = tk.Tk(); root.withdraw(); root.destroy()'
@@ -20,7 +20,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Install PyInstaller in this Python first: py -
 & $Python @arguments -m PyInstaller `
     --noconfirm --onefile --windowed `
     --name 'SkyRail-Dispatcher-2.1.4' `
-    --distpath (Join-Path $root 'dist') `
+    --distpath (Join-Path $root 'Common\dist') `
     --workpath $buildDirectory `
     --specpath $specDirectory `
     --paths (Join-Path $root 'STA\tools') `
@@ -28,4 +28,4 @@ if ($LASTEXITCODE -ne 0) { throw 'Install PyInstaller in this Python first: py -
     (Join-Path $root 'STA\tools\sta_dispatcher.py')
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller packaging failed.' }
 
-Write-Host "Built $(Join-Path $root 'dist\SkyRail-Dispatcher-2.1.4.exe')"
+Write-Host "Built $(Join-Path $root 'Common\dist\SkyRail-Dispatcher-2.1.4.exe')"

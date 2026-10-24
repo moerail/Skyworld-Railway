@@ -56,6 +56,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
     private final Map<UUID,RevokeJob> revokeJobs=new LinkedHashMap<>();
     java.util.function.Supplier<net.skyworld.sta.api.v6.DispatcherBrakeService> brakeSource=()->null;
     private final Set<UUID> warnedLostGrants=new HashSet<>();
+    private final Set<UUID> driverReleases=new HashSet<>();
     private volatile Diagnostics diagnostics;
     private final NodePassageMonitor integrity = new NodePassageMonitor();
     private volatile String integrityFailure;
@@ -202,7 +203,9 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
             liveGrants.remove(train);
             acknowledgedGrants.remove(train);
             warnedLostGrants.remove(train);
+            driverReleases.remove(train);
         } else if(List.of("request","sh","sr").contains(action)) {
+            if(driverReleases.contains(train)) return "DRIVER_RELEASE_PENDING";
             if(dispatcherSuspended.containsKey(train)) return "DISPATCHER_HOLD";
             if(Set.of("ISOLATED","RECOVERING").contains(desk.atpMode())) return desk.atpMode();
             if(!action.equals("request") && report.physical().state().speedMetersPerSecond() > .05) return "STOP_FIRST";
@@ -526,11 +529,27 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                         && cells.contains(model.resource.get(edge.id()))) pendingCrossings.add(model.resource.get(edge.id()));
             }
             Set<UUID> trainIds=new LinkedHashSet<>(intents.keySet());trainIds.addAll(occupied.keySet());
+            trainIds.addAll(driverReleases);
             for(UUID id:trainIds) {
                 var m=reports.get(id);var desk=drivers.get(id);var intent=intents.get(id);
                 String reason=reasons.getOrDefault(id,"IDLE");
                 boolean eligible=intent!=null;
                 var consist=observed.get(id);
+                var previousGrant=liveGrants.get(id);
+                boolean driverLost=intent!=null && (desk==null || !intent.lease().equals(desk.leaseId())
+                        || !intent.driver().equals(desk.driverId()) || !intent.provider().equals(input.driverSession()));
+                driverLost |= previousGrant!=null && (desk==null || !previousGrant.driverLeaseId().equals(desk.leaseId()));
+                if(available && driverLost) {
+                    intents.remove(id); liveGrants.remove(id); acknowledgedGrants.remove(id);
+                    warnedLostGrants.remove(id); reversed.remove(id); soundTracker.reset(id);
+                    driverReleases.add(id); eligible=false; reason="NO_DRIVER";
+                }
+                // Revoke permission immediately; retain the forward protection until a fresh stop is confirmed.
+                if(driverReleases.contains(id) && consist!=null
+                        && consist.integrity().permitsClearance(consist.expectedMembers(),now)
+                        && stoppedForDispatch(id)) {
+                    reserved.remove(id); maPoints.remove(id); driverReleases.remove(id);
+                }
                 if(consist==null || !consist.integrity().permitsClearance(consist.expectedMembers(),now)) {
                     eligible=false;
                     reason=consist==null?"TIMS_UNAVAILABLE":consist.integrity().state()==TrainIntegrity.State.COMPLETE
@@ -570,9 +589,16 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                     }
                 }
                 boolean located=position!=null;
+                boolean directionChanged=false;
                 if(eligible&&located) {
                     boolean reverse=m.physical().state().reversed();
-                    if(reversed.containsKey(id)&&reversed.get(id)!=reverse) {reason="DIRECTION_CHANGED";intents.remove(id);eligible=false;}
+                    directionChanged=reversed.containsKey(id)&&reversed.get(id)!=reverse;
+                    // SH keeps the driver's demand, not the previous direction's MA.
+                    // Replan against current occupancy/points and retain old reservations until receipt.
+                    if(directionChanged && (!intent.mode().equals("SH")
+                            || m.physical().state().speedMetersPerSecond()>.05)) {
+                        reason="DIRECTION_CHANGED";intents.remove(id);eligible=false;
+                    }
                     reversed.put(id,reverse);
                 }
                 if(eligible&&occupied.getOrDefault(id,Set.of()).isEmpty()) {
@@ -600,7 +626,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                     var old=liveGrants.get(id);
                     boolean granted = result.remaining()!=null && result.remaining()>0 && !result.path().isEmpty();
                     UUID grantId=null;
-                    if(granted) grantId=old!=null && old.mode().equals(intent.mode())
+                    if(granted) grantId=!directionChanged && old!=null && old.mode().equals(intent.mode())
                             && old.driverLeaseId().equals(desk.leaseId())
                             && old.graphRevision()==graph.revision
                             && old.eoaEdgeId().equals(result.edge())
@@ -819,7 +845,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
             intents.keySet().forEach(soundTracker::reset);
             var previousIntents=Map.copyOf(intents);
             intents.clear();reserved.clear();maPoints.clear();liveGrants.clear();
-            acknowledgedGrants.clear();warnedLostGrants.clear();reversed.clear();
+            acknowledgedGrants.clear();warnedLostGrants.clear();reversed.clear();driverReleases.clear();
             pendingPoints.clear();
             switchResults.forEach((id,result) -> result.complete(new Reply(id,"REJECTED","SERVICE_RESTARTED")));
             uncertain.addAll(occupied.keySet());
@@ -848,6 +874,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
         maPoints.remove(id); occupiedPoints.remove(id); uncertain.remove(id);
         dispatcherSuspended.remove(id);dispatcherTripped.remove(id);dispatcherRetainedPoints.remove(id);
         reversed.remove(id); reasons.remove(id); soundTracker.reset(id);
+        driverReleases.remove(id);
     }
 
     synchronized String clearArchived(UUID id, String actor) {

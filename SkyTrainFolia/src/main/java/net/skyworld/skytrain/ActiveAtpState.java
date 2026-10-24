@@ -67,7 +67,8 @@ final class ActiveAtpState {
         } else if (grantId == null || !currentLease.equals(lease)
                 || !controlSession.equals(permission.controlSession())
                 || permission.graphRevision() != graphRevision
-                || currentReversed != reversed || !currentReverser.equals(reverser)) {
+                || currentReversed != reversed
+                || (!"SH".equals(mode) && !currentReverser.equals(reverser))) {
             clear();
             return Decision.hold(operating, permission.reason());
         }

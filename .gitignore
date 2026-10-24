@@ -1,4 +1,5 @@
 # Generated files and local dependencies
+Latest/
 target/
 artifacts/
 dist/
@@ -34,4 +35,3 @@ whitelist.json
 usercache.json
 *.pem
 *.key
-

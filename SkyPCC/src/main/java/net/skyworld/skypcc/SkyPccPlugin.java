@@ -12,6 +12,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.skyworld.sta.api.v5.*;
 import net.skyworld.sta.api.v6.OperationalAuthorityService;
+import net.skyworld.sta.api.v7.StationAreaService;
 import net.skyworld.sta.api.v3.RailwayEventService;
 import net.skyworld.sta.api.v3.ConsistObservationService;
 import net.skyworld.sta.api.v5.*;
@@ -36,6 +37,7 @@ public final class SkyPccPlugin extends JavaPlugin {
     private ScheduledTask refreshTask;
     private volatile byte[] graph = bytes("{}"), snapshot = bytes("{}"), messages = bytes("{}");
     private volatile byte[] operationalEvents = bytes("{\"status\":\"UNAVAILABLE\",\"events\":[]}");
+    private volatile byte[] stationAreas = bytes("{\"status\":\"UNAVAILABLE\",\"areas\":[]}");
     private RailwayEventService.History eventHistory;
     private volatile boolean running;
     private final Semaphore streamSlots = new Semaphore(8);
@@ -159,9 +161,17 @@ public final class SkyPccPlugin extends JavaPlugin {
             operationalSource = null; operationalRevision = -1; pendingSrTrains = Set.of();
         }
         operationalMa = bytes(JSON.toJson(activeMa));
+        Object areaReport = Map.of("status", "UNAVAILABLE", "areas", List.of());
+        try {
+            var source = svc.load(StationAreaService.class);
+            var view = source == null || source.areaProtocolVersion() != StationAreaService.VERSION ? null : source.stationAreas();
+            if (view != null && view.status().equals("AVAILABLE") && view.graphRevision() == revision
+                    && now >= view.emittedAtMillis() && now - view.emittedAtMillis() <= 3500) areaReport = view;
+        } catch (RuntimeException | LinkageError ex) { /* Optional read-only SkyCBI provider. */ }
+        stationAreas = bytes(JSON.toJson(areaReport));
         snapshot = bytes(JSON.toJson(Map.of("schemaVersion", 5, "serverTimeMillis", now, "graphRevision", revision,
                 "serviceStatus", status, "trains", trains, "operationalEvents", eventReport,
-                "shadowMa", ma, "operationalMa", activeMa)));
+                "shadowMa", ma, "operationalMa", activeMa, "stationAreas", areaReport)));
         synchronized (update) { generation++; update.notifyAll(); }
     }
     private void handle(HttpExchange x) throws IOException {
@@ -177,6 +187,7 @@ public final class SkyPccPlugin extends JavaPlugin {
             case "/api/v5/railway-events" -> reply(x, 200, "application/json", operationalEvents);
             case "/api/v5/shadow-ma" -> reply(x, 200, "application/json", shadowMa);
             case "/api/v6/operational-ma" -> reply(x, 200, "application/json", operationalMa);
+            case "/api/v7/station-areas" -> reply(x, 200, "application/json", stationAreas);
             case "/api/v5/config" -> reply(x, 200, "application/json", bytes(JSON.toJson(Map.of("updateMode", mode, "pollIntervalMillis", interval, "controlEnabled", controlEnabled))));
             case "/api/v5/events" -> stream(x);
             case "/", "/index.html" -> reply(x, 200, "text/html", assets.get("index.html"));

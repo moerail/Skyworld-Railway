@@ -19,6 +19,9 @@
     selectedSrTrainId: null,
     followTrainId: null,
     lineFilter: '',
+    areaFilter: '',
+    stationAreas: null,
+    areaSignature: '',
     clockOffset: 0,
     view: { x: 0, y: 0, w: 100, h: 100 },
     fitted: false,
@@ -51,6 +54,7 @@
 
   const ui = Object.fromEntries([
     'railMap', 'edgeLayer', 'switchLayer', 'nodeLayer', 'labelLayer', 'trainLayer', 'lineFilter',
+    'areaLayer', 'areaFilter', 'areaStatus',
     'fitButton', 'zoomIn', 'zoomOut', 'fontDecrease', 'fontSizeValue', 'fontIncrease',
     'connectionDot', 'connectionText', 'themeToggle', 'brandLogo',
     'graphRevision', 'trainCount', 'activeCount', 'trainList', 'emptyState',
@@ -127,11 +131,13 @@
     renderPendingSr();
     if (sameTopology) {
       renderSwitchDirections();
+      renderStationAreas();
       return;
     }
     state.bounds = calculateBounds(graph);
     ui.graphRevision.textContent = graph.revision ?? '--';
     populateLines();
+    populateStationAreas();
     renderGraph();
     fitGraph();
   }
@@ -224,7 +230,118 @@
     });
     renderSwitchDirections();
     renderAuthority();
+    renderStationAreas();
     updateScaleStyles();
+  }
+
+  function updateStationAreas(report) {
+    state.stationAreas = report || null;
+    const signature = JSON.stringify(report || null);
+    if (signature !== state.areaSignature) {
+      state.areaSignature = signature;
+      populateStationAreas();
+      renderStationAreas();
+    }
+  }
+
+  function currentStationAreas() {
+    const report = state.stationAreas;
+    const age = Date.now() + state.clockOffset - Number(report?.emittedAtMillis || 0);
+    return report?.version === 7 && report.messageId === 6502 && report.packetId === 5002
+      && report.status === 'AVAILABLE' && report.graphRevision === state.graph?.revision
+      && age >= 0 && age <= 3500 ? report.areas || [] : [];
+  }
+
+  function populateStationAreas() {
+    const previous = state.areaFilter;
+    ui.areaFilter.replaceChildren(new Option(t('Hide station areas'), ''));
+    const areas = currentStationAreas();
+    areas.forEach(area => ui.areaFilter.add(new Option(
+      `${area.station}${area.yard ? ' / ' + area.yard : ''} · ${t(area.state)}`, area.id)));
+    // A temporary graph mismatch must not silently replace the user's choice with another area.
+    if (previous && !areas.some(area => area.id === previous)
+        && state.stationAreas?.areas?.some(area => area.id === previous)) {
+      const old = state.stationAreas.areas.find(area => area.id === previous);
+      ui.areaFilter.add(new Option(`${old.station}${old.yard ? ' / ' + old.yard : ''} · ${t('Area unavailable')}`, previous));
+    }
+    state.areaFilter = [...ui.areaFilter.options].some(option => option.value === previous) ? previous : '';
+    ui.areaFilter.value = state.areaFilter;
+  }
+
+  function renderStationAreas() {
+    ui.areaLayer.replaceChildren();
+    ui.areaStatus.textContent = '';
+    if (!state.areaFilter) return;
+    const area = currentStationAreas().find(item => item.id === state.areaFilter);
+    if (!area) { ui.areaStatus.textContent = t('Area unavailable'); return; }
+    let visible = 0;
+    const drawIntervals = (intervals, className, label) => {
+      (intervals || []).forEach(interval => {
+        const edge = state.edges.get(interval.edgeId);
+        if (!edge || state.lineFilter && lineOfEdge(edge) !== state.lineFilter) return;
+        const points = intervalPath(edge, interval.fromMeters, interval.toMeters);
+        if (points.length < 2) return;
+        visible++;
+        const path = svg('polyline', { points: points.map(p => `${p.x},${p.z}`).join(' '), class: className });
+        const title = svg('title'); title.textContent = label; path.append(title); ui.areaLayer.append(path);
+      });
+    };
+    drawIntervals(area.intervals, `station-area-path ${area.state === 'INVALID' ? 'invalid' : ''}`, area.station);
+    (area.tracks || []).forEach(track => {
+      drawIntervals(track.intervals, `station-track-path ${track.state === 'INVALID' ? 'invalid' : ''}`, track.name);
+      if (!track.rail || !track.intervals?.some(interval => {
+        const edge = state.edges.get(interval.edgeId); return edge && (!state.lineFilter || lineOfEdge(edge) === state.lineFilter);
+      })) return;
+      const label = svg('text', { x: track.rail.x + 3, y: track.rail.z - 4, class: 'station-track-label' });
+      label.textContent = track.name; ui.areaLayer.append(label);
+    });
+    (area.boundaries || []).forEach(boundary => {
+      if (!boundary.rail) return;
+      if (state.lineFilter && !(area.intervals || []).some(interval => {
+        const edge = state.edges.get(interval.edgeId);
+        return edge && lineOfEdge(edge) === state.lineFilter && edge.path?.some(p => p.x === boundary.rail.x && p.y === boundary.rail.y && p.z === boundary.rail.z && p.world === boundary.rail.world);
+      })) return;
+      const marker = svg('rect', { x: boundary.rail.x - 2.5, y: boundary.rail.z - 2.5, width: 5, height: 5, class: 'station-boundary-marker', 'data-x': boundary.rail.x, 'data-z': boundary.rail.z });
+      const title = svg('title'); title.textContent = `${t('Boundary')} · ${t(boundary.preference)} · ${boundary.inside}`;
+      marker.append(title); ui.areaLayer.append(marker);
+    });
+    ui.areaStatus.textContent = `${t(area.state)} · ${t('Boundaries')}: ${area.boundaries?.length || 0} · ${t('Tracks')}: ${area.tracks?.length || 0}`
+      + (area.issues?.length ? '\n' + area.issues.map(areaIssue).join('\n') : '')
+      + (state.lineFilter && !visible ? '\n' + t('Selected line does not cross this area') : '');
+    scaleAreaMarkers();
+  }
+
+  function scaleAreaMarkers() {
+    const unit = unitPerPixel();
+    ui.areaLayer.querySelectorAll('.station-track-label').forEach(label => {
+      label.style.fontSize = `${11 * state.labelScale * unit}px`;
+      label.style.strokeWidth = `${2 * unit}px`;
+    });
+    ui.areaLayer.querySelectorAll('.station-boundary-marker').forEach(marker => {
+      const x = Number(marker.dataset.x), z = Number(marker.dataset.z);
+      marker.setAttribute('x', x - 4 * unit); marker.setAttribute('y', z - 4 * unit);
+      marker.setAttribute('width', 8 * unit); marker.setAttribute('height', 8 * unit);
+    });
+  }
+
+  function areaIssue(issue) {
+    const parts = String(issue).split(':');
+    return t(parts.shift()) + (parts.length ? ': ' + parts.join(':') : '');
+  }
+
+  function intervalPath(edge, fromMeters, toMeters) {
+    if (!Number.isFinite(fromMeters) || !Number.isFinite(toMeters) || toMeters <= fromMeters) return [];
+    const points = [];
+    for (let i = 1; i < (edge.path || []).length; i++) {
+      const a = edge.path[i - 1], b = edge.path[i];
+      const lo = Math.max(fromMeters, a.distanceMeters), hi = Math.min(toMeters, b.distanceMeters);
+      if (hi <= lo || b.distanceMeters <= a.distanceMeters) continue;
+      for (const distance of [lo, hi]) {
+        const fraction = (distance - a.distanceMeters) / (b.distanceMeters - a.distanceMeters);
+        points.push({ x: a.x + (b.x - a.x) * fraction, z: a.z + (b.z - a.z) * fraction });
+      }
+    }
+    return points;
   }
 
   function faceVector(face) {
@@ -333,6 +450,7 @@
     const bounds = graphBounds();
     if (!bounds) return;
     const unit = unitPerPixel();
+    scaleAreaMarkers();
     ui.nodeLayer.querySelectorAll('.rail-node').forEach(node => {
       node.setAttribute('r', Number(node.dataset.radius || 3.2) * unit);
     });
@@ -439,6 +557,7 @@
     state.serviceStatus = snapshot.serviceStatus || 'AVAILABLE';
     state.lastSnapshotAt = Date.now();
     state.clockOffset = Number(snapshot.serverTimeMillis || Date.now()) - Date.now();
+    updateStationAreas(snapshot.stationAreas);
     renderAuthority();
     const next = new Map();
     (snapshot.trains || []).forEach(train => next.set(train.trainId, train));
@@ -959,6 +1078,10 @@
     state.lineFilter = ui.lineFilter.value;
     renderGraph();
   });
+  ui.areaFilter.addEventListener('change', () => {
+    state.areaFilter = ui.areaFilter.value;
+    renderStationAreas();
+  });
   ui.fitButton.addEventListener('click', () => { state.followTrainId = null; fitGraph(); });
   ui.themeToggle.addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
   ui.followTrain.addEventListener('click', () => {
@@ -1194,6 +1317,7 @@
     finally { srPending = false; updateInspector(); }
   });
   setInterval(renderAuthority, 500);
+  setInterval(renderStationAreas, 500);
 
   function setEventStatus(key) {
     eventStatusKey = key;
@@ -1210,7 +1334,7 @@
     PccI18n.apply();
     document.getElementById('languageSelect').value = PccI18n.language;
     setTheme(document.documentElement.dataset.theme || loadTheme());
-    if (state.graph) { populateLines(); renderGraph(); }
+    if (state.graph) { populateLines(); populateStationAreas(); renderGraph(); }
     renderTrainList();
     renderPendingSr();
     updateInspector();

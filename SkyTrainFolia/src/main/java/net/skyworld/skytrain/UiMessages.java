@@ -218,7 +218,7 @@ final class UiMessages {
         add("ma.ROUTE_MISMATCH", "当前安全进路与 SR 目标不一致。", "Current safe path does not lead to the SR target.", "Le parcours actuellement sûr ne mène pas à la cible SR.", "現在の安全な進路は SR 目標へ通じません。");
         add("ma.ROUTE_UNAVAILABLE", "当前无法为 SR 分配安全进路。", "No safe SR route can currently be allocated.", "Aucun parcours SR sûr ne peut être attribué actuellement.", "現在、安全な SR 進路を割り当てられません。");
         add("ma.APPROVED", "SR 已批准；仍须等待有效 MA 下发。", "SR approved; wait for a valid MA before moving.", "SR approuvé ; attendez une MA valide avant de démarrer.", "SR 承認済み。走行前に有効な MA を待ってください。");
-        add("ma.usage", "用法：/stcs ma demand|sh|sr|ack|release|status", "Usage: /stcs ma demand|sh|sr|ack|release|status", "Utilisation : /stcs ma demand|sh|sr|ack|release|status", "使い方: /stcs ma demand|sh|sr|ack|release|status");
+        add("ma.usage", "用法：/stcs ma fs|sh|sr|ack|release|status", "Usage: /stcs ma fs|sh|sr|ack|release|status", "Utilisation : /stcs ma fs|sh|sr|ack|release|status", "使い方: /stcs ma fs|sh|sr|ack|release|status");
         add("ma.srUsage", "用法：/stcs sr <列车名> <目标设备UUID>（管理员）", "Usage: /stcs sr <train-name> <target-device-uuid> (admin)", "Utilisation : /stcs sr <nom-du-train> <UUID-cible> (admin)", "使い方: /stcs sr <列車名> <目標設備UUID>（管理者）");
         add("ma.invalidTargetUuid", "目标设备 UUID 无效。", "Invalid target device UUID.", "UUID de l'équipement cible invalide.", "目標設備の UUID が無効です。");
         add("ma.trainNotFound", "当前 STCS 列车表中找不到该车。", "Train not found in the current STCS roster.", "Train introuvable dans la liste STCS actuelle.", "現在の STCS 列車一覧に見つかりません。");
@@ -230,6 +230,7 @@ final class UiMessages {
         add("ma.NOT_ON_TRAIN", "请先坐进已注册列车。", "Board a registered train first.", "Montez d'abord dans un train enregistré.", "まず登録済みの列車に乗車してください。");
         add("ma.NOT_DRIVER", "当前没有本车驾驶权，请重新 /st drive。", "You do not hold this train's driving lease; use /st drive again.", "Vous n'avez pas la conduite de ce train ; refaites /st drive.", "この列車の運転権がありません。/st drive を再実行してください。");
         add("ma.STOP_FIRST", "请先停车。", "Stop the train first.", "Arrêtez d'abord le train.", "先に列車を停止してください。");
+        add("ma.DRIVER_RELEASE_PENDING", "旧驾驶会话的 MA 已撤销，等待停稳和完整定位后重新申请。", "The previous driver's MA was revoked. Wait for a confirmed stop and full train position before requesting again.", "La MA du conducteur précédent est révoquée. Attendez la confirmation de l'arrêt et de la position complète avant une nouvelle demande.", "前の運転セッションの MA は取り消されました。停止と列車全体の位置確認後に再要求してください。");
         add("ma.RELEASE_FIRST", "请先停车并释放旧 MA，再申请新的运行模式。", "Stop and release the old MA before requesting a different operating mode.", "Arrêtez et libérez l'ancienne MA avant de demander un autre mode d'exploitation.", "停止して旧 MA を解放してから別の運転モードを要求してください。");
         add("ma.AUTOMATIC_TRAIN", "内置伪ATO自动列车不使用此状态机。", "Built-in pseudo-ATO trains do not use this state machine.", "Les trains du pseudo-ATO intégré n'utilisent pas cet automate.", "内蔵疑似 ATO 列車にはこの状態機を適用しません。");
         add("ma.DECLARE_DRIVE", "请先坐进列车并用 /st drive 取得驾驶权。", "Sit in the train and acquire control with /st drive first.", "Montez dans le train et prenez la conduite avec /st drive.", "乗車後、/st drive で運転権を取得してください。");

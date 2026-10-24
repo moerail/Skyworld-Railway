@@ -71,7 +71,7 @@ final class DriverControlService {
             train.reverser=Reverser.NEUTRAL;
             train.lastSelectedReverser=Reverser.BACKWARD;
             // A fresh declaration never inherits traction from an earlier driver/session.
-            DriverSafety.brake(train);
+            DriverSafety.revokeAuthority(train);
             ScheduledTask check = player.getScheduler().runAtFixedRate(plugin, task -> {
                 synchronized (driverLock) {
                     if (!DriverSafety.sameSession(leaseId, driverLeaseIds.get(playerId))) { task.cancel(); return; }
@@ -104,7 +104,7 @@ final class DriverControlService {
             if (trainId == null || !trainDrivers.remove(trainId, playerId)) return;
             Train train = trainLookup.apply(trainId);
             if (train == null) return;
-            DriverSafety.brake(train);
+            DriverSafety.revokeAuthority(train);
             publishDriverEvent(train, playerId, name, "DRIVER_UNAVAILABLE", reason);
             saveAction.run();
         }
@@ -141,7 +141,7 @@ final class DriverControlService {
             driverSeats.remove(playerId);
             cancelDriverCheck(playerId);
             String name = driverNames.remove(playerId);
-            DriverSafety.brake(train);
+            DriverSafety.revokeAuthority(train);
             publishDriverEvent(train, playerId, name, "DRIVER_RELEASED", "ADMIN_RELEASE");
             return Bukkit.getPlayer(playerId);
         }
@@ -227,7 +227,7 @@ final class DriverControlService {
                         ? "这列车由其他司机控制；管理员请使用 /st admin release <列车名>。"
                         : "无法确认你是上一位司机；请重新 /st drive 后 /st release，或由管理员释放列车。");
             }
-            DriverSafety.brake(train);
+            DriverSafety.revokeAuthority(train);
             train.manualReleaseConfirmed = true;
             trainDrivers.remove(train.id(), playerId);
             driverTargets.remove(playerId, train.id());
