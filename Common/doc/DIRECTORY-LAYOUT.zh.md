@@ -10,7 +10,7 @@ Minecraft Plugin/
 │   ├── STA/
 │   ├── SkyPCC/
 │   ├── Common/
-│   │   ├── README*.md、CHANGELOG.md、LICENSE、logo.png
+│   │   ├── README.<语言>.md、CHANGELOG.md、LICENSE、logo.png
 │   │   ├── doc/               手册、设计、发布说明
 │   │   ├── shared/            四插件共用源码
 │   │   ├── build.ps1、package-source.ps1
@@ -19,7 +19,7 @@ Minecraft Plugin/
 │   │   ├── target/            编译及测试中间文件
 │   │   └── logs/
 │   ├── Latest/                四个最近成功构建的插件 JAR、SHA256.json
-│   └── README.md              导航入口
+│   └── README.md              完整项目首页（2026-10-24 移回根目录）
 ├── Archive/Skyrail_Suite/     旧版源码、发布包、早期资料及临时副本
 └── Test_Server/              保留原位
 ```
