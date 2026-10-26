@@ -24,13 +24,13 @@ record AutomaticSignSpec(String action, Launch launch, double offset, long waitM
         String options = text.substring(action.length()).trim();
         if (action.equals("property")) {
             if (!options.isEmpty() || !clean(third).equals("v_target"))
-                throw new IllegalArgumentException("Property signs currently accept V_target only");
+                throw new UiException("Property signs currently accept V_target only", "Таблички свойств пока принимают только V_target");
             var properties = TrainProperties.defaults();
             properties.setAutomaticTargetSpeed(fourth);
             return new AutomaticSignSpec(action, Launch.automatic(), 0, 0, "", properties.automaticTargetSpeed, false, 0, "");
         }
         if (action.equals("destroy")) {
-            if (!options.isEmpty()) throw new IllegalArgumentException("destroy takes no second-line options");
+            if (!options.isEmpty()) throw new UiException("destroy takes no second-line options", "destroy не принимает параметры во второй строке");
             return new AutomaticSignSpec(action, Launch.automatic(), 0, 0, "", null, false, 0, "");
         }
         if (action.equals("spawn")) {
@@ -41,18 +41,18 @@ record AutomaticSignSpec(String action, Launch launch, double offset, long waitM
             boolean gotTime=false, gotSpeed=false;
             for(String part:parts) {
                 if(part.contains(":")) {
-                    if(gotTime) throw new IllegalArgumentException("Duplicate spawn interval");
+                    if(gotTime) throw new UiException("Duplicate spawn interval", "Интервал spawn указан повторно");
                     interval=time(part); gotTime=true;
                 } else {
-                    if(gotSpeed) throw new IllegalArgumentException("Duplicate spawn velocity");
+                    if(gotSpeed) throw new UiException("Duplicate spawn velocity", "Скорость spawn указана повторно");
                     speed=velocity(part); gotSpeed=true;
                 }
             }
             String pattern = (third == null ? "" : third) + (fourth == null ? "" : fourth);
-            if (pattern.isBlank()) throw new IllegalArgumentException("Spawn pattern is empty");
+            if (pattern.isBlank()) throw new UiException("Spawn pattern is empty", "Шаблон создания пуст");
             return new AutomaticSignSpec(action, Launch.automatic(), 0, 0, "", speed, false, interval, pattern.trim());
         }
-        if (!action.equals("station")) throw new IllegalArgumentException("Unknown automatic sign: " + action);
+        if (!action.equals("station")) throw new UiException("Unknown automatic sign: " + action, "Неизвестная автоматическая табличка: " + action);
         double offset = 0;
         Matcher matcher = OFFSET.matcher(options);
         if (matcher.find()) {
@@ -83,7 +83,7 @@ record AutomaticSignSpec(String action, Launch launch, double offset, long waitM
             if (value.endsWith("/tt")) a = number(value.substring(0, value.length()-3));
             else if (value.endsWith("/ss")) a = number(value.substring(0, value.length()-3)) / 400;
             else if (value.endsWith("m/s/s")) a = number(value.substring(0, value.length()-5)) / 400;
-            else throw new IllegalArgumentException("Unsupported acceleration unit: " + text);
+            else throw new UiException("Unsupported acceleration unit: " + text, "Неподдерживаемая единица ускорения: " + text);
             return new Launch(-1, -1, positive(a), linear);
         }
         if (value.matches(".*[stm]$")) {
@@ -107,7 +107,7 @@ record AutomaticSignSpec(String action, Launch launch, double offset, long waitM
         double millis;
         if (text.contains(":")) {
             String[] parts = text.split(":", -1);
-            if (parts.length > 3) throw new IllegalArgumentException("Invalid time: " + value);
+            if (parts.length > 3) throw new UiException("Invalid time: " + value, "Недопустимое время: " + value);
             double seconds = 0;
             for (String part : parts) seconds = seconds * 60 + nonnegative(number(part));
             millis = seconds * 1000;
@@ -115,7 +115,7 @@ record AutomaticSignSpec(String action, Launch launch, double offset, long waitM
         else if (text.endsWith("s")) millis = number(text.substring(0,text.length()-1)) * 1000;
         else if (text.endsWith("t")) millis = number(text.substring(0,text.length()-1)) * 50;
         else millis = number(text) * 1000;
-        if (millis < 0 || millis > 31_536_000_000L) throw new IllegalArgumentException("Time is out of range");
+        if (millis < 0 || millis > 31_536_000_000L) throw new UiException("Time is out of range", "Время вне допустимого диапазона");
         return Math.round(millis);
     }
 
@@ -150,10 +150,10 @@ record AutomaticSignSpec(String action, Launch launch, double offset, long waitM
     private static double number(String s) {
         double n;
         try { n = Double.parseDouble(s.replace(',', '.')); }
-        catch(NumberFormatException ex) { throw new IllegalArgumentException("Invalid number: " + s); }
-        if (!Double.isFinite(n)) throw new IllegalArgumentException("Non-finite number");
+        catch(NumberFormatException ex) { throw new UiException("Invalid number: " + s, "Недопустимое число: " + s); }
+        if (!Double.isFinite(n)) throw new UiException("Non-finite number", "Число должно быть конечным");
         return n;
     }
-    private static double nonnegative(double n) { if(n<0) throw new IllegalArgumentException("Negative value"); return n; }
-    private static double positive(double n) { if(n<=0) throw new IllegalArgumentException("Expected positive value"); return n; }
+    private static double nonnegative(double n) { if(n<0) throw new UiException("Negative value", "Отрицательное значение"); return n; }
+    private static double positive(double n) { if(n<=0) throw new UiException("Expected positive value", "Требуется положительное значение"); return n; }
 }

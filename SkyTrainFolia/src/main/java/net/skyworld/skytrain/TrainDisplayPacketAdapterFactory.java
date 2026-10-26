@@ -8,7 +8,7 @@ final class TrainDisplayPacketAdapterFactory {
         String suffix = switch (minecraftVersion) {
             case "26.2" -> "26_2";
             case "26.3" -> "26_3";
-            default -> throw new IllegalArgumentException("Unsupported display protocol: " + minecraftVersion);
+            default -> throw new UiException("Unsupported display protocol: " + minecraftVersion, "Неподдерживаемый протокол отображения: " + minecraftVersion);
         };
         try {
             String name = TrainDisplayPacketAdapterFactory.class.getPackageName()

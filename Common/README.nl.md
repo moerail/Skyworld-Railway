@@ -77,7 +77,7 @@ De waarschuwing herhaalt zes C5-G5-paren per reeks totdat de snelheid onder de h
 
 De testbank leest bij elkaar horende railgraph- en shadow-occupancy.json-bestanden zonder ze te wijzigen. Alleen na controle dat de volledige oorspronkelijke trein verdwenen is: consolecommando `stcs ma clear <volledige-UUID> confirm`. Dit verwijdert alle schaduwbewijzen voor die identiteit, met back-up en audit; historische M1-gegevens blijven behouden. Een niet-geladen trein is niet automatisch verdwenen.
 
-[Home](README.md) | [中文](README.zh.md) | [English](README.en.md) | **Nederlands**
+[Home](README.md) | [中文](README.zh.md) | [English](README.en.md) | **Nederlands** | [Русский](README.ru.md)
 
 **Nederlandse uitgave. Zelfstandig leesbaar: aanvullende documentatie is niet nodig om deze handleiding te gebruiken.**
 

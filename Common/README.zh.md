@@ -1,5 +1,11 @@
 # SkyRail Suite
 
+## 为了同志 / Ради товарищей — STF 4.0.10 · 2026-10-26
+
+[中俄双语发布说明](doc/releases/suite-v4.0.10.md)。当前发行组合：STF **4.0.10** / STCS **4.1.1** / STA **2.2.0** / SkyPCC **2.1.0**。
+
+使用 `/st lang ru` 切换 STF 命令、驾驶台/侧栏、MA/ATP 显示、停车标记及司机引导；语言偏好会保存。旧版自定义 `driver-guide.yml` 缺少俄语条目时回退到内置俄语文案，不覆盖已有配置。`/st help ru` 可临时查看俄语帮助；网页 PCC 的语言设置独立。
+
 ## 驾驶员交接与 MA — 2026-10-24
 
 当前源码：STCS **4.1.1** / STF **4.0.9** / STA **2.2.0** / SkyPCC **2.1.0**。司机下车、掉线或释放驾驶权后自动撤销旧 MA，回到 `SB` 并保持制动；停稳、完整定位和 TIMS 确认后自动释放前方预约，保留车身占用。下一位司机重新 `/st drive` 后申请 `/stcs ma fs`，无需补做 `release`。`/stcs ma demand` 保留为兼容别名。需配套更新 STCS 与 STF。26.2、26.3 各 **87 项 Java 测试通过**；实服验收待完成。[更新记录](CHANGELOG.md)
@@ -83,7 +89,7 @@ Message 与 Packet 独立编号：已分配影子 MA 为 **Message 1003 / Packet
   <img src="logo.png" alt="SkyRail Suite" width="64" height="64">
 </p>
 
-[首页 / Home](README.md) | **中文** | [English](README.en.md) | [Nederlands](README.nl.md)
+[首页 / Home](README.md) | **中文** | [English](README.en.md) | [Nederlands](README.nl.md) | [Русский](README.ru.md)
 
 **中文完整手册，可独立阅读，无需配套文档。**
 

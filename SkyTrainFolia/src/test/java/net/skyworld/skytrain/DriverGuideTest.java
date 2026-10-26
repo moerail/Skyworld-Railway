@@ -19,13 +19,30 @@ public final class DriverGuideTest {
         check(select(true, false, "IDLE", false, true) == DriverGuide.Hint.BRAKE_HELD,
                 "emergency brake reminder after MA");
         check(DriverGuide.select(new DriverGuide.State(true, true, true, false, Reverser.FORWARD,
-                OperatingMode.TR, ProtectionMode.ACTIVE, false, true, true, false, "TRIP", true))
+                OperatingMode.TR, ProtectionMode.ACTIVE, false, true, true, false, "TRIP", true, false))
                 == DriverGuide.Hint.ACK_TRIP, "trip acknowledgement first");
         check(DriverGuide.select(new DriverGuide.State(true, true, true, false, Reverser.FORWARD,
-                OperatingMode.PT, ProtectionMode.ACTIVE, false, true, true, false, "PT", true))
+                OperatingMode.PT, ProtectionMode.ACTIVE, false, true, true, false, "PT", true, false))
                 == DriverGuide.Hint.RELEASE_OLD_MA, "old MA release");
 
         var guide = new DriverGuide();
+        for (var mode : OperatingMode.values()) {
+            var tims = new DriverGuide.State(true, true, true, false, Reverser.NEUTRAL,
+                    mode, ProtectionMode.ACTIVE, false, false, false, false, "TIMS_HOLD", true, true);
+            check(DriverGuide.select(tims) == DriverGuide.Hint.ACK_TIMS,
+                    "TIMS acknowledgement precedes mode/reverser/service hints in " + mode);
+            check(guide.next(tims, 1_000, 60_000) == (mode == OperatingMode.SB
+                    ? DriverGuide.Hint.ACK_TIMS : DriverGuide.Hint.NONE), "TIMS hint throttling");
+        }
+        check(DriverGuide.select(new DriverGuide.State(true, false, true, false, Reverser.FORWARD,
+                OperatingMode.TR, ProtectionMode.ACTIVE, false, true, true, false, "TIMS_HOLD", true, true))
+                == DriverGuide.Hint.NONE, "No stationary recovery hint while moving");
+        check(DriverGuide.select(new DriverGuide.State(true, true, false, true, Reverser.FORWARD,
+                OperatingMode.TR, ProtectionMode.ACTIVE, false, true, true, false, "TIMS_HOLD", true, true))
+                == DriverGuide.Hint.NONE, "Passengers cannot acknowledge another driver's TIMS");
+        check(guide.next(new DriverGuide.State(true, true, true, false, Reverser.FORWARD,
+                OperatingMode.TR, ProtectionMode.ACTIVE, false, true, true, false, "TRIP", true, false),
+                2_000, 60_000) == DriverGuide.Hint.ACK_TRIP, "TR follows TIMS clearance immediately");
         var ready = state(true, false, "IDLE", true, false, false);
         check(guide.next(ready, 1_000, 60_000) == DriverGuide.Hint.DEMAND, "first hint");
         check(guide.next(ready, 2_000, 60_000) == DriverGuide.Hint.NONE, "no spam");
@@ -37,6 +54,20 @@ public final class DriverGuideTest {
             bundled.load(new InputStreamReader(resource, StandardCharsets.UTF_8));
         }
         var lexicon = DriverGuideLexicon.parse(new YamlConfiguration(), bundled);
+        var oldLocal = new YamlConfiguration();
+        oldLocal.loadFromString(bundled.saveToString());
+        oldLocal.set("name.ru", null);
+        for (var action : DriverGuideLexicon.Action.values())
+            oldLocal.set("actions." + action.name().toLowerCase(java.util.Locale.ROOT) + ".ru", null);
+        for (var hint : DriverGuide.Hint.values())
+            oldLocal.set("scenarios." + hint.name().toLowerCase(java.util.Locale.ROOT) + ".ru", null);
+        oldLocal.set("name.fr", "Guide personnalisé");
+        var upgraded = DriverGuideLexicon.parse(oldLocal, bundled);
+        check(upgraded.name(UiLanguage.RU).equals("Кури-тян"), "Russian defaults for old word bank");
+        check(upgraded.name(UiLanguage.FR).equals("Guide personnalisé"), "Preserve existing custom language");
+        oldLocal.set("scenarios.ack_tims.ru", java.util.List.of("Подтвердите TIMS после остановки."));
+        check(DriverGuideLexicon.parse(oldLocal, bundled).phrase(DriverGuide.Hint.ACK_TIMS, UiLanguage.RU)
+                .equals("Подтвердите TIMS после остановки."), "Editable Russian override");
         for (var language : UiLanguage.values()) {
             check(!lexicon.name(language).isBlank(), "speaker name " + language);
             for (var action : DriverGuideLexicon.Action.values())
@@ -78,7 +109,7 @@ public final class DriverGuideTest {
             boolean demand, boolean brake, boolean serviceDown) {
         return new DriverGuide.State(true, true, driver, false, Reverser.FORWARD,
                 brake ? OperatingMode.FS : OperatingMode.SB, ProtectionMode.ACTIVE,
-                former, !serviceDown, !"POSITION_UNCERTAIN".equals(reason), demand, reason, brake);
+                former, !serviceDown, !"POSITION_UNCERTAIN".equals(reason), demand, reason, brake, false);
     }
 
     private static void check(boolean condition, String message) {

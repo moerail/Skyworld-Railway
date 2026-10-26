@@ -71,7 +71,7 @@ final class LineInfrastructureManager {
     LineMileageClearResult clearLineMileage(String lineName) {
         String cleaned = cleanLine(lineName);
         if (cleaned == null) {
-            throw new IllegalArgumentException("线路名不能为空且不能超过 64 个字符。");
+            throw new UiException("线路名不能为空且不能超过 64 个字符。", "Имя линии не должно быть пустым или превышать 64 символа.");
         }
         String lineKey = InfrastructureMarker.normalizeLine(cleaned);
         List<InfrastructureMarker> sameLine = markers.values().stream()
@@ -119,7 +119,7 @@ final class LineInfrastructureManager {
                             String world = section.getString("world");
                             String line = cleanLine(section.getString("line"));
                             if (type == null || world == null || line == null) {
-                                throw new IllegalArgumentException("Missing type, world, or line");
+                                throw new UiException("Missing type, world, or line", "Не указан тип, мир или линия");
                             }
                             SwitchBlockPosition sign = readPosition(section, "sign", world);
                             SwitchBlockPosition rail = readPosition(section, "rail", world);
@@ -199,16 +199,16 @@ final class LineInfrastructureManager {
     MarkerRegistration registerSign(Block signBlock, InfrastructureMarkerType type,
             String lineText, String detailText) {
         if (signBlock == null || type == null) {
-            throw new IllegalArgumentException("无法识别基础设施控制牌。");
+            throw new UiException("无法识别基础设施控制牌。", "Не удалось распознать инфраструктурную табличку.");
         }
         String lineName = cleanLine(lineText);
         if (lineName == null) {
-            throw new IllegalArgumentException("第三行必须填写线路名，例如 line_a。");
+            throw new UiException("第三行必须填写线路名，例如 line_a。", "В третьей строке укажите имя линии, например line_a.");
         }
 
         RailInfo rail = nearestRail(signBlock.getLocation().add(0.5, 0.5, 0.5), markerRailSearchRadius());
         if (rail == null) {
-            throw new IllegalArgumentException("控制牌附近找不到铁轨，请把牌子放在轨道侧面 1~2 格内。");
+            throw new UiException("控制牌附近找不到铁轨，请把牌子放在轨道侧面 1~2 格内。", "Рядом с табличкой нет рельсов; установите её в 1–2 блоках сбоку от пути.");
         }
 
         SwitchBlockPosition signPosition = SwitchBlockPosition.of(signBlock);
@@ -223,7 +223,7 @@ final class LineInfrastructureManager {
                 String where = duplicate == null ? existingOrigin.toString()
                         : duplicate.sign.worldName() + " " + duplicate.sign.x() + " "
                                 + duplicate.sign.y() + " " + duplicate.sign.z();
-                throw new IllegalArgumentException("线路 " + lineName + " 已存在 Origin: " + where);
+                throw new UiException("线路 " + lineName + " 已存在 Origin: " + where, "У линии " + lineName + " уже есть Origin: " + where);
             }
         }
 
@@ -383,44 +383,52 @@ final class LineInfrastructureManager {
     }
 
     List<String> describe(InfrastructureMarker marker) {
+        return describe(marker, UiLanguage.ZH);
+    }
+
+    List<String> describe(InfrastructureMarker marker, UiLanguage language) {
         if (marker == null) {
             return List.of();
         }
         List<String> lines = new ArrayList<>();
         lines.add("&e" + marker.type.storageName().toUpperCase(Locale.ROOT)
-                + " &f" + marker.displayName + " &7| 线路: &b" + marker.lineName);
+                + " &f" + marker.displayName + UiMessages.literal(language, " &7| 线路: &b", " &7| Линия: &b") + marker.lineName);
         lines.add("&7UUID: &f" + marker.id);
-        lines.add("&7牌子: &f" + formatPosition(marker.sign)
-                + " &7| 绑定轨道: &f" + formatPosition(marker.rail));
-        lines.add("&7里程: " + (marker.mileageKnown()
+        lines.add(UiMessages.literal(language, "&7牌子: &f", "&7Табличка: &f") + formatPosition(marker.sign)
+                + UiMessages.literal(language, " &7| 绑定轨道: &f", " &7| Рельс: &f") + formatPosition(marker.rail));
+        lines.add(UiMessages.literal(language, "&7里程: ", "&7Координата: ") + (marker.mileageKnown()
                 ? "&a" + formatMileage(marker.mileageMeters())
-                : "&c未标定（让列车从该线路 Origin 驶过此处）"));
+                : UiMessages.literal(language, "&c未标定（让列车从该线路 Origin 驶过此处）", "&cНе откалибровано (проведите поезд от Origin этой линии)")));
 
         InfrastructureMarker origin = origin(marker.lineKey);
         if (marker.type != InfrastructureMarkerType.ORIGIN) {
-            lines.add("&7线路 Origin: " + (origin == null
-                    ? "&c未配置"
+            lines.add(UiMessages.literal(language, "&7线路 Origin: ", "&7Origin линии: ") + (origin == null
+                    ? UiMessages.literal(language, "&c未配置", "&cНе настроен")
                     : "&a" + formatPosition(origin.sign)));
         }
         if (marker.type == InfrastructureMarkerType.BALISE && marker.mileageKnown()) {
-            lines.add("&8以下为同线路的里程前后关系，不代表道岔或支线拓扑连接。");
-            appendAdjacentBalises(lines, marker);
+            lines.add(UiMessages.literal(language, "&8以下为同线路的里程前后关系，不代表道岔或支线拓扑连接。", "&8Ниже — порядок координат одной линии, не топология стрелок или боковых путей."));
+            appendAdjacentBalises(lines, marker, language);
         }
         return List.copyOf(lines);
     }
 
     String describeTrainMileage(Train train) {
+        return describeTrainMileage(train, UiLanguage.ZH);
+    }
+
+    String describeTrainMileage(Train train, UiLanguage language) {
         TrainMileageSnapshot snapshot = train == null ? TrainMileageSnapshot.unknown() : train.mileageSnapshot();
         if (snapshot.lineName() == null || snapshot.lineName().isBlank()) {
-            return "&7列车尚未经过已注册的 Origin 或 Balise，当前里程未知。";
+            return UiMessages.literal(language, "&7列车尚未经过已注册的 Origin 或 Balise，当前里程未知。", "&7Поезд ещё не прошёл зарегистрированный Origin или Balise; координата неизвестна.");
         }
-        String mileage = snapshot.known() ? formatMileage(snapshot.meters()) : "未标定";
+        String mileage = snapshot.known() ? formatMileage(snapshot.meters()) : UiMessages.literal(language, "未标定", "Не откалибровано");
         String balise = snapshot.lastBaliseName() == null ? "--" : snapshot.lastBaliseName();
-        String range = snapshot.inSignalRange() ? "&a信号范围内" : "&c超出信号区间";
-        return "&7线路: &b" + snapshot.lineName()
-                + " &7| 里程: &f" + mileage
-                + " &7| 上一 Balise: &f" + balise
-                + " &7| 状态: " + range;
+        String range = snapshot.inSignalRange() ? UiMessages.literal(language, "&a信号范围内", "&aВ зоне сигнала") : UiMessages.literal(language, "&c超出信号区间", "&cВне зоны сигнала");
+        return UiMessages.literal(language, "&7线路: &b", "&7Линия: &b") + snapshot.lineName()
+                + UiMessages.literal(language, " &7| 里程: &f", " &7| Координата: &f") + mileage
+                + UiMessages.literal(language, " &7| 上一 Balise: &f", " &7| Предыдущая бализа: &f") + balise
+                + UiMessages.literal(language, " &7| 状态: ", " &7| Состояние: ") + range;
     }
 
     double inspectionRadius() {
@@ -499,6 +507,10 @@ final class LineInfrastructureManager {
     }
 
     private void appendAdjacentBalises(List<String> lines, InfrastructureMarker marker) {
+        appendAdjacentBalises(lines, marker, UiLanguage.ZH);
+    }
+
+    private void appendAdjacentBalises(List<String> lines, InfrastructureMarker marker, UiLanguage language) {
         List<InfrastructureMarker> sameLine = markers.values().stream()
                 .filter(candidate -> candidate.type == InfrastructureMarkerType.BALISE)
                 .filter(candidate -> candidate.lineKey.equals(marker.lineKey))
@@ -508,20 +520,24 @@ final class LineInfrastructureManager {
         int index = sameLine.indexOf(marker);
         InfrastructureMarker previous = index > 0 ? sameLine.get(index - 1) : null;
         InfrastructureMarker next = index >= 0 && index + 1 < sameLine.size() ? sameLine.get(index + 1) : null;
-        lines.add(adjacentText("负里程方向", marker, previous));
-        lines.add(adjacentText("正里程方向", marker, next));
+        lines.add(adjacentText(UiMessages.literal(language, "负里程方向", "Убывание координаты"), marker, previous, language));
+        lines.add(adjacentText(UiMessages.literal(language, "正里程方向", "Возрастание координаты"), marker, next, language));
     }
 
     private String adjacentText(String label, InfrastructureMarker from, InfrastructureMarker target) {
+        return adjacentText(label, from, target, UiLanguage.ZH);
+    }
+
+    private String adjacentText(String label, InfrastructureMarker from, InfrastructureMarker target, UiLanguage language) {
         if (target == null) {
-            return "&7" + label + ": &c限定距离内无已标定 Balise";
+            return "&7" + label + UiMessages.literal(language, ": &c限定距离内无已标定 Balise", ": &cНет откалиброванной бализы в пределах расстояния");
         }
         double distance = Math.abs(target.mileageMeters() - from.mileageMeters());
         if (distance > signalRangeMeters()) {
-            return "&7" + label + ": &c" + target.displayName + " 距离 "
-                    + String.format(Locale.ROOT, "%.2f m（超出 %.0f m 信号范围）", distance, signalRangeMeters());
+            return "&7" + label + ": &c" + target.displayName + UiMessages.literal(language, " 距离 ", " расстояние ")
+                    + String.format(Locale.ROOT, UiMessages.literal(language, "%.2f m（超出 %.0f m 信号范围）", "%.2f m (вне зоны сигнала %.0f m)"), distance, signalRangeMeters());
         }
-        return "&7" + label + ": &a" + target.displayName + " &7| 距离: &f"
+        return "&7" + label + ": &a" + target.displayName + UiMessages.literal(language, " &7| 距离: &f", " &7| Расстояние: &f")
                 + String.format(Locale.ROOT, "%.2f m", distance);
     }
 
@@ -569,19 +585,20 @@ final class LineInfrastructureManager {
             InfrastructureMarkerType type) {
         String side = sideText == null ? "" : sideText.trim().toLowerCase(Locale.ROOT);
         if (!"left".equals(side) && !"right".equals(side)) {
-            throw new IllegalArgumentException(type.storageName()
-                    + " 第四行必须写 left 或 right。Origin 表示正里程方向，End 表示线路结束方向。");
+            throw new UiException(type.storageName()
+                    + " 第四行必须写 left 或 right。Origin 表示正里程方向，End 表示线路结束方向。", type.storageName()
+                    + ": в четвёртой строке нужны left или right. Для Origin это направление роста координаты, для End — завершения линии.");
         }
         Vector facing = signFacing(signBlock.getBlockData());
         if (facing.lengthSquared() < EPSILON) {
-            throw new IllegalArgumentException("无法从牌子朝向确定 " + type.storageName() + " 的方向。");
+            throw new UiException("无法从牌子朝向确定 " + type.storageName() + " 的方向。", "По ориентации таблички не удалось определить направление " + type.storageName() + ".");
         }
         Vector screenDirection = "left".equals(side)
                 ? new Vector(-facing.getZ(), 0.0, facing.getX())
                 : new Vector(facing.getZ(), 0.0, -facing.getX());
         Vector positive = RailMath.direction(rail.rail.getShape(), screenDirection);
         if (positive.lengthSquared() < EPSILON) {
-            throw new IllegalArgumentException(type.storageName() + " 必须放在能确定左右方向的轨道旁。");
+            throw new UiException(type.storageName() + " 必须放在能确定左右方向的轨道旁。", type.storageName() + " должен находиться у пути с определимыми направлениями влево/вправо.");
         }
         return positive.normalize();
     }

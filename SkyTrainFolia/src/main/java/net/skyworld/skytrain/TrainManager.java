@@ -197,7 +197,7 @@ final class TrainManager implements TrainMotionController.Host {
     void reloadAll() {
         synchronized (driverLock) {
             if (trains.values().stream().anyMatch(t -> Math.max(t.currentSpeed(), t.maxMemberSpeed()) > 0.001)) {
-                throw new IllegalArgumentException("Stop all trains before reloading vehicle performance.");
+                throw new UiException("Stop all trains before reloading vehicle performance.", "Перед перезагрузкой характеристик остановите все поезда.");
             }
             long previousTickInterval = settings.tickInterval();
             plugin.reloadVehicleConfiguration();
@@ -219,10 +219,10 @@ final class TrainManager implements TrainMotionController.Host {
     Train createTrain(String name, List<Minecart> carts) {
         String cleanName = cleanName(name);
         if (nameIndex.containsKey(Train.normalizeName(cleanName))) {
-            throw new IllegalArgumentException("列车名已经存在: " + cleanName);
+            throw new UiException("列车名已经存在: " + cleanName, "Имя поезда уже существует: " + cleanName);
         }
         if (carts.isEmpty()) {
-            throw new IllegalArgumentException("附近没有可用矿车");
+            throw new UiException("附近没有可用矿车", "Рядом нет доступных вагонеток");
         }
 
         Train train = new Train(UUID.randomUUID(), cleanName, settings.defaultSpeed(), settings.maxSpeed(), settings.defaultSpacing());
@@ -309,7 +309,7 @@ final class TrainManager implements TrainMotionController.Host {
             if (part.name().length() == 1 && "mspht".contains(part.name())) continue;
             SavedTrainDefinition saved = savedTrains.get(Train.normalizeName(part.name()));
             if (saved == null || !saved.properties.conductionMode.automatic()) {
-                throw new IllegalArgumentException("Spawn template must be explicitly saved in auto mode: " + part.name());
+                throw new UiException("Spawn template must be explicitly saved in auto mode: " + part.name(), "Шаблон создания должен быть явно сохранён в auto: " + part.name());
             }
         }
     }
@@ -333,36 +333,36 @@ final class TrainManager implements TrainMotionController.Host {
             if (type != null) types.add(type);
             else {
                 SavedTrainDefinition saved = savedTrains.get(Train.normalizeName(token));
-                if (saved == null || !saved.properties.conductionMode.automatic()) throw new IllegalArgumentException("Template no longer automatic");
+                if (saved == null || !saved.properties.conductionMode.automatic()) throw new UiException("Template no longer automatic", "Шаблон больше не автоматический");
                 if (template == null) template = saved;
-                if (types.size() + saved.memberCount > limit) throw new IllegalArgumentException("Spawn cart limit exceeded");
+                if (types.size() + saved.memberCount > limit) throw new UiException("Spawn cart limit exceeded", "Превышен предел создаваемых вагонеток");
                 for (int i = 0; i < saved.memberCount; i++) types.add(Minecart.class);
             }
         }
-        if (types.isEmpty() || types.size() > limit) throw new IllegalArgumentException("Invalid spawn length");
+        if (types.isEmpty() || types.size() > limit) throw new UiException("Invalid spawn length", "Недопустимая длина создаваемого состава");
         double spacing = template == null ? settings.defaultSpacing() : template.spacing;
         double length = spacing * (types.size() - 1);
         VanillaRailWalker walker = VanillaRailWalker.at(rail.getLocation().add(.5,.0625,.5), preferred);
-        if (walker == null) throw new IllegalArgumentException("No spawn rail");
+        if (walker == null) throw new UiException("No spawn rail", "Нет рельса для создания");
         double forward = switch (parsed.center()) {
             case MIDDLE -> length * .5;
             case LEFT -> 0;
             case RIGHT -> length;
             case NONE -> centered ? length * .5 : length;
         };
-        if (!walker.move(forward)) throw new IllegalArgumentException("Insufficient loaded rail ahead");
+        if (!walker.move(forward)) throw new UiException("Insufficient loaded rail ahead", "Недостаточно загруженного пути впереди");
         List<Location> locations = new ArrayList<>();
         Vector travel = walker.direction();
         walker.invert();
         for (int i = 0; i < types.size(); i++) {
-            if (i > 0 && !walker.move(spacing)) throw new IllegalArgumentException("Insufficient loaded rail behind");
+            if (i > 0 && !walker.move(spacing)) throw new UiException("Insufficient loaded rail behind", "Недостаточно загруженного пути позади");
             Location location = walker.position();
             for (int dx : new int[]{-2,2}) for (int dz : new int[]{-2,2}) {
                 if (!RailSignAccess.readable(location.getBlock().getRelative(dx,0,dz)))
-                    throw new IllegalArgumentException("Spawn area crosses unavailable region");
+                    throw new UiException("Spawn area crosses unavailable region", "Область создания пересекает недоступный регион");
             }
             if (!location.getWorld().getNearbyEntities(location, 1, 1, 1, e -> e instanceof Minecart).isEmpty())
-                throw new IllegalArgumentException("Spawn track occupied");
+                throw new UiException("Spawn track occupied", "Путь создания занят");
             Vector facing = walker.direction().multiply(-1);
             location.setYaw(actuator.yawFromDirection(facing));
             locations.add(location);
@@ -372,7 +372,7 @@ final class TrainManager implements TrainMotionController.Host {
         try {
             for (int i = 0; i < types.size(); i++) {
                 Minecart cart = locations.get(i).getWorld().spawn(locations.get(i), types.get(i));
-                if (!cart.isValid()) throw new IllegalArgumentException("Minecart spawn was cancelled");
+                if (!cart.isValid()) throw new UiException("Minecart spawn was cancelled", "Создание вагонетки отменено");
                 carts.add(cart);
             }
             TrainProperties properties = template == null ? TrainProperties.defaults() : template.properties.copy();
@@ -891,7 +891,7 @@ final class TrainManager implements TrainMotionController.Host {
     Train spawnSavedTrain(Player player, String savedName, String trainName) {
         SavedTrainDefinition saved = savedTrains.get(Train.normalizeName(savedName));
         if (saved == null) {
-            throw new IllegalArgumentException("找不到保存的列车模板: " + savedName);
+            throw new UiException("找不到保存的列车模板: " + savedName, "Сохранённый шаблон поезда не найден: " + savedName);
         }
 
         String actualTrainName = trainName == null || trainName.isBlank()
@@ -900,7 +900,7 @@ final class TrainManager implements TrainMotionController.Host {
         Location base = player.getLocation();
         World world = base.getWorld();
         if (world == null) {
-            throw new IllegalArgumentException("无法在当前位置生成列车。");
+            throw new UiException("无法在当前位置生成列车。", "В этом месте нельзя создать поезд.");
         }
 
         RailInfo rail = RailMath.findRail(base);
@@ -920,7 +920,7 @@ final class TrainManager implements TrainMotionController.Host {
             }
         }
         if (carts.isEmpty()) {
-            throw new IllegalArgumentException("没有成功生成任何矿车。");
+            throw new UiException("没有成功生成任何矿车。", "Не удалось создать ни одной вагонетки.");
         }
 
         Train train = createTrain(actualTrainName, carts);
@@ -934,6 +934,10 @@ final class TrainManager implements TrainMotionController.Host {
     }
 
     String setProperty(String trainName, String property, String value) {
+        return setProperty(trainName, property, value, UiLanguage.ZH);
+    }
+
+    String setProperty(String trainName, String property, String value, UiLanguage language) {
         Train train = requireTrain(trainName);
         TrainProperties properties = train.properties();
         String key = normalizeProperty(property);
@@ -978,11 +982,11 @@ final class TrainManager implements TrainMotionController.Host {
             case "speed", "targetspeed" -> train.targetSpeed = RailMath.clamp(parseDouble(cleanValue, key), 0.0, train.maxSpeed);
             case "maxspeed" -> controls.setTrainMaxSpeed(train, parseDouble(cleanValue, key));
             case "spacing" -> train.spacing = RailMath.clamp(parseDouble(cleanValue, key), 0.8, 8.0);
-            default -> throw new IllegalArgumentException("暂不支持的列车属性: " + property);
+            default -> throw new UiException("暂不支持的列车属性: " + property, "Свойство поезда пока не поддерживается: " + property);
         }
 
         persistence.save();
-        return "&a已设置 &e" + train.name() + " &a的属性 &e" + property + " &a= &f" + cleanValue;
+        return UiMessages.literal(language, "&a已设置 &e", "&aПоезд &e") + train.name() + UiMessages.literal(language, " &a的属性 &e", " &a: свойство &e") + property + " &a= &f" + cleanValue;
     }
 
     String propertyValue(String trainName, String property) {
@@ -1015,49 +1019,61 @@ final class TrainManager implements TrainMotionController.Host {
             case "tags" -> String.join(",", properties.tags());
             case "owners" -> String.join(",", properties.owners());
             case "route" -> String.join("->", properties.route());
-            default -> throw new IllegalArgumentException("暂不支持的列车属性: " + property);
+            default -> throw new UiException("暂不支持的列车属性: " + property, "Свойство поезда пока не поддерживается: " + property);
         };
     }
 
     String updateTag(String trainName, String action, String tag) {
+        return updateTag(trainName, action, tag, UiLanguage.ZH);
+    }
+
+    String updateTag(String trainName, String action, String tag, UiLanguage language) {
         TrainProperties properties = requireTrain(trainName).properties();
         String mode = action.toLowerCase(Locale.ROOT);
         if ("list".equals(mode)) {
-            return "&eTags: &f" + String.join(", ", properties.tags());
+            return UiMessages.literal(language, "&eTags: &f", "&eТеги: &f") + String.join(", ", properties.tags());
         }
         if ("add".equals(mode)) {
             properties.addTag(tag);
         } else if ("remove".equals(mode) || "del".equals(mode)) {
             properties.removeTag(tag);
         } else {
-            throw new IllegalArgumentException("用法: /st tag <列车> add|remove|list <标签>");
+            throw new UiException("用法: /st tag <列车> add|remove|list <标签>", "Использование: /st tag <train> add|remove|list <tag>");
         }
         persistence.save();
-        return "&aTags: &f" + String.join(", ", properties.tags());
+        return UiMessages.literal(language, "&aTags: &f", "&aТеги: &f") + String.join(", ", properties.tags());
     }
 
     String updateOwner(String trainName, String action, String owner) {
+        return updateOwner(trainName, action, owner, UiLanguage.ZH);
+    }
+
+    String updateOwner(String trainName, String action, String owner, UiLanguage language) {
         TrainProperties properties = requireTrain(trainName).properties();
         String mode = action.toLowerCase(Locale.ROOT);
         if ("list".equals(mode)) {
-            return "&eOwners: &f" + String.join(", ", properties.owners());
+            return UiMessages.literal(language, "&eOwners: &f", "&eВладельцы: &f") + String.join(", ", properties.owners());
         }
         if ("add".equals(mode)) {
             properties.addOwner(owner);
         } else if ("remove".equals(mode) || "del".equals(mode)) {
             properties.removeOwner(owner);
         } else {
-            throw new IllegalArgumentException("用法: /st owner <列车> add|remove|list <玩家>");
+            throw new UiException("用法: /st owner <列车> add|remove|list <玩家>", "Использование: /st owner <train> add|remove|list <player>");
         }
         persistence.save();
-        return "&aOwners: &f" + String.join(", ", properties.owners());
+        return UiMessages.literal(language, "&aOwners: &f", "&aВладельцы: &f") + String.join(", ", properties.owners());
     }
 
     String updateRoute(String trainName, String action, List<String> destinations) {
+        return updateRoute(trainName, action, destinations, UiLanguage.ZH);
+    }
+
+    String updateRoute(String trainName, String action, List<String> destinations, UiLanguage language) {
         TrainProperties properties = requireTrain(trainName).properties();
         String mode = action.toLowerCase(Locale.ROOT);
         if ("list".equals(mode)) {
-            return "&eRoute: &f" + String.join(" -> ", properties.route());
+            return UiMessages.literal(language, "&eRoute: &f", "&eМаршрут: &f") + String.join(" -> ", properties.route());
         }
         if ("clear".equals(mode)) {
             properties.clearRoute();
@@ -1068,10 +1084,10 @@ final class TrainManager implements TrainMotionController.Host {
                 properties.addRouteDestination(destination);
             }
         } else {
-            throw new IllegalArgumentException("用法: /st route <列车> set|add|clear|list <目的地...>");
+            throw new UiException("用法: /st route <列车> set|add|clear|list <目的地...>", "Использование: /st route <train> set|add|clear|list <destination...>");
         }
         persistence.save();
-        return "&aRoute: &f" + String.join(" -> ", properties.route());
+        return UiMessages.literal(language, "&aRoute: &f", "&aМаршрут: &f") + String.join(" -> ", properties.route());
     }
 
     int activateSignForNearbyTrain(Player player, Block signBlock, String actionLine,
@@ -1086,7 +1102,7 @@ final class TrainManager implements TrainMotionController.Host {
     Train requireTrain(String name) {
         Train train = train(name);
         if (train == null) {
-            throw new IllegalArgumentException("找不到列车: " + name);
+            throw new UiException("找不到列车: " + name, "Поезд не найден: " + name);
         }
         return train;
     }
@@ -1362,12 +1378,12 @@ final class TrainManager implements TrainMotionController.Host {
 
     private double parseDouble(String value, String property) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(property + " 需要数字值。");
+            throw new UiException(property + " 需要数字值。", property + " требует числового значения.");
         }
         try {
             return Double.parseDouble(value.trim());
         } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(property + " 需要数字值。");
+            throw new UiException(property + " 需要数字值。", property + " требует числового значения.");
         }
     }
 
@@ -1376,7 +1392,7 @@ final class TrainManager implements TrainMotionController.Host {
         return switch (lower) {
             case "true", "yes", "on", "1", "allow", "enabled" -> true;
             case "false", "no", "off", "0", "deny", "disabled" -> false;
-            default -> throw new IllegalArgumentException(property + " 需要 true/false。");
+            default -> throw new UiException(property + " 需要 true/false。", property + " требует true/false.");
         };
     }
 
@@ -1385,7 +1401,7 @@ final class TrainManager implements TrainMotionController.Host {
         String newKey = Train.normalizeName(clean);
         UUID existing = nameIndex.get(newKey);
         if (existing != null && !existing.equals(train.id())) {
-            throw new IllegalArgumentException("列车名已经存在: " + clean);
+            throw new UiException("列车名已经存在: " + clean, "Имя поезда уже существует: " + clean);
         }
         nameIndex.remove(train.key());
         train.rename(clean);
@@ -1484,17 +1500,17 @@ final class TrainManager implements TrainMotionController.Host {
     private String cleanName(String name) {
         String clean = name == null ? "" : name.trim();
         if (clean.isEmpty()) {
-            throw new IllegalArgumentException("列车名不能为空");
+            throw new UiException("列车名不能为空", "Имя поезда не должно быть пустым");
         }
         if (clean.length() > 32) {
-            throw new IllegalArgumentException("列车名不能超过 32 个字符");
+            throw new UiException("列车名不能超过 32 个字符", "Имя поезда не должно превышать 32 символа");
         }
         return clean;
     }
 
     String normalizeProperty(String property) {
         if (property == null || property.isBlank()) {
-            throw new IllegalArgumentException("属性名不能为空。");
+            throw new UiException("属性名不能为空。", "Имя свойства не должно быть пустым.");
         }
         return property.toLowerCase(Locale.ROOT).replace("-", "").replace("_", "");
     }

@@ -6,18 +6,19 @@ import java.util.EnumMap;
 final class DriverGuide {
     enum Hint { NONE, CLAIM, RECLAIM, REVERSER, DEMAND, SHADOW_DEMAND,
         SERVICE_UNAVAILABLE, POSITION_WAIT, MA_WAITING, SR_PENDING, BRAKE_HELD,
-        ACK_TRIP, RELEASE_OLD_MA }
+        ACK_TIMS, ACK_TRIP, RELEASE_OLD_MA }
 
     record State(boolean manual, boolean stopped, boolean driver, boolean anotherDriver,
             Reverser reverser, OperatingMode operatingMode, ProtectionMode protectionMode,
             boolean formerDriver, boolean serviceAvailable, boolean positionKnown,
-            boolean demandAvailable, String authorityReason, boolean emergencyBrake) {}
+            boolean demandAvailable, String authorityReason, boolean emergencyBrake, boolean timsHeld) {}
 
     private final EnumMap<Hint, Long> lastSent = new EnumMap<>(Hint.class);
     private Hint previous = Hint.NONE;
 
     static Hint select(State state) {
         if (!state.manual() || !state.stopped()) return Hint.NONE;
+        if (state.driver() && state.timsHeld()) return Hint.ACK_TIMS;
         if (state.driver() && state.operatingMode() == OperatingMode.TR) return Hint.ACK_TRIP;
         if (state.driver() && state.operatingMode() == OperatingMode.PT) return Hint.RELEASE_OLD_MA;
         if (!state.driver()) return state.anotherDriver() ? Hint.NONE

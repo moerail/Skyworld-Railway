@@ -6,7 +6,8 @@ enum UiLanguage {
     ZH("zh", "中文"),
     EN("en", "English"),
     FR("fr", "Français"),
-    JP("jp", "日本語");
+    JP("jp", "日本語"),
+    RU("ru", "Русский");
 
     final String code;
     final String displayName;
@@ -26,6 +27,7 @@ enum UiLanguage {
             case "en", "us", "en_us", "en-us", "english" -> EN;
             case "fr", "fr_fr", "fr-fr", "french" -> FR;
             case "jp", "ja", "ja_jp", "ja-jp", "japanese" -> JP;
+            case "ru", "ru_ru", "ru-ru", "russian", "русский" -> RU;
             default -> ZH;
         };
     }

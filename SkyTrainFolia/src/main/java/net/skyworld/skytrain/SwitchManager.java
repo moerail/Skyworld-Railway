@@ -106,7 +106,7 @@ final class SwitchManager {
                             String world = section.getString("world");
                             SwitchGeometry geometry = SwitchGeometry.parse(section.getString("geometry"));
                             if (world == null || geometry == null) {
-                                throw new IllegalArgumentException("Missing world or geometry");
+                                throw new UiException("Missing world or geometry", "Не указан мир или геометрия");
                             }
 
                             SwitchBlockPosition sign = readPosition(section, "sign", world);
@@ -118,7 +118,7 @@ final class SwitchManager {
                             BlockFace divergingFace = parseHorizontalFace(section.getString("ports.diverging"));
                             if (commonFace == null || straightFace == null || divergingFace == null) {
                                 if (legacyFront == null || !geometry.legacyFrontFacing()) {
-                                    throw new IllegalArgumentException("Missing switch port directions");
+                                    throw new UiException("Missing switch port directions", "Не указаны направления портов стрелки");
                                 }
                                 straightFace = legacyFront;
                                 commonFace = legacyFront.getOppositeFace();
@@ -244,7 +244,7 @@ final class SwitchManager {
     SwitchRegistration registerSign(Block signBlock, String geometryText, String localNameText) {
         SwitchGeometry geometry = SwitchGeometry.parseNewDefinition(geometryText);
         if (geometry == null) {
-            throw new IllegalArgumentException("道岔方向必须写 left 或 right。");
+            throw new UiException("道岔方向必须写 left 或 right。", "Направление стрелки должно быть left или right.");
         }
 
         SwitchSignMount signMount = switchSignMount(signBlock);
@@ -260,7 +260,7 @@ final class SwitchManager {
         Rail.Shape straightShape = shapeFor(common, straight);
         Rail.Shape divergingShape = shapeFor(common, diverging);
         if (!pivotRail.getShapes().contains(straightShape) || !pivotRail.getShapes().contains(divergingShape)) {
-            throw new IllegalArgumentException("当前铁轨类型不支持该道岔几何。");
+            throw new UiException("当前铁轨类型不支持该道岔几何。", "Текущий тип рельса не поддерживает эту геометрию стрелки.");
         }
 
         SwitchBlockPosition signPosition = SwitchBlockPosition.of(signBlock);
@@ -269,7 +269,7 @@ final class SwitchManager {
         UUID existingAtSign = signIndex.get(signPosition.key());
         UUID existingAtPivot = pivotIndex.get(pivotPosition.key());
         if (existingAtPivot != null && !existingAtPivot.equals(existingAtSign)) {
-            throw new IllegalArgumentException("这根尖轨已经绑定了另一个 SkyTrain 道岔牌。");
+            throw new UiException("这根尖轨已经绑定了另一个 SkyTrain 道岔牌。", "Этот поворотный рельс уже связан с другой табличкой стрелки SkyTrain.");
         }
 
         UUID id = existingAtSign == null ? UUID.randomUUID() : existingAtSign;
@@ -1058,7 +1058,7 @@ final class SwitchManager {
             SwitchGeometry geometry) {
         Block pivot = support.getRelative(BlockFace.UP, 2);
         if (pivot.getType() != Material.RAIL || !(pivot.getBlockData() instanceof Rail)) {
-            throw new IllegalArgumentException("fl/fr 安装要求道岔尖轨位于控制牌背后承载方块的上方两格。");
+            throw new UiException("fl/fr 安装要求道岔尖轨位于控制牌背后承载方块的上方两格。", "Для fl/fr поворотный рельс должен быть на два блока выше опорного блока за табличкой.");
         }
         BlockFace common = throughSign.getOppositeFace();
         return new SwitchLayout(
@@ -1085,11 +1085,11 @@ final class SwitchManager {
             // the placing player looks at the sign from.
             BlockFace front = hangingSign.getRotation().getOppositeFace();
             if (!isHorizontal(front)) {
-                throw new IllegalArgumentException("悬挂告示牌必须摆正朝向东、南、西或北，不能斜放。");
+                throw new UiException("悬挂告示牌必须摆正朝向东、南、西或北，不能斜放。", "Подвесная табличка должна быть направлена строго на восток, юг, запад или север, не по диагонали.");
             }
             return new SwitchSignMount(signBlock.getRelative(BlockFace.UP), BlockFace.UP, front, true);
         }
-        throw new IllegalArgumentException("道岔控制牌必须是墙上告示牌或悬挂告示牌。");
+        throw new UiException("道岔控制牌必须是墙上告示牌或悬挂告示牌。", "Стрелочная табличка должна быть настенной или подвесной.");
     }
 
     private static SwitchLayout switchLayout(SwitchSignMount signMount, SwitchGeometry geometry) {
@@ -1103,7 +1103,7 @@ final class SwitchManager {
         if (signMount.hangingBelowTrack()) {
             Block pivot = support.getRelative(BlockFace.UP);
             if (pivot.getType() != Material.RAIL || !(pivot.getBlockData() instanceof Rail)) {
-                throw new IllegalArgumentException("悬挂告示牌上方必须依次是承载方块和道岔尖轨。");
+                throw new UiException("悬挂告示牌上方必须依次是承载方块和道岔尖轨。", "Над подвесной табличкой должны последовательно находиться опорный блок и поворотный рельс.");
             }
             return sideMountedLayout(pivot, front.getOppositeFace(), geometry);
         }
@@ -1118,7 +1118,7 @@ final class SwitchManager {
             BlockFace common = front.getOppositeFace();
             return new SwitchLayout(belowPivot, common, front, geometry.divergingFace(front));
         }
-        throw new IllegalArgumentException("未找到尖轨：侧贴模式要求尖轨在承载方块上方一格；下装模式要求尖轨在上方两格。");
+        throw new UiException("未找到尖轨：侧贴模式要求尖轨在承载方块上方一格；下装模式要求尖轨在上方两格。", "Поворотный рельс не найден: сбоку он должен быть на блок выше опоры, при нижнем креплении — на два блока.");
     }
 
     private static SwitchLayout sideMountedLayout(Block pivot, BlockFace behindSign,
@@ -1149,7 +1149,7 @@ final class SwitchManager {
         if (contains(first, second, BlockFace.SOUTH, BlockFace.WEST)) {
             return Rail.Shape.SOUTH_WEST;
         }
-        throw new IllegalArgumentException("Unsupported switch rail faces: " + first + ", " + second);
+        throw new UiException("Unsupported switch rail faces: " + first + ", " + second, "Неподдерживаемые направления рельса стрелки: " + first + ", " + second);
     }
 
     private static boolean contains(BlockFace first, BlockFace second, BlockFace expectedA, BlockFace expectedB) {

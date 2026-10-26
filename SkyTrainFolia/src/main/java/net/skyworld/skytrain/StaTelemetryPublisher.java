@@ -35,7 +35,7 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
             if (java.nio.file.Files.exists(destructionFile)) {
                 var saved = new com.google.gson.Gson().fromJson(java.nio.file.Files.readString(destructionFile), ConsistObservation[].class);
                 for (var receipt : saved) {
-                    if (!receipt.confirmedDestruction()) throw new IllegalArgumentException("Incomplete destruction receipt");
+                    if (!receipt.confirmedDestruction()) throw new UiException("Incomplete destruction receipt", "Неполное подтверждение удаления");
                     destructions.put(receipt.train(), receipt);
                 }
             }
@@ -43,7 +43,7 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
             throw new IllegalStateException("Invalid destruction receipts; original file retained", ex);
         }
         scale = plugin.getConfig().getDouble("infrastructure.blocks-per-meter", 1.0);
-        if (!Double.isFinite(scale) || scale <= 0) throw new IllegalArgumentException("Invalid distance scale");
+        if (!Double.isFinite(scale) || scale <= 0) throw new UiException("Invalid distance scale", "Недопустимый масштаб расстояния");
         store = new LatestMessageStore(session, 16384, ex -> plugin.getLogger().warning("STA consumer failed: " + ex));
         task = plugin.getServer().getAsyncScheduler().runAtFixedRate(plugin, t -> {
             store.dispatch(); store.pruneRemovals(System.currentTimeMillis() - 120000);

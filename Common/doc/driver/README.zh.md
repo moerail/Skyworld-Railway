@@ -1,5 +1,7 @@
 # SkyRail 司机手册
 
+TIMS 停车保持时，聊天通知提供可点击的 `/st tims ack`。停稳后司机引导会优先显示“确认 TIMS”，确认成功后再按提示处理 `/stcs ma ack`、`/stcs ma release` 和 `/stcs ma fs`。先恢复原编组并确认全列停稳；点击不会跳过完整性检查，确认后仍保持制动。
+
 ## 当前更新：STF 4.0.8 / STCS 4.1.0
 
 STA 当前为 2.1.4，SkyPCC 为 2.0.3。维护者确认 STCS 4.1.0 测试通过。库莉酱会按玩家语言提供停稳后的下一步提示及 MA、定位、SR 等待状态，提示文字由管理员词库控制，不会自动操作列车。FS 会随车速更早检查前方道岔，但只有取得当前有效的 MA 才能行车；冲突、未知状态和 MA 上限仍然有效。下方旧版本基线保留作历史记录。[版本概览](../../README.zh.md)。
@@ -8,7 +10,7 @@ STA 当前为 2.1.4，SkyPCC 为 2.0.3。维护者确认 STCS 4.1.0 测试通过
 
 本次小版本为 **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**。停车后，调度转岔会先取得车端停车保持确认，再释放相关 MA 预约、转岔并重算 MA，司机无需先 release。网页 PCC 新增“撤销所选列车 MA → TR”：手动列车运行或停车都进入 TR 并制动；运行中的旧预约保留到全列确认停稳，车身占用始终保留。影子通道也执行此项主动调度停车命令。司机停稳后执行 `/stcs ma ack`、`/stcs ma release`，再重新申请 MA。失败／超时不代表撤销完成。需配套更新已安装插件并刷新客户端，保留原证书和令牌；实服验收待完成。 [4.0.7 release notes](../releases/suite-v4.0.7.md)
 
-[中文](README.zh.md) | [English](README.en.md) | [Français](README.fr.md) | [日本語](README.ja.md) · [项目首页](../../README.md)
+[中文](README.zh.md) | [English](README.en.md) | [Français](README.fr.md) | [日本語](README.ja.md) | [Русский](README.ru.md) · [项目首页](../../README.md)
 
 适用于已经坐在手动列车上、准备驾驶的普通玩家。已发布版本：Shiroha 26.2 或 26.3 上的 STF 4.0.7、STCS 4.0.5、STA 2.1.3、SkyPCC 2.0.2。建车、铺轨、插件配置由管理员负责；实服验收仍待完成。
 

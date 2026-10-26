@@ -34,7 +34,7 @@ final class MaSoundSettings {
         try {
             String id = c.getString(p + "sound", fallback.sound()).trim();
             if (!id.contains(":")) id = "minecraft:" + id;
-            if (!id.matches("[a-z0-9_.-]+:[a-z0-9/._-]+")) throw new IllegalArgumentException("invalid sound ID");
+            if (!id.matches("[a-z0-9_.-]+:[a-z0-9/._-]+")) throw new UiException("invalid sound ID", "недопустимый ID звука");
             double v = c.getDouble(p + "volume", volume), f = c.getDouble(p + "pitch", pitch);
             int n = c.getInt(p + "count", count);
             long interval = c.getLong(p + "interval-ticks", defaultInterval);
@@ -43,18 +43,18 @@ final class MaSoundSettings {
             if (c.contains(p + "pitch-sequence", true)) {
                 Object configured = c.get(p + "pitch-sequence");
                 if (!(configured instanceof List<?> values) || values.isEmpty() || values.size() > 64)
-                    throw new IllegalArgumentException("invalid pitch-sequence");
+                    throw new UiException("invalid pitch-sequence", "недопустимая pitch-sequence");
                 pitches = new ArrayList<>();
                 for (Object value : values) {
                     if (!(value instanceof Number number) || !Double.isFinite(number.doubleValue())
                             || number.doubleValue() < .5 || number.doubleValue() > 2)
-                        throw new IllegalArgumentException("invalid pitch-sequence pitch");
+                        throw new UiException("invalid pitch-sequence pitch", "недопустимая высота тона pitch-sequence");
                     pitches.add(number.floatValue());
                 }
             }
             if (!Double.isFinite(v) || v < 0 || v > 4 || !Double.isFinite(f) || f < .5 || f > 2
                     || n < 1 || n > 16 || n * pitches.size() > 64 || interval < 1 || interval > 200)
-                throw new IllegalArgumentException("value out of range");
+                throw new UiException("value out of range", "значение вне диапазона");
             result.put(cue, new Tone(c.getBoolean("ma-sounds.enabled", true) && c.getBoolean(p + "enabled", true), id,
                     SoundCategory.valueOf(c.getString(p + "category", "MASTER").toUpperCase(Locale.ROOT)),
                     (float)v, (float)f, n, interval, pitches));

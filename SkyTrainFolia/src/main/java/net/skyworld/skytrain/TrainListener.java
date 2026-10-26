@@ -192,7 +192,7 @@ final class TrainListener implements Listener {
             return;
         }
         event.setCancelled(true);
-        tell(event.getEntered(), "&c这辆列车暂时不允许上车。");
+        tell(event.getEntered(), "&c这辆列车暂时不允许上车。", "&cПосадка в этот поезд сейчас запрещена.");
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -207,7 +207,7 @@ final class TrainListener implements Listener {
             return;
         }
         event.setCancelled(true);
-        tell(event.getExited(), "&c这辆列车暂时不允许下车。");
+        tell(event.getExited(), "&c这辆列车暂时不允许下车。", "&cВыход из этого поезда сейчас запрещён.");
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -222,7 +222,7 @@ final class TrainListener implements Listener {
         }
         event.setCancelled(true);
         event.setDamage(0.0);
-        tell(event.getAttacker(), "&c这辆列车受保护，只能使用 /st remove 或 destroy 控制牌回收。");
+        tell(event.getAttacker(), "&c这辆列车受保护，只能使用 /st remove 或 destroy 控制牌回收。", "&cПоезд защищён; удалить его можно только через /st remove или табличку destroy.");
     }
 
     @EventHandler
@@ -249,7 +249,7 @@ final class TrainListener implements Listener {
         if (automaticHeader != null && AutomaticSigns.action(event.getLine(1))) {
             if (!event.getPlayer().hasPermission("skytrain.admin")) {
                 event.setCancelled(true);
-                event.getPlayer().sendMessage(ChatColor.RED + "Missing permission: skytrain.admin");
+                event.getPlayer().sendMessage(ChatColor.RED + ui.literal(event.getPlayer(), "Missing permission: skytrain.admin", "Нет права: skytrain.admin"));
                 return;
             }
             try {
@@ -262,10 +262,10 @@ final class TrainListener implements Listener {
                         manager.automaticSigns().register(event.getBlock());
                     }
                 },1L);
-                event.getPlayer().sendMessage(ChatColor.GREEN + "Automatic sign registered: " + actionLine);
+                event.getPlayer().sendMessage(ChatColor.GREEN + ui.literal(event.getPlayer(), "Automatic sign registered: ", "Автоматическая табличка зарегистрирована: ") + actionLine);
             } catch (IllegalArgumentException ex) {
                 event.setCancelled(true);
-                event.getPlayer().sendMessage(ChatColor.RED + ex.getMessage());
+                event.getPlayer().sendMessage(ChatColor.RED + ui.error(event.getPlayer(), ex));
             }
             return;
         }
@@ -275,7 +275,7 @@ final class TrainListener implements Listener {
 
         if (!event.getPlayer().hasPermission("skytrain.admin")) {
             event.setCancelled(true);
-            event.getPlayer().sendMessage(ChatColor.RED + "你没有 skytrain.admin 权限，不能创建 SkyTrain 控制牌。");
+            event.getPlayer().sendMessage(ChatColor.RED + ui.literal(event.getPlayer(), "你没有 skytrain.admin 权限，不能创建 SkyTrain 控制牌。", "Без skytrain.admin нельзя создавать управляющие таблички SkyTrain."));
             return;
         }
 
@@ -289,17 +289,17 @@ final class TrainListener implements Listener {
                 event.setLine(2, registration.geometry().code);
                 event.setLine(3, ChatColor.stripColor(event.getLine(3) == null ? "" : event.getLine(3)).trim());
                 event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.GREEN
-                        + "道岔已创建。UUID: " + ChatColor.YELLOW + registration.id());
+                        + ui.literal(event.getPlayer(), "道岔已创建。UUID: ", "Стрелка создана. UUID: ") + ChatColor.YELLOW + registration.id());
                 if ("waiting".equals(registration.actuatorStatus())) {
                     event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.YELLOW
-                            + "未找到道岔执行拉杆；请在控制牌或承载方块旁 1 格内放置一个拉杆。");
+                            + ui.literal(event.getPlayer(), "未找到道岔执行拉杆；请在控制牌或承载方块旁 1 格内放置一个拉杆。", "Рычаг привода стрелки не найден; установите один в пределах блока от таблички или её опоры."));
                 } else if ("conflict".equals(registration.actuatorStatus())) {
                     event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.RED
-                            + "附近找到多个道岔执行拉杆；请只保留一个。");
+                            + ui.literal(event.getPlayer(), "附近找到多个道岔执行拉杆；请只保留一个。", "Рядом несколько рычагов привода стрелки; оставьте только один."));
                 }
             } catch (IllegalArgumentException ex) {
                 event.setCancelled(true);
-                event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.RED + ex.getMessage());
+                event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.RED + ui.error(event.getPlayer(), ex));
             }
             return;
         }
@@ -318,11 +318,11 @@ final class TrainListener implements Listener {
                     event.setLine(3, registration.displayName());
                 }
                 event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.GREEN
-                        + markerType.storageName() + " 已创建。UUID: "
+                        + markerType.storageName() + ui.literal(event.getPlayer(), " 已创建。UUID: ", " создан. UUID: ")
                         + ChatColor.YELLOW + registration.id());
             } catch (IllegalArgumentException ex) {
                 event.setCancelled(true);
-                event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.RED + ex.getMessage());
+                event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.RED + ui.error(event.getPlayer(), ex));
             }
             return;
         }
@@ -334,10 +334,10 @@ final class TrainListener implements Listener {
                 event.setLine(1, "station");
                 event.setLine(3, station.departure());
                 event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.GREEN
-                        + "车站停车标已创建。UUID: " + ChatColor.YELLOW + station.id());
+                        + ui.literal(event.getPlayer(), "车站停车标已创建。UUID: ", "Маркер остановки станции создан. UUID: ") + ChatColor.YELLOW + station.id());
             } catch (IllegalArgumentException ex) {
                 event.setCancelled(true);
-                event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.RED + ex.getMessage());
+                event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.RED + ui.error(event.getPlayer(), ex));
                 return;
             }
             return;
@@ -346,13 +346,13 @@ final class TrainListener implements Listener {
         if ("property".equalsIgnoreCase(action)) {
             event.setLine(1, "property");
             event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.GREEN
-                    + "属性控制牌已创建。");
+                    + ui.literal(event.getPlayer(), "属性控制牌已创建。", "Табличка свойства создана."));
             return;
         }
 
         event.setCancelled(true);
         event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.RED
-                + "不支持的控制牌类型。第二行目前支持 switch、station、property、origin、balise、end。");
+                + ui.literal(event.getPlayer(), "不支持的控制牌类型。第二行目前支持 switch、station、property、origin、balise、end。", "Неподдерживаемый тип таблички. Вторая строка поддерживает switch, station, property, origin, balise, end."));
         return;
 
     }
@@ -362,14 +362,14 @@ final class TrainListener implements Listener {
         manager.automaticSigns().remove(event.getBlock());
         if (infrastructureManager.removeSign(event.getBlock())) {
             event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.YELLOW
-                    + "线路基础设施定义已删除。");
+                    + ui.literal(event.getPlayer(), "线路基础设施定义已删除。", "Определение инфраструктуры линии удалено."));
         }
         if (stationManager.removeSign(event.getBlock())) {
             event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.YELLOW
-                    + "车站停车标定义已删除。");
+                    + ui.literal(event.getPlayer(), "车站停车标定义已删除。", "Определение маркера остановки станции удалено."));
         }
         if (switchManager.removeBrokenComponent(event.getBlock())) {
-            event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.YELLOW + "道岔定义已删除。");
+            event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.YELLOW + ui.literal(event.getPlayer(), "道岔定义已删除。", "Определение стрелки удалено."));
         }
         switchManager.onBlockBroken(event.getBlock());
     }
@@ -387,9 +387,9 @@ final class TrainListener implements Listener {
         }
     }
 
-    private void tell(Entity entity, String message) {
+    private void tell(Entity entity, String message, String ru) {
         if (entity instanceof Player player) {
-            player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6[SkyTrain]&r " + message));
+            player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&6[SkyTrain]&r " + ui.literal(player, message, ru)));
         }
     }
 }

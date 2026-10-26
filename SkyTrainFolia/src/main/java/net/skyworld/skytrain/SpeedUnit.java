@@ -30,7 +30,7 @@ enum SpeedUnit {
             case "kph", "kmh", "km/h" -> KPH;
             case "mph" -> MPH;
             case "blocktick", "block/tick", "bpt", "blockspertick" -> BLOCK_PER_TICK;
-            default -> throw new IllegalArgumentException("Unknown speed unit: " + value);
+            default -> throw new UiException("Unknown speed unit: " + value, "Неизвестная единица скорости: " + value);
         };
     }
 }

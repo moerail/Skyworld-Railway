@@ -12,8 +12,7 @@ enum ConductionMode {
         return switch (normalized) {
             case "manual", "man", "human", "driver", "atooff" -> MANUAL;
             case "automatic", "auto", "ato", "driverless" -> AUTOMATIC;
-            default -> throw new IllegalArgumentException(
-                    "conduction-mode 只能是 manual 或 automatic。");
+            default -> throw new UiException("conduction-mode 只能是 manual 或 automatic。", "conduction-mode должен быть manual или automatic.");
         };
     }
 

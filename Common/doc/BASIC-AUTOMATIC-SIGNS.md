@@ -1,5 +1,7 @@
 # Basic Automatic Signs (STF 2.1.3)
 
+**English** | [Русский](BASIC-AUTOMATIC-SIGNS.ru.md)
+
 This update covers automatic target speed, lead-cart station alignment and local
 station detection without STCS line calibration. It does not add occupancy
 protection, MA enforcement or a new driver-authority state machine.

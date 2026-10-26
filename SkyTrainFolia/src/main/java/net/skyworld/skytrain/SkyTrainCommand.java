@@ -112,7 +112,7 @@ final class SkyTrainCommand implements TabExecutor {
             switch (subcommand) {
                 case "syncstatus" -> {
                     if (!sender.hasPermission("skytrain.admin")) {
-                        plugin.send(sender, "&c需要 skytrain.admin 权限。");
+                        plugin.send(sender, ui.literal(sender, "&c需要 skytrain.admin 权限。", "&cТребуется право skytrain.admin."));
                     } else {
                         plugin.send(sender, manager.motionSyncStatus());
                     }
@@ -148,7 +148,7 @@ final class SkyTrainCommand implements TabExecutor {
                 default -> plugin.send(sender, "&c" + ui.text(sender, "error.unknown"));
             }
         } catch (IllegalArgumentException ex) {
-            plugin.send(sender, "&c" + ui.text(sender, ex.getMessage()));
+            plugin.send(sender, "&c" + ui.error(sender, ex));
         }
         return true;
     }
@@ -199,7 +199,7 @@ final class SkyTrainCommand implements TabExecutor {
             return partial(args[2], List.of("straight", "diverging"));
         }
         if (args.length == 2 && List.of("lang", "language").contains(subcommand)) {
-            return partial(args[1], List.of("zh", "en", "fr", "jp"));
+            return partial(args[1], List.of("zh", "en", "fr", "jp", "ja", "ru"));
         }
         if (args.length == 2 && List.of("speedunit", "unit").contains(subcommand)) {
             return partial(args[1], List.of("kph", "mph", "block/tick"));
@@ -252,13 +252,13 @@ final class SkyTrainCommand implements TabExecutor {
         boolean resetAdmin = sender instanceof org.bukkit.command.ConsoleCommandSender
                 || sender instanceof Player && sender.hasPermission("stcs.admin");
         if (manager.trainCount() == 0) {
-            plugin.send(sender, "&7目前还没有创建列车。");
+            plugin.send(sender, ui.literal(sender, "&7目前还没有创建列车。", "&7Поезда ещё не созданы."));
             if (resetAdmin && args.length == 1) {
                 String code = plugin.issueShadowLedgerResetChallenge(sender, true);
-                if (code != null) plugin.send(sender, "&e影子账本重置验证码：&f" + code
-                        + "&e（60 秒有效、仅本人可用、使用一次即失效）。完成全线和未加载区块的实体巡查后执行 /stcs ma reset-ledger "
-                        + code + " confirm；此码不证明轨道已清空。");
-                else plugin.send(sender, "&c列车数据尚未加载完毕，无法发放账本重置验证码。");
+                if (code != null) plugin.send(sender, ui.literal(sender, "&e影子账本重置验证码：&f", "&eКод сброса теневого реестра: &f") + code
+                        + ui.literal(sender, "&e（60 秒有效、仅本人可用、使用一次即失效）。完成全线和未加载区块的实体巡查后执行 /stcs ma reset-ledger ", "&e (действует 60 секунд, только для вас и один раз). После осмотра сущностей на всей линии, включая незагруженные чанки, выполните /stcs ma reset-ledger ")
+                        + code + ui.literal(sender, " confirm；此码不证明轨道已清空。", " confirm; этот код не доказывает свободность пути."));
+                else plugin.send(sender, ui.literal(sender, "&c列车数据尚未加载完毕，无法发放账本重置验证码。", "&cДанные поездов ещё загружаются; код сброса пока недоступен."));
             } else if (resetAdmin) plugin.revokeShadowLedgerResetChallenge(sender);
             return;
         }
@@ -313,66 +313,66 @@ final class SkyTrainCommand implements TabExecutor {
     private void scan(CommandSender sender, String[] args) {
         requireUse(sender);
         Player player = requirePlayer(sender);
-        double radius = args.length >= 2 ? parseDouble(args[1], "半径") : scanRadius();
+        double radius = args.length >= 2 ? parseDouble(sender, args[1], ui.literal(sender, "半径", "Радиус")) : scanRadius();
         int count = manager.scanNearby(player, radius).size();
-        plugin.send(sender, "&a已扫描附近 &e" + count + " &a辆矿车。");
+        plugin.send(sender, ui.literal(sender, "&a已扫描附近 &e", "&aНайдено вагонеток рядом: &e") + count + ui.literal(sender, " &a辆矿车。", " &aшт."));
     }
 
     private void create(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 2) {
-            throw new IllegalArgumentException("用法: /st create <名字> [半径]");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st create <名字> [半径]", "Использование: /st create <name> [radius]"));
         }
         Player player = requirePlayer(sender);
-        double radius = args.length >= 3 ? parseDouble(args[2], "半径") : scanRadius();
+        double radius = args.length >= 3 ? parseDouble(sender, args[2], ui.literal(sender, "半径", "Радиус")) : scanRadius();
         Train train = manager.createTrain(args[1], manager.scanNearby(player, radius));
-        plugin.send(sender, "&a已创建列车: " + ui.trainSummary(sender, train));
+        plugin.send(sender, ui.literal(sender, "&a已创建列车: ", "&aПоезд создан: ") + ui.trainSummary(sender, train));
     }
 
     private void connect(CommandSender sender, String[] args) {
         requireAdmin(sender);
         Player player = requirePlayer(sender);
-        double radius = args.length >= 2 ? parseDouble(args[1], "半径") : scanRadius();
+        double radius = args.length >= 2 ? parseDouble(sender, args[1], ui.literal(sender, "半径", "Радиус")) : scanRadius();
         int changed = manager.connectNearby(player, radius);
-        plugin.send(sender, changed > 0 ? "&a已自动连接 &e" + changed + " &a辆矿车。" : "&7附近没有需要连接的矿车。");
+        plugin.send(sender, changed > 0 ? ui.literal(sender, "&a已自动连接 &e", "&aСцеплено вагонеток: &e") + changed + ui.literal(sender, " &a辆矿车。", " &aшт.") : ui.literal(sender, "&7附近没有需要连接的矿车。", "&7Рядом нет вагонеток, требующих сцепления."));
     }
 
     private void append(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 2) {
-            throw new IllegalArgumentException("用法: /st append <名字> [半径]");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st append <名字> [半径]", "Использование: /st append <name> [radius]"));
         }
         Player player = requirePlayer(sender);
-        double radius = args.length >= 3 ? parseDouble(args[2], "半径") : scanRadius();
+        double radius = args.length >= 3 ? parseDouble(sender, args[2], ui.literal(sender, "半径", "Радиус")) : scanRadius();
         int added = manager.appendCarts(args[1], manager.scanNearby(player, radius));
-        plugin.send(sender, "&a已追加 &e" + added + " &a辆矿车。");
+        plugin.send(sender, ui.literal(sender, "&a已追加 &e", "&aДобавлено вагонеток: &e") + added + ui.literal(sender, " &a辆矿车。", " &aшт."));
     }
 
     private void start(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 2) {
-            throw new IllegalArgumentException("用法: /st start <名字> [速度]");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st start <名字> [速度]", "Использование: /st start <name> [speed]"));
         }
         scanIfPlayer(sender);
-        Double speed = args.length >= 3 ? parseDouble(args[2], "速度") : null;
+        Double speed = args.length >= 3 ? parseDouble(sender, args[2], ui.literal(sender, "速度", "Скорость")) : null;
         manager.start(args[1], speed);
-        plugin.send(sender, "&a列车已启动。");
+        plugin.send(sender, ui.literal(sender, "&a列车已启动。", "&aПоезд запущен."));
     }
 
     private void stop(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 2) {
-            throw new IllegalArgumentException("用法: /st stop <名字>");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st stop <名字>", "Использование: /st stop <name>"));
         }
         scanIfPlayer(sender);
         manager.stop(args[1]);
-        plugin.send(sender, "&a列车已停车。");
+        plugin.send(sender, ui.literal(sender, "&a列车已停车。", "&aПоезд остановлен."));
     }
 
     private void reverse(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 2) {
-            throw new IllegalArgumentException("用法: /st reverse <名字>");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st reverse <名字>", "Использование: /st reverse <name>"));
         }
         scanIfPlayer(sender);
         Train train = manager.requireTrain(args[1]);
@@ -387,28 +387,28 @@ final class SkyTrainCommand implements TabExecutor {
     private void speed(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 3) {
-            throw new IllegalArgumentException("用法: /st speed <名字> <速度>");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st speed <名字> <速度>", "Использование: /st speed <name> <speed>"));
         }
-        manager.speed(args[1], parseDouble(args[2], "速度"));
-        plugin.send(sender, "&a速度已更新。");
+        manager.speed(args[1], parseDouble(sender, args[2], ui.literal(sender, "速度", "Скорость")));
+        plugin.send(sender, ui.literal(sender, "&a速度已更新。", "&aСкорость обновлена."));
     }
 
     private void maxSpeed(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 3) {
-            throw new IllegalArgumentException("用法: /st maxspeed <名字> <速度>");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st maxspeed <名字> <速度>", "Использование: /st maxspeed <name> <speed>"));
         }
-        manager.setMaxSpeed(args[1], parseDouble(args[2], "最大速度"));
-        plugin.send(sender, "&a最大速度已更新。");
+        manager.setMaxSpeed(args[1], parseDouble(sender, args[2], ui.literal(sender, "最大速度", "Максимальная скорость")));
+        plugin.send(sender, ui.literal(sender, "&a最大速度已更新。", "&aМаксимальная скорость обновлена."));
     }
 
     private void spacing(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 3) {
-            throw new IllegalArgumentException("用法: /st spacing <名字> <间距>");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st spacing <名字> <间距>", "Использование: /st spacing <name> <spacing>"));
         }
-        manager.setSpacing(args[1], parseDouble(args[2], "间距"));
-        plugin.send(sender, "&a车厢间距已更新。");
+        manager.setSpacing(args[1], parseDouble(sender, args[2], ui.literal(sender, "间距", "Интервал")));
+        plugin.send(sender, ui.literal(sender, "&a车厢间距已更新。", "&aИнтервал вагонеток обновлён."));
     }
 
     private void drive(CommandSender sender) {
@@ -453,14 +453,14 @@ final class SkyTrainCommand implements TabExecutor {
         }
         boolean enabled = cabUiManager.toggleHotbar(player, train);
         plugin.send(sender, enabled
-                ? "&a热键栏驾驶已开启: 副手=EB 1=B7 2=B5 3=B3 4=B1 5=N 6=P1 7=P2 8=P3 9=P4"
-                : "&7热键栏驾驶已关闭。");
+                ? ui.literal(sender, "&a热键栏驾驶已开启: 副手=EB 1=B7 2=B5 3=B3 4=B1 5=N 6=P1 7=P2 8=P3 9=P4", "&aХотбар включён: смена рук=EB 1=B7 2=B5 3=B3 4=B1 5=N 6=P1 7=P2 8=P3 9=P4")
+                : ui.literal(sender, "&7热键栏驾驶已关闭。", "&7Управление хотбаром отключено."));
     }
 
     private void admin(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 3) {
-            throw new IllegalArgumentException("用法: /st admin release|p1..p4|b1..b7|n|eb <列车名>");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st admin release|p1..p4|b1..b7|n|eb <列车名>", "Использование: /st admin release|p1..p4|b1..b7|n|eb <train>"));
         }
         String action = args[1].toLowerCase(Locale.ROOT);
         Train train = manager.requireTrain(args[2]);
@@ -468,11 +468,11 @@ final class SkyTrainCommand implements TabExecutor {
             cabUiManager.forceRelease(train);
             manager.emergencyBrake(train);
             manager.confirmManualRelease(train);
-            plugin.send(sender, "&c已切断列车 " + train.name() + " 的当前司机控制权，并施加 EB。");
+            plugin.send(sender, ui.literal(sender, "&c已切断列车 ", "&cУправление машиниста поездом ") + train.name() + ui.literal(sender, " 的当前司机控制权，并施加 EB。", " отозвано; включён EB."));
             return;
         }
         if (!isAdminDriveAction(action)) {
-            throw new IllegalArgumentException("未知管理员驾驶指令: " + action);
+            throw new IllegalArgumentException(ui.literal(sender, "未知管理员驾驶指令: ", "Неизвестная административная команда вождения: ") + action);
         }
         train.driverEmergencyHold = false;
         applyDriveAction(sender, train, action);
@@ -595,7 +595,7 @@ final class SkyTrainCommand implements TabExecutor {
                     plugin.send(sender, "&a" + ui.text(sender, "drive.notch.brake", notch, ui.driveStatus(sender, train)));
                     return;
                 }
-                throw new IllegalArgumentException("未知驾驶指令: " + action);
+                throw new IllegalArgumentException(ui.literal(sender, "未知驾驶指令: ", "Неизвестная команда вождения: ") + action);
             }
         }
     }
@@ -605,105 +605,105 @@ final class SkyTrainCommand implements TabExecutor {
         Player player = requirePlayer(sender);
         List<Minecart> carts = manager.scanNearby(player, 4.0);
         if (carts.isEmpty()) {
-            plugin.send(sender, "&c附近没有矿车。");
+            plugin.send(sender, ui.literal(sender, "&c附近没有矿车。", "&cРядом нет вагонеток."));
             return;
         }
         Train train = manager.removeCart(carts.get(0), true);
-        plugin.send(sender, train == null ? "&7这辆矿车没有绑定列车。" : "&a已移除矿车绑定。");
+        plugin.send(sender, train == null ? ui.literal(sender, "&7这辆矿车没有绑定列车。", "&7Эта вагонетка не привязана к поезду.") : ui.literal(sender, "&a已移除矿车绑定。", "&aПривязка вагонетки удалена."));
     }
 
     private void remove(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 2) {
-            throw new IllegalArgumentException("用法: /st remove <名字>");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st remove <名字>", "Использование: /st remove <name>"));
         }
-        plugin.send(sender, manager.removeTrain(args[1]) ? "&a列车已删除。" : "&c找不到列车。");
+        plugin.send(sender, manager.removeTrain(args[1]) ? ui.literal(sender, "&a列车已删除。", "&aПоезд удалён.") : ui.literal(sender, "&c找不到列车。", "&cПоезд не найден."));
     }
 
     private void property(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 3) {
-            throw new IllegalArgumentException("用法: /st property <列车> <属性> [值]");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st property <列车> <属性> [值]", "Использование: /st property <train> <property> [value]"));
         }
         String action = args[2].toLowerCase(Locale.ROOT);
         if ("get".equals(action) || "show".equals(action)) {
             if (args.length < 4) {
-                throw new IllegalArgumentException("用法: /st property <列车> get <属性>");
+                throw new IllegalArgumentException(ui.literal(sender, "用法: /st property <列车> get <属性>", "Использование: /st property <train> get <property>"));
             }
             plugin.send(sender, "&e" + args[3] + " &7= &f" + manager.propertyValue(args[1], args[3]));
             return;
         }
         if ("set".equals(action)) {
             if (args.length < 5) {
-                throw new IllegalArgumentException("用法: /st property <列车> <属性> <值>");
+                throw new IllegalArgumentException(ui.literal(sender, "用法: /st property <列车> <属性> <值>", "Использование: /st property <train> <property> <value>"));
             }
-            plugin.send(sender, manager.setProperty(args[1], args[3], join(args, 4)));
+            plugin.send(sender, manager.setProperty(args[1], args[3], join(args, 4), ui.language(sender)));
             return;
         }
         if (args.length == 3) {
             plugin.send(sender, "&e" + args[2] + " &7= &f" + manager.propertyValue(args[1], args[2]));
             return;
         }
-        plugin.send(sender, manager.setProperty(args[1], args[2], join(args, 3)));
+        plugin.send(sender, manager.setProperty(args[1], args[2], join(args, 3), ui.language(sender)));
     }
 
     private void tag(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 3) {
-            throw new IllegalArgumentException("用法: /st tag <列车> add|remove|list [标签]");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st tag <列车> add|remove|list [标签]", "Использование: /st tag <train> add|remove|list [tag]"));
         }
         String tag = args.length >= 4 ? join(args, 3) : "";
-        plugin.send(sender, manager.updateTag(args[1], args[2], tag));
+        plugin.send(sender, manager.updateTag(args[1], args[2], tag, ui.language(sender)));
     }
 
     private void owner(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 3) {
-            throw new IllegalArgumentException("用法: /st owner <列车> add|remove|list [玩家]");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st owner <列车> add|remove|list [玩家]", "Использование: /st owner <train> add|remove|list [player]"));
         }
         String owner = args.length >= 4 ? args[3] : "";
-        plugin.send(sender, manager.updateOwner(args[1], args[2], owner));
+        plugin.send(sender, manager.updateOwner(args[1], args[2], owner, ui.language(sender)));
     }
 
     private void route(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 3) {
-            throw new IllegalArgumentException("用法: /st route <列车> set|add|clear|list [目的地...]");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st route <列车> set|add|clear|list [目的地...]", "Использование: /st route <train> set|add|clear|list [destination...]"));
         }
         List<String> destinations = destinations(args, 3);
-        plugin.send(sender, manager.updateRoute(args[1], args[2], destinations));
+        plugin.send(sender, manager.updateRoute(args[1], args[2], destinations, ui.language(sender)));
     }
 
     private void savedTrain(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 2) {
-            throw new IllegalArgumentException("用法: /st savedtrain list|save|spawn ...");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st savedtrain list|save|spawn ...", "Использование: /st savedtrain list|save|spawn ..."));
         }
         String action = args[1].toLowerCase(Locale.ROOT);
         switch (action) {
             case "list" -> {
                 List<String> names = manager.savedTrainNames();
                 plugin.send(sender, names.isEmpty()
-                        ? "&7还没有保存的列车模板。"
-                        : "&e列车模板: &f" + String.join(", ", names));
+                        ? ui.literal(sender, "&7还没有保存的列车模板。", "&7Сохранённых шаблонов поездов пока нет.")
+                        : ui.literal(sender, "&e列车模板: &f", "&eШаблоны поездов: &f") + String.join(", ", names));
             }
             case "save" -> {
                 if (args.length < 4) {
-                    throw new IllegalArgumentException("用法: /st savedtrain save <列车> <模板名>");
+                    throw new IllegalArgumentException(ui.literal(sender, "用法: /st savedtrain save <列车> <模板名>", "Использование: /st savedtrain save <train> <template>"));
                 }
                 SavedTrainDefinition saved = manager.saveTrainTemplate(args[2], args[3]);
-                plugin.send(sender, "&a已保存列车模板 &e" + saved.name + " &a(车厢 " + saved.memberCount + " 辆)。");
+                plugin.send(sender, ui.literal(sender, "&a已保存列车模板 &e", "&aСохранён шаблон &e") + saved.name + ui.literal(sender, " &a(车厢 ", " &a(вагонеток: ") + saved.memberCount + ui.literal(sender, " 辆)。", " шт.)."));
             }
             case "spawn" -> {
                 if (args.length < 3) {
-                    throw new IllegalArgumentException("用法: /st savedtrain spawn <模板名> [列车名]");
+                    throw new IllegalArgumentException(ui.literal(sender, "用法: /st savedtrain spawn <模板名> [列车名]", "Использование: /st savedtrain spawn <template> [train]"));
                 }
                 Player player = requirePlayer(sender);
                 String trainName = args.length >= 4 ? args[3] : null;
                 Train train = manager.spawnSavedTrain(player, args[2], trainName);
-                plugin.send(sender, "&a已生成列车: " + ui.trainSummary(sender, train));
+                plugin.send(sender, ui.literal(sender, "&a已生成列车: ", "&aПоезд создан: ") + ui.trainSummary(sender, train));
             }
-            default -> throw new IllegalArgumentException("用法: /st savedtrain list|save|spawn ...");
+            default -> throw new IllegalArgumentException(ui.literal(sender, "用法: /st savedtrain list|save|spawn ...", "Использование: /st savedtrain list|save|spawn ..."));
         }
     }
 
@@ -713,7 +713,7 @@ final class SkyTrainCommand implements TabExecutor {
         if ("list".equals(action)) {
             List<String> descriptions = switchManager.descriptions();
             if (descriptions.isEmpty()) {
-                plugin.send(sender, "&7目前还没有已注册的道岔。");
+                plugin.send(sender, ui.literal(sender, "&7目前还没有已注册的道岔。", "&7Зарегистрированных стрелок пока нет."));
                 return;
             }
             for (String description : descriptions) {
@@ -723,56 +723,56 @@ final class SkyTrainCommand implements TabExecutor {
         }
         if ("scan".equals(action)) {
             Player player = requirePlayer(sender);
-            int radius = args.length >= 3 ? parsePositiveInt(args[2], "扫描半径") : 32;
+            int radius = args.length >= 3 ? parsePositiveInt(sender, args[2], ui.literal(sender, "扫描半径", "Радиус сканирования")) : 32;
             if (radius > 128) {
-                throw new IllegalArgumentException("道岔扫描半径不能超过 128 格。");
+                throw new IllegalArgumentException(ui.literal(sender, "道岔扫描半径不能超过 128 格。", "Радиус сканирования стрелок не может превышать 128 блоков."));
             }
-            plugin.send(sender, "&7正在扫描已加载区域内复制的 SkyTrain 道岔牌……");
+            plugin.send(sender, ui.literal(sender, "&7正在扫描已加载区域内复制的 SkyTrain 道岔牌……", "&7Сканирование скопированных табличек стрелок SkyTrain в загруженной области…"));
             switchManager.scanAround(player.getLocation(), radius, result -> player.getScheduler().run(
                     plugin,
-                    task -> plugin.send(player, "&a道岔扫描完成：新登记 &e" + result.registered()
-                            + "&a，已存在 &e" + result.existing()
-                            + "&a，无效 &e" + result.invalid()
-                            + "&a（扫描已加载区块 &e" + result.chunks() + "&a）。"),
+                    task -> plugin.send(player, ui.literal(sender, "&a道岔扫描完成：新登记 &e", "&aСканирование стрелок завершено: новых &e") + result.registered()
+                            + ui.literal(sender, "&a，已存在 &e", "&a, существующих &e") + result.existing()
+                            + ui.literal(sender, "&a，无效 &e", "&a, недопустимых &e") + result.invalid()
+                            + ui.literal(sender, "&a（扫描已加载区块 &e", "&a (просканировано чанков: &e") + result.chunks() + ui.literal(sender, "&a）。", "&a).")),
                     () -> {
                     }));
             return;
         }
         if ("cleanup".equals(action)) {
-            plugin.send(sender, "&7正在逐个检查已登记道岔……");
+            plugin.send(sender, ui.literal(sender, "&7正在逐个检查已登记道岔……", "&7Проверка зарегистрированных стрелок…"));
             switchManager.cleanupGhostSwitches(removed -> sendSwitchCleanupResult(sender, removed));
             return;
         }
 
         SkyTrainSwitch railwaySwitch = switchManager.nearest(senderLocation(sender), 8.0);
         if (railwaySwitch == null) {
-            throw new IllegalArgumentException("附近 8 格内没有已注册的道岔。");
+            throw new IllegalArgumentException(ui.literal(sender, "附近 8 格内没有已注册的道岔。", "В радиусе 8 блоков нет зарегистрированной стрелки."));
         }
         switch (action) {
             case "info" -> plugin.send(sender, "&e" + railwaySwitch.status());
             case "set" -> {
                 if (args.length < 3) {
-                    throw new IllegalArgumentException("用法: /st switch set straight|diverging");
+                    throw new IllegalArgumentException(ui.literal(sender, "用法: /st switch set straight|diverging", "Использование: /st switch set straight|diverging"));
                 }
                 SwitchState state = SwitchState.parse(args[2], null);
                 if (state == null) {
-                    throw new IllegalArgumentException("道岔状态必须是 straight 或 diverging。");
+                    throw new IllegalArgumentException(ui.literal(sender, "道岔状态必须是 straight 或 diverging。", "Положение стрелки должно быть straight или diverging."));
                 }
                 switchManager.setCommandedState(railwaySwitch, state);
-                plugin.send(sender, "&a道岔请求状态已设为 &e" + state.storageName() + "&a。");
+                plugin.send(sender, ui.literal(sender, "&a道岔请求状态已设为 &e", "&aЗапрошенное положение стрелки: &e") + state.storageName() + ui.literal(sender, "&a。", "&a."));
             }
             case "remove" -> {
                 switchManager.remove(railwaySwitch);
-                plugin.send(sender, "&a道岔定义已删除；方块和告示牌保持不变。");
+                plugin.send(sender, ui.literal(sender, "&a道岔定义已删除；方块和告示牌保持不变。", "&aОпределение стрелки удалено; блоки и таблички сохранены."));
             }
-            default -> throw new IllegalArgumentException("用法: /st switch list|scan [半径]|info|set|remove|cleanup");
+            default -> throw new IllegalArgumentException(ui.literal(sender, "用法: /st switch list|scan [半径]|info|set|remove|cleanup", "Использование: /st switch list|scan [radius]|info|set|remove|cleanup"));
         }
     }
 
     private void sendSwitchCleanupResult(CommandSender sender, int removed) {
         Runnable message = () -> plugin.send(sender, removed == 0
-                ? "&7没有发现幽灵道岔。"
-                : "&a已清理 &e" + removed + " &a个幽灵道岔。");
+                ? ui.literal(sender, "&7没有发现幽灵道岔。", "&7Призрачных стрелок не обнаружено.")
+                : ui.literal(sender, "&a已清理 &e", "&aУдалено &e") + removed + ui.literal(sender, " &a个幽灵道岔。", " &aпризрачных стрелок."));
         if (sender instanceof Player player) {
             player.getScheduler().run(plugin, task -> message.run(), () -> {
             });
@@ -786,7 +786,7 @@ final class SkyTrainCommand implements TabExecutor {
         manager.save();
         switchManager.save();
         infrastructureManager.save();
-        plugin.send(sender, "&a列车、道岔和线路基础设施数据已保存。");
+        plugin.send(sender, ui.literal(sender, "&a列车、道岔和线路基础设施数据已保存。", "&aДанные поездов, стрелок и инфраструктуры сохранены."));
     }
 
     private void reload(CommandSender sender) {
@@ -794,7 +794,7 @@ final class SkyTrainCommand implements TabExecutor {
         manager.reloadAll();
         switchManager.reload();
         infrastructureManager.reload();
-        plugin.send(sender, "&a配置、列车、道岔和线路基础设施数据已重载。");
+        plugin.send(sender, ui.literal(sender, "&a配置、列车、道岔和线路基础设施数据已重载。", "&aНастройки, поезда, стрелки и инфраструктура перезагружены."));
     }
 
     private void infrastructure(CommandSender sender, String[] args, InfrastructureMarkerType type) {
@@ -804,20 +804,20 @@ final class SkyTrainCommand implements TabExecutor {
             requireAdmin(sender);
             Collection<InfrastructureMarker> markers = infrastructureManager.markers(type);
             if (markers.isEmpty()) {
-                plugin.send(sender, "&7当前没有已注册的 " + type.storageName() + "。" );
+                plugin.send(sender, ui.literal(sender, "&7当前没有已注册的 ", "&7Нет зарегистрированного оборудования типа ") + type.storageName() + ui.literal(sender, "。", ".") );
                 return;
             }
             for (InfrastructureMarker marker : markers) {
                 String mileage = marker.mileageKnown()
                         ? LineInfrastructureManager.formatMileage(marker.mileageMeters())
-                        : "未标定";
-                plugin.send(sender, "&e" + marker.displayName + " &7| 线路: &b" + marker.lineName
-                        + " &7| 里程: &f" + mileage + " &7| UUID: &8" + marker.id);
+                        : ui.literal(sender, "未标定", "Не откалибровано");
+                plugin.send(sender, "&e" + marker.displayName + ui.literal(sender, " &7| 线路: &b", " &7| Линия: &b") + marker.lineName
+                        + ui.literal(sender, " &7| 里程: &f", " &7| Координата: &f") + mileage + " &7| UUID: &8" + marker.id);
             }
             return;
         }
         if (!"info".equals(action)) {
-            throw new IllegalArgumentException("用法: /st " + type.storageName() + " [info|list]");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st ", "Использование: /st ") + type.storageName() + " [info|list]");
         }
         Player player = requirePlayer(sender);
         InfrastructureMarker marker = type == InfrastructureMarkerType.BALISE
@@ -827,10 +827,10 @@ final class SkyTrainCommand implements TabExecutor {
                         player.getLocation(), type, infrastructureManager.inspectionRadius());
         if (marker == null) {
             throw new IllegalArgumentException(type == InfrastructureMarkerType.BALISE
-                    ? "附近找不到已注册的 Origin、Balise 或 End 牌子，请站到牌子 1~2 格内。"
-                    : "附近找不到已注册的 " + type.storageName() + " 牌子，请站到牌子 1~2 格内。");
+                    ? ui.literal(sender, "附近找不到已注册的 Origin、Balise 或 End 牌子，请站到牌子 1~2 格内。", "Рядом нет зарегистрированной таблички Origin, Balise или End; встаньте в 1–2 блоках от неё.")
+                    : ui.literal(sender, "附近找不到已注册的 ", "Рядом нет зарегистрированной таблички типа ") + type.storageName() + ui.literal(sender, " 牌子，请站到牌子 1~2 格内。", "; встаньте в 1–2 блоках от неё."));
         }
-        for (String line : infrastructureManager.describe(marker)) {
+        for (String line : infrastructureManager.describe(marker, ui.language(sender))) {
             plugin.send(sender, line);
         }
     }
@@ -847,30 +847,30 @@ final class SkyTrainCommand implements TabExecutor {
                 train = nearbyTrain(sender);
             }
         } else {
-            throw new IllegalArgumentException("控制台用法: /st mileage <列车名>");
+            throw new IllegalArgumentException(ui.literal(sender, "控制台用法: /st mileage <列车名>", "Из консоли: /st mileage <train>"));
         }
         if (train == null) {
-            throw new IllegalArgumentException("请乘坐、靠近或指定一列 STF 列车。");
+            throw new IllegalArgumentException(ui.literal(sender, "请乘坐、靠近或指定一列 STF 列车。", "Сядьте в поезд STF, подойдите к нему или укажите его имя."));
         }
         plugin.send(sender, "&e" + train.name() + " &7| "
-                + infrastructureManager.describeTrainMileage(train));
+                + infrastructureManager.describeTrainMileage(train, ui.language(sender)));
     }
 
     private void clearKm(CommandSender sender, String[] args) {
         requireAdmin(sender);
         if (args.length < 2 || args[1].isBlank()) {
-            throw new IllegalArgumentException("用法: /st clearkm <线路名>");
+            throw new IllegalArgumentException(ui.literal(sender, "用法: /st clearkm <线路名>", "Использование: /st clearkm <line>"));
         }
         LineInfrastructureManager.LineMileageClearResult result =
                 infrastructureManager.clearLineMileage(args[1]);
         if (!result.found()) {
-            throw new IllegalArgumentException("找不到线路: " + args[1]);
+            throw new IllegalArgumentException(ui.literal(sender, "找不到线路: ", "Линия не найдена: ") + args[1]);
         }
         int clearedTrains = manager.clearLineMileage(result.lineName());
-        plugin.send(sender, "&a已清除线路 &e" + result.lineName()
-                + " &a的里程标定：&e" + result.clearedMarkers()
-                + " &a个 Balise/End，&e" + clearedTrains
-                + " &a列在线列车已重置。Origin 保留为 K0+000，请重新跑线标定。");
+        plugin.send(sender, ui.literal(sender, "&a已清除线路 &e", "&aСброшена калибровка линии &e") + result.lineName()
+                + ui.literal(sender, " &a的里程标定：&e", "&a: &e") + result.clearedMarkers()
+                + ui.literal(sender, " &a个 Balise/End，&e", " &aBalise/End, сброшено поездов: &e") + clearedTrains
+                + ui.literal(sender, " &a列在线列车已重置。Origin 保留为 K0+000，请重新跑线标定。", "&a. Origin сохранён как K0+000; выполните повторный калибровочный проезд."));
     }
 
     private Train nearbyTrain(CommandSender sender) {
@@ -917,7 +917,7 @@ final class SkyTrainCommand implements TabExecutor {
         if (sender instanceof BlockCommandSender blockSender) {
             return blockSender.getBlock().getLocation().add(0.5, 0.5, 0.5);
         }
-        throw new IllegalArgumentException("@train 需要由玩家或命令方块执行。");
+        throw new IllegalArgumentException(ui.literal(sender, "@train 需要由玩家或命令方块执行。", "@train должен выполняться игроком или командным блоком."));
     }
 
     private void scanIfPlayer(CommandSender sender) {
@@ -928,7 +928,7 @@ final class SkyTrainCommand implements TabExecutor {
 
     private void requireUse(CommandSender sender) {
         if (!sender.hasPermission("skytrain.use") && !sender.hasPermission("skytrain.admin")) {
-            throw new IllegalArgumentException("你没有 skytrain.use 权限。");
+            throw new IllegalArgumentException(ui.literal(sender, "你没有 skytrain.use 权限。", "У вас нет права skytrain.use."));
         }
     }
 
@@ -937,7 +937,7 @@ final class SkyTrainCommand implements TabExecutor {
             return;
         }
         if (!sender.hasPermission("skytrain.admin")) {
-            throw new IllegalArgumentException("你没有 skytrain.admin 权限。");
+            throw new IllegalArgumentException(ui.literal(sender, "你没有 skytrain.admin 权限。", "У вас нет права skytrain.admin."));
         }
     }
 
@@ -945,26 +945,26 @@ final class SkyTrainCommand implements TabExecutor {
         if (sender instanceof Player player) {
             return player;
         }
-        throw new IllegalArgumentException("这个命令需要玩家在游戏内执行。");
+        throw new IllegalArgumentException(ui.literal(sender, "这个命令需要玩家在游戏内执行。", "Эту команду должен выполнить игрок в игре."));
     }
 
-    private double parseDouble(String text, String name) {
+    private double parseDouble(CommandSender sender, String text, String name) {
         try {
             return Double.parseDouble(text);
         } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(name + " 必须是数字。");
+            throw new IllegalArgumentException(name + ui.literal(sender, " 必须是数字。", " — требуется число."));
         }
     }
 
-    private int parsePositiveInt(String text, String name) {
+    private int parsePositiveInt(CommandSender sender, String text, String name) {
         try {
             int value = Integer.parseInt(text);
             if (value <= 0) {
-                throw new IllegalArgumentException(name + " 必须是正整数。");
+                throw new IllegalArgumentException(name + ui.literal(sender, " 必须是正整数。", " — требуется положительное целое число."));
             }
             return value;
         } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(name + " 必须是正整数。");
+            throw new IllegalArgumentException(name + ui.literal(sender, " 必须是正整数。", " — требуется положительное целое число."));
         }
     }
 

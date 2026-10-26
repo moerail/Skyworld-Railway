@@ -12,12 +12,11 @@ final class ShadowCurve {
     record Settings(boolean enabled, boolean enforcementEnabled, double stopMargin,
             double approachDistance, double approachMps, double reactionSeconds, double brakeFactor) {
         Settings {
-            if (enforcementEnabled) throw new IllegalArgumentException(
-                    "shadow-atp.enforcement-enabled=true is unsupported: no validated FS brake execution chain");
+            if (enforcementEnabled) throw new UiException("shadow-atp.enforcement-enabled=true is unsupported: no validated FS brake execution chain", "shadow-atp.enforcement-enabled=true не поддерживается: нет проверенной цепочки торможения FS");
             if (!finite(stopMargin, approachDistance, approachMps, reactionSeconds, brakeFactor)
                     || stopMargin < 0 || approachDistance <= stopMargin || approachMps <= 0
                     || reactionSeconds < 0 || brakeFactor <= 0 || brakeFactor > 1)
-                throw new IllegalArgumentException("Invalid shadow-atp curve settings");
+                throw new UiException("Invalid shadow-atp curve settings", "Недопустимые настройки кривой shadow-atp");
         }
     }
     static Result calculate(Settings settings, Input input, double actualMps, double ceilingMps,

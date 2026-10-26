@@ -47,12 +47,12 @@ final class AutomaticSigns {
     }
     void validate(Block sign, String headerText, String second, String third, String fourth) {
         var header=TrainSignHeader.parse(headerText);
-        if(header==null) throw new IllegalArgumentException("Invalid train sign header");
-        if(!header.remote().isEmpty()) throw new IllegalArgumentException("Remote train-name headers are not supported in this preview");
+        if(header==null) throw new UiException("Invalid train sign header", "Недопустимый заголовок таблички поезда");
+        if(!header.remote().isEmpty()) throw new UiException("Remote train-name headers are not supported in this preview", "Удалённые заголовки с именем поезда в этой версии не поддерживаются");
         var spec=AutomaticSignSpec.parse(plain(second),plain(third),plain(fourth),defaultSpeed());
-        if(spec.route()) throw new IllegalArgumentException("station route requires destination routing; not available in this MVP");
+        if(spec.route()) throw new UiException("station route requires destination routing; not available in this MVP", "station route требует маршрутизации по назначению; в этом MVP она недоступна");
         if(spec.action().equals("spawn")) manager.validateSpawnPattern(spec.pattern());
-        if(RailSignAccess.railFor(sign)==null) throw new IllegalArgumentException("No associated rail in the sign column");
+        if(RailSignAccess.railFor(sign)==null) throw new UiException("No associated rail in the sign column", "В столбце таблички нет связанного рельса");
     }
     void register(Block sign) {
         if(closed) return;

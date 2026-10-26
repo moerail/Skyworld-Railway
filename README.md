@@ -1,10 +1,22 @@
 # SkyRail Suite
 
+## 为了同志 / Ради товарищей — STF 4.0.10 · 2026-10-26
+
+**为了同志更新 / Обновление «Ради товарищей»**：[中俄双语发布说明 / Описание на китайском и русском](Common/doc/releases/suite-v4.0.10.md)。STF **4.0.10** / STCS **4.1.1** / STA **2.2.0** / SkyPCC **2.1.0**。
+
+В STF появился русский интерфейс: `/st lang ru`. Переведены кабина, боковая панель, MA/ATP и подсказки Кури-тян; выбор языка сохраняется. [Руководство](Common/README.ru.md).
+
+STF 新增 `/st lang ru`，切换命令提示、驾驶台、侧栏、MA/ATP BossBar、停车标记和库莉酱司机引导；玩家语言按原机制保存。旧 `driver-guide.yml` 缺少俄语条目时使用内置默认值，保留既有自定义文案。俄语帮助可用 `/st help ru`；网页 PCC 的语言选择独立。
+
+STF now supports `/st lang ru` for commands, cab/sidebar, MA/ATP displays, stop markers and driver guidance. Player preferences persist; older custom word banks use bundled Russian defaults for missing entries. Use `/st help ru` for temporary Russian help. PCC web language remains separate.
+
 ## 驾驶员交接与 MA / Driver handover and MA — 2026-10-24
 
 当前源码：STCS **4.1.1** / SkyTrainFolia **4.0.9** / STA **2.2.0** / SkyPCC **2.1.0**。司机下车、掉线或释放驾驶权后自动撤销旧 MA，回到 `SB` 并保持制动；停稳、完整定位和 TIMS 确认后自动释放前方预约，保留车身占用。下一位司机重新 `/st drive` 并申请 `/stcs ma fs`，无需补做 `release`。`demand` 保留为兼容别名。配套更新 STCS 与 STF。
 
 Driver loss revokes the previous MA and returns the onboard mode to `SB` with brakes held. Forward reservations clear after a confirmed stop, position and integrity; body occupancy remains protected. The next driver requests `/stcs ma fs` again; `/stcs ma demand` remains an alias. Update STCS and STF together. **87 Java tests passed on each of Shiroha 26.2 and 26.3; live-server acceptance is pending.** [更新记录 / Changelog](Common/CHANGELOG.md)
+
+TIMS 停车保持提示现提供可点击的 `/st tims ack`，司机引导优先处理 TIMS，再依次提示 TR 确认、释放旧 MA 和重新申请。只有恢复列车完整性并全列停稳后才能确认；点击不会绕过检查或自动缓解制动。 / TIMS brake-hold notices include a clickable `/st tims ack`; driver guidance handles TIMS before TR, release and a new MA request. Integrity and whole-train stop checks still apply, and acknowledgement keeps the brakes held.
 
 ## 历史源码更新 / Historical source update — 2026-10-09
 
@@ -35,9 +47,11 @@ The default dynamic parameters are 1 m/s², 5 seconds and 25 metres; disable `ma
 >
 > 基于 Minecraft/Folia 的开源铁路运行、控制与仿真实验项目，将实际多人服务器中的铁路运行与信号、列控概念的实验探索相结合。
 
-**Full manuals / 完整手册:** [中文](Common/README.zh.md) | [English](Common/README.en.md) | [Nederlands](Common/README.nl.md) | [Français](Common/README.fr.md) | [日本語](Common/README.ja.md)
+**Full manuals / 完整手册:** [中文](Common/README.zh.md) | [English](Common/README.en.md) | [Nederlands](Common/README.nl.md) | [Français](Common/README.fr.md) | [日本語](Common/README.ja.md) | [Русский](Common/README.ru.md)
 
-**Driver quick start / 玩家司机手册:** [中文](Common/doc/driver/README.zh.md) | [English](Common/doc/driver/README.en.md) | [Français](Common/doc/driver/README.fr.md) | [日本語](Common/doc/driver/README.ja.md)
+**Driver quick start / 玩家司机手册:** [中文](Common/doc/driver/README.zh.md) | [English](Common/doc/driver/README.en.md) | [Français](Common/doc/driver/README.fr.md) | [日本語](Common/doc/driver/README.ja.md) | [Русский](Common/doc/driver/README.ru.md)
+
+**自动告示牌 / Automatic signs:** [English](Common/doc/BASIC-AUTOMATIC-SIGNS.md) | [Русский](Common/doc/BASIC-AUTOMATIC-SIGNS.ru.md)
 
 从上车、取得驾驶权到手柄控制、MA 申请与停车交接；面向普通玩家，无需阅读管理员配置章节。
 

@@ -71,7 +71,7 @@ enum SwitchGeometry {
             case WEST -> BlockFace.SOUTH;
             case SOUTH -> BlockFace.EAST;
             case EAST -> BlockFace.NORTH;
-            default -> throw new IllegalArgumentException("Switch front must be horizontal: " + face);
+            default -> throw new UiException("Switch front must be horizontal: " + face, "Фронт стрелки должен быть горизонтальным: " + face);
         };
     }
 
@@ -81,7 +81,7 @@ enum SwitchGeometry {
             case EAST -> BlockFace.SOUTH;
             case SOUTH -> BlockFace.WEST;
             case WEST -> BlockFace.NORTH;
-            default -> throw new IllegalArgumentException("Switch front must be horizontal: " + face);
+            default -> throw new UiException("Switch front must be horizontal: " + face, "Фронт стрелки должен быть горизонтальным: " + face);
         };
     }
 }

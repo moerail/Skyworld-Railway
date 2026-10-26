@@ -1,5 +1,7 @@
 # SkyRail Driver Manual
 
+TIMS brake-hold notices provide a clickable `/st tims ack`. While stopped, driver guidance prioritizes TIMS acknowledgement, then guides you through `/stcs ma ack`, `/stcs ma release` and `/stcs ma fs` as required. Restore the original consist and stop the whole train first; clicking preserves integrity checks and keeps the brakes held after acknowledgement.
+
 ## Current update: STF 4.0.8 / STCS 4.1.0
 
 STA is now 2.1.1 and SkyPCC 2.0.3. The maintainer confirmed STCS 4.1.0 testing passed. Kuri-chan gives language-aware hints to stopped manual drivers, including localisation, MA and SR waiting states; editable phrases never operate the train. FS checks points earlier as speed rises, but driving still requires a current valid MA. Conflicts, unknown states and MA caps still apply. The older baseline below is historical. [Version overview](../../README.en.md).
@@ -8,7 +10,7 @@ Local development candidate **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3*
 
 This patch uses **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. For a stopped manual train, a dispatcher point change first obtains an onboard brake-hold acknowledgement, then withdraws the affected forward reservation, changes the point and replans MA; no driver release is needed first. Web PCC adds “Revoke MA → TR”. A moving or stopped manual train enters TR and brakes after onboard confirmation. Moving-train reservations remain until the complete train is confirmed stopped; body occupancy is retained. This explicit dispatcher command also holds trains in the shadow channel. Recovery: stop, `/stcs ma ack`, `/stcs ma release`, then request MA again. Timeout is not confirmation. Update installed plugins together and refresh clients; retain certificates and tokens. Live-server acceptance is pending. [4.0.7 release notes](../releases/suite-v4.0.7.md)
 
-[中文](README.zh.md) | [English](README.en.md) | [Français](README.fr.md) | [日本語](README.ja.md) · [Project home](../../README.md)
+[中文](README.zh.md) | [English](README.en.md) | [Français](README.fr.md) | [日本語](README.ja.md) | [Русский](README.ru.md) · [Project home](../../README.md)
 
 For ordinary players aboard a manual train. Published release: STF 4.0.7, STCS 4.0.5, STA 2.1.3, SkyPCC 2.0.2 on Shiroha 26.2 or 26.3. Administrators handle train creation, track construction and plugin configuration; live-server acceptance of this combination is pending.
 

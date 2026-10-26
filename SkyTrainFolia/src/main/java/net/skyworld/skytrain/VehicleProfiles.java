@@ -19,10 +19,10 @@ final class VehicleProfiles {
 
     static VehicleProfile load(File directory, String id) throws IOException, InvalidConfigurationException {
         if (id == null || !id.matches("[a-z0-9][a-z0-9_-]{0,63}")) {
-            throw new IllegalArgumentException("Invalid settings.default-vehicle-profile: " + id);
+            throw new UiException("Invalid settings.default-vehicle-profile: " + id, "Недопустимый settings.default-vehicle-profile: " + id);
         }
         File file = new File(directory, id + ".yml");
-        if (!file.isFile()) throw new IllegalArgumentException("Vehicle profile not found: " + file);
+        if (!file.isFile()) throw new UiException("Vehicle profile not found: " + file, "Профиль поезда не найден: " + file);
         return VehicleProfile.parse(id, read(file));
     }
 
@@ -43,7 +43,7 @@ final class VehicleProfiles {
             VehicleProfile.parse("legacy", converted);
             if (legacy.exists()) {
                 if (!read(legacy).saveToString().equals(converted.saveToString())) {
-                    throw new IllegalArgumentException("Refusing to overwrite " + legacy);
+                    throw new UiException("Refusing to overwrite " + legacy, "Отказ от перезаписи " + legacy);
                 }
             } else {
                 converted.save(legacy);

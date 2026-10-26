@@ -7,6 +7,7 @@ final class ShadowCurveDisplay {
             case EN -> "ATP limit";
             case FR -> "Limite ATP";
             case JP -> "ATP制限速度";
+            case RU -> "Предел ATP";
         };
         return maTitle + " | " + label + ": " + (permittedMps == null ? "--"
                 : String.format(java.util.Locale.ROOT, "%.1f km/h", permittedMps * 3.6));

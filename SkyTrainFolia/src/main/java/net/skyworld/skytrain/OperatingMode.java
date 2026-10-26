@@ -13,16 +13,16 @@ enum OperatingMode {
             case "FS" -> FS;
             case "SH" -> SH;
             case "SR" -> SR;
-            default -> throw new IllegalArgumentException("Invalid permission mode");
+            default -> throw new UiException("Invalid permission mode", "Недопустимый режим разрешения");
         };
         if (this == target) return this;
         if (!stopped || (this != SB && !(this == FS && target == SH)))
-            throw new IllegalArgumentException("Operating mode change requires a stopped, eligible train");
+            throw new UiException("Operating mode change requires a stopped, eligible train", "Смена режима требует остановленного поезда, отвечающего условиям");
         return target;
     }
 
     OperatingMode release(boolean stopped) {
-        if (!stopped || this == TR) throw new IllegalArgumentException("Stop and acknowledge Trip before release");
+        if (!stopped || this == TR) throw new UiException("Stop and acknowledge Trip before release", "Перед освобождением остановитесь и подтвердите TR");
         return SB;
     }
 
@@ -31,7 +31,7 @@ enum OperatingMode {
     }
 
     OperatingMode acknowledge(boolean stopped) {
-        if (this != TR || !stopped) throw new IllegalArgumentException("Acknowledge Trip after stopping");
+        if (this != TR || !stopped) throw new UiException("Acknowledge Trip after stopping", "Подтвердите TR после остановки");
         return PT;
     }
 

@@ -55,7 +55,7 @@ record VehicleProfile(String id, boolean forceMode, double mass, double maxSpeed
     }
 
     private static IllegalArgumentException invalid(String key) {
-        return new IllegalArgumentException("Invalid/missing vehicle value: " + key);
+        return new UiException("Invalid/missing vehicle value: " + key, "Недопустимый/отсутствующий параметр профиля: " + key);
     }
 
     double powerAcceleration(int notch) { return power.get(Math.max(0, Math.min(4, notch))); }

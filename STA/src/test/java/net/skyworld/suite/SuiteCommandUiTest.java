@@ -18,7 +18,7 @@ public final class SuiteCommandUiTest {
     }
     public static void main(String[] args) {
         for (String root : List.of("st", "stcs", "sta", "skypcc")) {
-            for (String lang : List.of("zh", "en", "fr", "ja")) {
+            for (String lang : List.of("zh", "en", "fr", "ja", "ru")) {
                 List<String> all = new ArrayList<>();
                 for (int page=1; page<=SuiteCommandUi.pageCount(root); page++) {
                     List<String> lines=SuiteCommandUi.helpLines(root,lang,page);
@@ -33,6 +33,10 @@ public final class SuiteCommandUiTest {
         }
         assert SuiteCommandUi.normalize("jp").equals("ja");
         assert SuiteCommandUi.normalize("fr_FR").equals("fr");
+        assert SuiteCommandUi.normalize("ru_RU").equals("ru");
+        assert SuiteCommandUi.normalize("ru-RU").equals("ru");
+        assert SuiteCommandUi.complete("st", new String[]{"help","r"}).equals(List.of("ru"));
+        assert SuiteCommandUi.complete("st", new String[]{"version","r"}).equals(List.of("ru"));
         assert SuiteCommandUi.complete("st", new String[]{"help",""}).contains("5");
         assert SuiteCommandUi.complete("stcs", new String[]{"version","f"}).equals(List.of("fr"));
         List<String> output=new ArrayList<>();
@@ -60,9 +64,17 @@ public final class SuiteCommandUiTest {
         assert output.getFirst().equals("/st Help 2/5");
         assert SuiteCommandUi.language(plugin,sender).equals("fr");
         output.clear();
+        SuiteCommandUi.handle(plugin,sender,"st",new String[]{"help","1","ru"});
+        assert output.getFirst().equals("/st Справка 1/5");
+        assert output.stream().anyMatch(s -> s.contains("Получить управление"));
+        assert SuiteCommandUi.language(plugin,sender).equals("fr");
+        output.clear();
+        SuiteCommandUi.handle(plugin,sender,"st",new String[]{"version","ru"});
+        assert output.stream().anyMatch(s -> s.contains("Не установлен"));
+        output.clear();
         SuiteCommandUi.handle(plugin,sender,"st",new String[]{"help","999"});
         assert output.getFirst().contains("Arguments invalides");
         assert !SuiteCommandUi.handle(plugin,sender,"st",new String[]{"p1"});
-        System.out.println("PASS four-language pages, live metadata, optional plugins, language preference/override and completion");
+        System.out.println("PASS five-language pages, live metadata, optional plugins, language preference/override and completion");
     }
 }

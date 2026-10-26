@@ -217,15 +217,17 @@ final class DriverControlService {
     }
 
     void releaseManualControl(Player player, Train train) {
-        if (train == null) throw new IllegalArgumentException("没有找到要释放的列车，请靠近列车后重试。");
+        if (train == null) throw new UiException("没有找到要释放的列车，请靠近列车后重试。", "Поезд для освобождения не найден; подойдите к нему и повторите.");
         synchronized (driverLock) {
-            if (trainLookup.apply(train.id()) != train) throw new IllegalArgumentException("列车已不存在。");
+            if (trainLookup.apply(train.id()) != train) throw new UiException("列车已不存在。", "Поезд больше не существует.");
             UUID playerId = player.getUniqueId();
             UUID driver = trainDrivers.get(train.id());
             if (!mayRelease(playerId, driver, train.lastManualDriver, player.hasPermission("skytrain.admin"))) {
-                throw new IllegalArgumentException(driver != null
+                throw new UiException(driver != null
                         ? "这列车由其他司机控制；管理员请使用 /st admin release <列车名>。"
-                        : "无法确认你是上一位司机；请重新 /st drive 后 /st release，或由管理员释放列车。");
+                        : "无法确认你是上一位司机；请重新 /st drive 后 /st release，或由管理员释放列车。", driver != null
+                        ? "Поездом управляет другой машинист; администратору доступна /st admin release <train>."
+                        : "Не удалось подтвердить, что вы прежний машинист; выполните /st drive, затем /st release, либо обратитесь к администратору.");
             }
             DriverSafety.revokeAuthority(train);
             train.manualReleaseConfirmed = true;

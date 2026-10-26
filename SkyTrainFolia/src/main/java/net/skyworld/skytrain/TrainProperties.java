@@ -18,7 +18,7 @@ final class TrainProperties {
     void setAutomaticTargetSpeed(String value) {
         double speed = AutomaticSignSpec.velocity(value);
         if (!Double.isFinite(speed) || speed < 0 || speed > 100)
-            throw new IllegalArgumentException("V_target must be between 0 and 100 blocks/tick.");
+            throw new UiException("V_target must be between 0 and 100 blocks/tick.", "V_target должна быть от 0 до 100 блоков/тик.");
         automaticTargetSpeed = speed;
     }
     volatile String collisionMode = "default";
@@ -45,7 +45,7 @@ final class TrainProperties {
     void setTrainNumber(String value) {
         String clean = value == null ? "" : value.trim();
         if (clean.length() > 32 || clean.codePoints().anyMatch(c -> Character.isISOControl(c) || c == '|'))
-            throw new IllegalArgumentException("trainnumber: max 32 characters; no control characters or |.");
+            throw new UiException("trainnumber: max 32 characters; no control characters or |.", "trainnumber: максимум 32 символа; управляющие символы и | запрещены.");
         trainNumber = clean.equals("-") || clean.equalsIgnoreCase("clear") ? "" : clean;
     }
 

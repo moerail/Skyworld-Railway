@@ -1,6 +1,18 @@
 # Updates / 更新说明
 
+## 为了同志 / Ради товарищей — STF 4.0.10 · 2026-10-26
+
+[中俄双语发布说明 / Описание на китайском и русском](doc/releases/suite-v4.0.10.md) · STCS 4.1.1 / STA 2.2.0 / SkyPCC 2.1.0。
+
+- 将俄语作为第五种 STF 界面语言接入：`/st lang ru`，兼容 `ru_RU`、`ru-RU` 和 `russian`；补齐命令补全、共享帮助与版本页、玩家语言保存及恢复。
+- 翻译驾驶台、侧栏、MA/ATP BossBar、保护模式、TIMS/MA 回复、站点停车标记及司机引导词库；保留 SB/FS/SH/SR/TR/PT、命令与协议标识。旧词库缺少俄语条目时使用内置默认值，不覆盖既有自定义项。
+- 补充旧版命令、基础设施查询、告示牌反馈和输入错误的俄语呈现。错误对象保留原始诊断，玩家数据在拼接前与固定文案分别处理；其他语言沿用原有文本。
+- Russian is a per-player STF preference. The SkyPCC browser interface has its own language selection; this change does not add Russian to that web frontend. Translation does not change train control, braking or authority rules.
+- Validation: **88 Java test entry points passed on each of Shiroha 26.2 and 26.3**, including Russian catalog/format checks, player-preference round-trip, old word-bank fallback and editable Russian overrides. Both STF display adapters are packaged in the JAR. Live-server UI acceptance is pending; server installations were not modified.
+
 ## 驾驶员交接与 MA / Driver handover and MA — 2026-10-24
+
+- TIMS 保持通知和四语言司机引导增加可点击的 `/st tims ack`。停稳后的 TIMS 引导优先于 TR/PT、换向器和 MA 提示；确认后恢复既有 `ma ack → release → fs` 流程。沿用 TIMS 完整性、停稳、驾驶权检查和提示节流；旧版自定义词库缺少新条目时使用内置默认值。
 
 - 司机下车、掉线或释放驾驶权后撤销旧 MA，清除车载许可缓存，回到 `SB` 并保持制动。前方预约在停稳、完整定位和 TIMS 确认后自动释放；车身占用继续保留。驾驶会话直接更换也适用，下一位司机需重新申请 MA，无需补做 `release`。
 - Make `/stcs ma fs` the primary FS request command and retain `/stcs ma demand` as a compatibility alias. Update command completion, cab actions, help and manuals.

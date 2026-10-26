@@ -122,7 +122,7 @@ final class TrainDrivingControls {
         if (target != Reverser.NEUTRAL
                 && train.reverser != target
                 && !canChangeReverser(train)) {
-            throw new IllegalArgumentException("列车未停稳，不能切换换向器。");
+            throw new UiException("列车未停稳，不能切换换向器。", "Перед сменой реверсора полностью остановите поезд.");
         }
         takeManualControl(train);
         train.clearPlayerPush();
@@ -224,11 +224,11 @@ final class TrainDrivingControls {
     }
 
     static void authorizeAutomatic(Train train, boolean hasDriver, double stopThreshold) {
-        if (hasDriver) throw new IllegalArgumentException("请先 /st release 释放司机控制权，再设置 auto。");
+        if (hasDriver) throw new UiException("请先 /st release 释放司机控制权，再设置 auto。", "Перед auto освободите управление командой /st release.");
         if (train.manualTakeover && !train.manualReleaseConfirmed)
-            throw new IllegalArgumentException("手动接管尚未明确释放。请先 /st release，或 /st admin release <列车名>。");
+            throw new UiException("手动接管尚未明确释放。请先 /st release，或 /st admin release <列车名>。", "Ручной перехват явно не освобождён. Выполните /st release или /st admin release <train>.");
         if (Math.max(train.currentSpeed(), train.maxMemberSpeed()) > stopThreshold)
-            throw new IllegalArgumentException("列车尚未停稳，不能启用 auto。");
+            throw new UiException("列车尚未停稳，不能启用 auto。", "Поезд ещё не остановлен; auto включить нельзя.");
         stopTrain(train);
         train.driverEmergencyHold = false;
         train.manualTakeover = false;

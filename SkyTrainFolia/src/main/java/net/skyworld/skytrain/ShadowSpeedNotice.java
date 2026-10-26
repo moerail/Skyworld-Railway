@@ -18,7 +18,7 @@ final class ShadowSpeedNotice {
                     || !Double.isFinite(lowSpeedEnterGapKmh) || lowSpeedEnterGapKmh < 0
                     || !Double.isFinite(lowSpeedClearGapKmh) || lowSpeedClearGapKmh <= lowSpeedEnterGapKmh
                     || overspeedClearGapKmh >= lowSpeedClearGapKmh)
-                throw new IllegalArgumentException("Invalid shadow-atp warning hysteresis");
+                throw new UiException("Invalid shadow-atp warning hysteresis", "Недопустимый гистерезис предупреждения shadow-atp");
         }
         static Settings load(ConfigurationSection config) {
             return new Settings(config.getDouble("shadow-atp.warning.enter-gap-kmh", 15),

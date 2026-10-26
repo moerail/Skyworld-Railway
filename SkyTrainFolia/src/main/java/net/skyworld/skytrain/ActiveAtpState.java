@@ -15,7 +15,7 @@ final class ActiveAtpState {
                     || approachMps <= 0 || serviceDecelerationMps2 <= 0 || reactionSeconds < 0
                     || overspeedToleranceMps < 0 || overspeedGraceMillis < 0
                     || serviceToEmergencyMillis < 0)
-                throw new IllegalArgumentException("Invalid active ATP settings");
+                throw new UiException("Invalid active ATP settings", "Недопустимые настройки активной ATP");
         }
     }
 

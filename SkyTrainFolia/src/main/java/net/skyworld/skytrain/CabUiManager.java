@@ -136,7 +136,7 @@ final class CabUiManager implements Listener {
                             "配置已重载：驾驶权和热键驾驶已收回。请重新 /st drive；需要热键驾驶时先选中第 5 格，再 /st hotbar。",
                             "Reload: driving control and hotbar cab were released. Use /st drive again; select slot 5 before /st hotbar.",
                             "Rechargement : commande et barre rapide libérées. Refaites /st drive ; sélectionnez la case 5 avant /st hotbar.",
-                            "再読込により運転権限とホットバー運転を解除しました。再度 /st drive を実行し、5番スロットを選んで /st hotbar を実行してください。"));
+                            "再読込により運転権限とホットバー運転を解除しました。再度 /st drive を実行し、5番スロットを選んで /st hotbar を実行してください。", "Перезагрузка: управление и хотбар освобождены. Повторите /st drive; перед /st hotbar выберите слот 5."));
                 }
             }, () -> {});
         }
@@ -175,7 +175,7 @@ final class CabUiManager implements Listener {
                     "管理员已切断你的列车控制权，列车已施加紧急制动。",
                     "An administrator released your cab control and applied emergency braking.",
                     "Un administrateur a repris la commande et applique le freinage d'urgence.",
-                    "管理者が運転権限を解除し、非常制動を投入しました。"));
+                    "管理者が運転権限を解除し、非常制動を投入しました。", "Администратор освободил вашу кабину и включил экстренное торможение."));
         }
     }
 
@@ -186,7 +186,7 @@ final class CabUiManager implements Listener {
             reverserSwingTicks.remove(playerId);
             player.sendActionBar(Component.text(localized(ui.language(player),
                     "热键驾驶已关闭。", "Hotbar cab disabled.",
-                    "Contrôle par barre rapide désactivé.", "ホットバー運転を無効にしました。"),
+                    "Contrôle par barre rapide désactivé.", "ホットバー運転を無効にしました。", "Управление хотбаром отключено."),
                     NamedTextColor.GRAY));
             return false;
         }
@@ -207,7 +207,7 @@ final class CabUiManager implements Listener {
                 "请先选中快捷栏第 5 格（N），再输入 /st hotbar。当前操纵状态未改变。",
                 "Select hotbar slot 5 (N) before using /st hotbar. Current controls are unchanged.",
                 "Sélectionnez la case 5 (N) avant /st hotbar. Les commandes restent inchangées.",
-                "ホットバーの5番スロット（N）を選んでから /st hotbar を実行してください。操作状態は変更されていません。"));
+                "ホットバーの5番スロット（N）を選んでから /st hotbar を実行してください。操作状態は変更されていません。", "Перед /st hotbar выберите слот 5 (N). Текущее управление не изменено."));
     }
 
     private void activate(Player player, Train train, boolean openInventory) {
@@ -216,7 +216,7 @@ final class CabUiManager implements Listener {
             throw new IllegalArgumentException(localized(
                     player == null ? UiLanguage.ZH : ui.language(player),
                     "没有可用的驾驶目标。", "No train is selected.",
-                    "Aucun train sélectionné.", "運転対象の列車がありません。"));
+                    "Aucun train sélectionné.", "運転対象の列車がありません。", "Поезд не выбран."));
         }
         Bukkit.getGlobalRegionScheduler().run(plugin, task -> {
             CabSession session;
@@ -320,7 +320,7 @@ final class CabUiManager implements Listener {
                     bell(player, train);
                 }
             } catch (IllegalArgumentException ex) {
-                plugin.send(player, "&c" + ui.text(player, ex.getMessage()));
+                plugin.send(player, "&c" + ui.error(player, ex));
             }
             return;
         }
@@ -328,7 +328,7 @@ final class CabUiManager implements Listener {
         try {
             requireDrivingControl(player, train);
         } catch (IllegalArgumentException ex) {
-            plugin.send(player, "&c" + ui.text(player, ex.getMessage()));
+            plugin.send(player, "&c" + ui.error(player, ex));
             return;
         }
 
@@ -340,7 +340,7 @@ final class CabUiManager implements Listener {
             playControlSound(player, rawSlot);
         } catch (IllegalArgumentException ex) {
             if ("protection.tractionBlocked".equals(ex.getMessage())) {
-                plugin.send(player, "&c" + ui.text(player, ex.getMessage()));
+                plugin.send(player, "&c" + ui.error(player, ex));
                 renderInventory(topInventory, player, train);
                 return;
             }
@@ -348,7 +348,7 @@ final class CabUiManager implements Listener {
                     "列车未停稳，不能切换换向器。",
                     "The train must stop before changing the reverser.",
                     "Le train doit être arrêté avant de changer l'inverseur.",
-                    "列車が停止するまで逆転器は変更できません。"));
+                    "列車が停止するまで逆転器は変更できません。", "Перед сменой положения реверсора остановите поезд."));
             renderInventory(topInventory, player, train);
         }
     }
@@ -433,17 +433,17 @@ final class CabUiManager implements Listener {
                         "列车未停稳，不能切换换向器。",
                         "The train must stop before changing the reverser.",
                         "Le train doit être arrêté avant de changer l'inverseur.",
-                        "列車が停止するまで逆転器は変更できません。"), NamedTextColor.RED));
+                        "列車が停止するまで逆転器は変更できません。", "Перед сменой положения реверсора остановите поезд."), NamedTextColor.RED));
                 return;
             }
             manager.setReverser(train, manager.cycleReverserTarget(train));
             renderOpenCabIfPresent(player, train);
             playReverserSound(player);
             player.sendActionBar(Component.text(localized(ui.language(player),
-                    "换向器: ", "Reverser: ", "Inverseur: ", "逆転器: ")
+                    "换向器: ", "Reverser: ", "Inverseur: ", "逆転器: ", "Реверсор: ")
                     + reverser(ui.language(player), train.reverser), NamedTextColor.YELLOW));
         } catch (IllegalArgumentException ex) {
-            plugin.send(player, "&c" + ui.text(player, ex.getMessage()));
+            plugin.send(player, "&c" + ui.error(player, ex));
             hotbarDrivers.remove(playerId);
             reverserSwingTicks.remove(playerId);
         }
@@ -468,10 +468,10 @@ final class CabUiManager implements Listener {
             playHandleSound(player);
             player.sendActionBar(Component.text(localized(ui.language(player),
                     "紧急制动 EB", "Emergency brake EB",
-                    "Freinage d'urgence FU", "非常制動 EB"),
+                    "Freinage d'urgence FU", "非常制動 EB", "Экстренное торможение EB"),
                     NamedTextColor.RED));
         } catch (IllegalArgumentException ex) {
-            plugin.send(player, "&c" + ui.text(player, ex.getMessage()));
+            plugin.send(player, "&c" + ui.error(player, ex));
             hotbarDrivers.remove(player.getUniqueId());
         }
     }
@@ -536,7 +536,7 @@ final class CabUiManager implements Listener {
                 "必须乘坐这列车才能操作鸣笛或车钟。",
                 "You must be aboard this train to use its horn or bell.",
                 "Vous devez être à bord de ce train pour utiliser l'avertisseur ou la cloche.",
-                "警笛または車鐘を操作するには、この列車に乗車してください。"));
+                "警笛または車鐘を操作するには、この列車に乗車してください。", "Для гудка или звонка нужно находиться в этом поезде."));
     }
 
     private void removeSession(Player player, boolean closeInventory) {
@@ -595,12 +595,13 @@ final class CabUiManager implements Listener {
                         "已识别前方车站信息，开始减速。距停车点约 " + distance + " 格。",
                         "Station ahead identified. Braking for the stop, about " + distance + " blocks away.",
                         "Station en amont identifiée. Début du freinage, arrêt dans environ " + distance + " blocs.",
-                        "前方の駅を認識しました。減速を開始します。停止位置まで約 " + distance + " ブロック。")
+                        "前方の駅を認識しました。減速を開始します。停止位置まで約 " + distance + " ブロック。",
+                        "Станция впереди. Начинается торможение; до остановки около " + distance + " блоков.")
                         : localized(language,
                         "已在站牌处识别车站，开始减速（未使用提前预告）。",
                         "Station identified at the sign. Braking without advance notice.",
                         "Station identifiée au panneau. Début du freinage sans annonce anticipée.",
-                        "駅看板で駅を認識しました。事前予告なしで減速を開始します。");
+                        "駅看板で駅を認識しました。事前予告なしで減速を開始します。", "Станция обнаружена у таблички. Торможение без предварительного обнаружения.");
                 plugin.send(player, "&f" + message);
             }, () -> {});
         }
@@ -622,7 +623,8 @@ final class CabUiManager implements Listener {
                         "当前 V_target 已更新为 " + speed + "。",
                         "V_target updated to " + speed + ".",
                         "V_target mise à jour : " + speed + ".",
-                        "現在の V_target を " + speed + " に更新しました。"));
+                        "現在の V_target を " + speed + " に更新しました。",
+                        "V_target изменена на " + speed + "."));
             }, () -> {});
         }
     }
@@ -637,6 +639,9 @@ final class CabUiManager implements Listener {
                         || !(player.getVehicle() instanceof Minecart cart)
                         || manager.trainForCart(cart) != train) return;
                 plugin.send(player, "&e" + ui.text(player, "error.tims-hold") + " &7(" + reason + ")");
+                if (manager.isDriver(player, train))
+                    player.sendMessage(guideAction(plugin.driverGuideLexicon(), ui.language(player),
+                            DriverGuideLexicon.Action.ACK_TIMS, "/st tims ack"));
             }, () -> {});
         }
     }
@@ -731,7 +736,8 @@ final class CabUiManager implements Listener {
                 stopped, driver, manager.driverName(train) != null && !driver,
                 train.reverser, train.operatingMode, train.protectionMode,
                 player.getUniqueId().equals(train.lastManualDriver), serviceAvailable,
-                positionKnown, mayDemand, authorityReason, train.emergencyBrake);
+                positionKnown, mayDemand, authorityReason, train.emergencyBrake,
+                train.tims.view(System.currentTimeMillis()).brakeHeld());
         long repeat = Math.max(15, Math.min(600,
                 plugin.getConfig().getLong("settings.driver-guide-repeat-seconds", 60))) * 1000L;
         DriverGuide.Hint hint = session.guide().next(state, System.currentTimeMillis(), repeat);
@@ -750,6 +756,7 @@ final class CabUiManager implements Listener {
                 case CLAIM, RECLAIM -> DriverGuideLexicon.Action.CLAIM;
                 case DEMAND, SHADOW_DEMAND -> DriverGuideLexicon.Action.DEMAND;
                 case ACK_TRIP -> DriverGuideLexicon.Action.ACK;
+                case ACK_TIMS -> DriverGuideLexicon.Action.ACK_TIMS;
                 case RELEASE_OLD_MA -> DriverGuideLexicon.Action.RELEASE;
                 default -> null;
             };
@@ -758,6 +765,7 @@ final class CabUiManager implements Listener {
                     case CLAIM -> "/st drive";
                     case DEMAND -> "/stcs ma fs";
                     case ACK -> "/stcs ma ack";
+                    case ACK_TIMS -> "/st tims ack";
                     case RELEASE -> "/stcs ma release";
                     default -> throw new IllegalStateException("Unexpected driver guide action");
                 };
@@ -794,33 +802,33 @@ final class CabUiManager implements Listener {
                 : mileage.known() ? mileage.meters() : null;
 
         String[] lines = new String[CabSidebar.LINE_COUNT];
-        lines[0] = line(localized(language, "速度", "Speed", "Vitesse", "速度"),
+        lines[0] = line(localized(language, "速度", "Speed", "Vitesse", "速度", "Скорость"),
                 format(unit.convert(speed)) + "/" + format(unit.convert(plugin.trainSpeedLimit(train))) + " " + unit.label);
-        lines[1] = line(localized(language, "当前线路", "Current line", "Ligne actuelle", "現在線区"),
+        lines[1] = line(localized(language, "当前线路", "Current line", "Ligne actuelle", "現在線区", "Текущая линия"),
                 currentLine == null ? "--" : currentLine);
-        lines[2] = line(localized(language, "当前里程", "Current mileage", "Point kilométrique", "現在キロ程"),
+        lines[2] = line(localized(language, "当前里程", "Current mileage", "Point kilométrique", "現在キロ程", "Путевая координата"),
                 currentMileage == null ? "--" : LineInfrastructureManager.formatMileageCompact(currentMileage));
-        lines[3] = line(localized(language, "下一应答器", "Next balise", "Prochaine balise", "次のバリス"),
+        lines[3] = line(localized(language, "下一应答器", "Next balise", "Prochaine balise", "次のバリス", "Следующая бализа"),
                 nextBalise.available() ? nextBalise.name() + " / " + nextBalise.position() : "--");
-        lines[4] = line(localized(language, "距离应答器", "Balise distance", "Distance à la balise", "バリスまで"),
+        lines[4] = line(localized(language, "距离应答器", "Balise distance", "Distance à la balise", "バリスまで", "До бализы"),
                 nextBalise.available() ? formatDistance(nextBalise.distanceMeters()) : "--");
         String switchPosition = stcs.nextSwitchMileageMeters() != null
                 ? LineInfrastructureManager.formatMileageCompact(stcs.nextSwitchMileageMeters())
                 : stcs.nextSwitchPosition();
-        lines[5] = line(localized(language, "下一道岔", "Next switch", "Prochaine aiguille", "次の分岐器"),
+        lines[5] = line(localized(language, "下一道岔", "Next switch", "Prochaine aiguille", "次の分岐器", "Следующая стрелка"),
                 stcs.nextSwitchAvailable()
                         ? stcs.nextSwitchName() + " / " + (switchPosition == null ? "--" : switchPosition)
                         : "--");
-        lines[6] = line(localized(language, "距离道岔", "Switch distance", "Distance à l'aiguille", "分岐器まで"),
+        lines[6] = line(localized(language, "距离道岔", "Switch distance", "Distance à l'aiguille", "分岐器まで", "До стрелки"),
                 stcs.nextSwitchAvailable() ? formatDistance(stcs.nextSwitchDistanceMeters()) : "--");
-        lines[7] = line(localized(language, "换向器", "Reverser", "Inverseur de marche", "逆転ハンドル"),
+        lines[7] = line(localized(language, "换向器", "Reverser", "Inverseur de marche", "逆転ハンドル", "Реверсор"),
                 reverser(language, train.reverser));
-        lines[8] = line(localized(language, "主控手柄", "Master controller", "Manipulateur traction-frein", "主ハンドル"),
+        lines[8] = line(localized(language, "主控手柄", "Master controller", "Manipulateur traction-frein", "主ハンドル", "Контроллер"),
                 masterHandle(language, train));
         String driver = manager.automaticEligible(train)
-                ? localized(language, "自动驾驶", "Automatic", "Automatique", "自動")
+                ? localized(language, "自动驾驶", "Automatic", "Automatique", "自動", "Автоматика")
                 : manager.driverName(train);
-        lines[9] = line(localized(language, "驾驶员", "Driver", "Conducteur", "運転士"),
+        lines[9] = line(localized(language, "驾驶员", "Driver", "Conducteur", "運転士", "Машинист"),
                 driver == null ? "--" : driver);
         var stcsPlugin = Bukkit.getPluginManager().getPlugin("STCS");
         boolean stcsEnabled = stcsPlugin != null && stcsPlugin.isEnabled();
@@ -830,7 +838,7 @@ final class CabUiManager implements Listener {
                 ui.text(language, "protection.mode." + train.protectionMode) + " | " + operating);
         String unavailable = ui.text(language, train.protectionMode == ProtectionMode.ISOLATED ? "protection.isolated" : "ma.wait");
         lines[11] = line(ui.text(language, "protection.eoa"), unavailable);
-        String curveLabel = localized(language, "影子限速", "Shadow limit", "Limite ombre", "影の制限速度");
+        String curveLabel = localized(language, "影子限速", "Shadow limit", "Limite ombre", "影の制限速度", "Теневое ограничение");
         if (train.protectionMode == ProtectionMode.ACTIVE)
             curveLabel = ui.text(language, "protection.speedLimit");
         lines[12] = line(curveLabel, "--");
@@ -856,7 +864,7 @@ final class CabUiManager implements Listener {
                         plugin.vehicleProfile().brakeAcceleration(7) * 400 / scale);
                 shadowLimitMps = curve.permittedMps();
                 String warning = curve.state().equals("OVERSPEED") || curve.state().equals("EOA_OVERRUN")
-                        ? localized(language, " 超限", " EXCEEDED", " DEPASSE", " 超過") : "";
+                        ? localized(language, " 超限", " EXCEEDED", " DEPASSE", " 超過", " ПРЕВЫШЕНО") : "";
                 // Curve speed uses physical metres, unlike the legacy block-based speed preference.
                 lines[12] = line(curveLabel, curve.permittedMps() == null ? "-- (" + curve.state() + ")"
                         : format(curve.permittedMps() * 3.6) + " km/h" + warning);
@@ -943,7 +951,7 @@ final class CabUiManager implements Listener {
         }
 
         inventory.setItem(0, controlItem(Material.REDSTONE_BLOCK,
-                localized(language, "紧急制动", "Emergency brake", "Freinage d'urgence", "非常制動"),
+                localized(language, "紧急制动", "Emergency brake", "Freinage d'urgence", "非常制動", "Экстренное торможение"),
                 train.emergencyBrake, false, language));
         for (int slot = 1; slot <= 7; slot++) {
             int notch = 8 - slot;
@@ -951,16 +959,16 @@ final class CabUiManager implements Listener {
                     !train.emergencyBrake && train.brakeNotch == notch, false, language));
         }
         inventory.setItem(HORN_SLOT, controlItem(Material.GOAT_HORN,
-                localized(language, "鸣笛", "Horn", "Avertisseur", "警笛"),
+                localized(language, "鸣笛", "Horn", "Avertisseur", "警笛", "Гудок"),
                 false, false, language));
         inventory.setItem(BELL_SLOT, controlItem(Material.BELL,
-                localized(language, "车钟", "Bell", "Cloche", "車鐘"),
+                localized(language, "车钟", "Bell", "Cloche", "車鐘", "Звонок"),
                 false, false, language));
         inventory.setItem(INFO_SLOT, controlItem(Material.MINECART,
-                localized(language, "列车信息", "Train information", "Informations du train", "列車情報"),
+                localized(language, "列车信息", "Train information", "Informations du train", "列車情報", "Информация о поезде"),
                 false, false, language));
         inventory.setItem(16, controlItem(Material.WHITE_WOOL,
-                localized(language, "中立 N", "Neutral N", "Neutre N", "中立 N"),
+                localized(language, "中立 N", "Neutral N", "Neutre N", "中立 N", "Нейтраль N"),
                 !train.emergencyBrake && train.powerNotch == 0 && train.brakeNotch == 0,
                 false, language));
         for (int slot = 22; slot <= 25; slot++) {
@@ -1051,7 +1059,7 @@ final class CabUiManager implements Listener {
             playHandleSound(player);
             player.sendActionBar(Component.text(hotbarStatus(ui.language(player), train), NamedTextColor.AQUA));
         } catch (IllegalArgumentException ex) {
-            plugin.send(player, "&c" + ui.text(player, ex.getMessage()));
+            plugin.send(player, "&c" + ui.error(player, ex));
             hotbarDrivers.remove(player.getUniqueId());
         }
     }
@@ -1068,12 +1076,12 @@ final class CabUiManager implements Listener {
                 "热键驾驶: 副手=EB 1=B7 2=B5 3=B3 4=B1 5=N/挥动换向 6=P1 7=P2 8=P3 9=P4",
                 "Hotbar cab: swap=EB 1=B7 2=B5 3=B3 4=B1 5=N/swing reverser 6=P1 7=P2 8=P3 9=P4",
                 "Barre rapide: échange=FU 1=B7 2=B5 3=B3 4=B1 5=N/balancer inverseur 6=P1 7=P2 8=P3 9=P4",
-                "ホットバー: 持替=EB 1=B7 2=B5 3=B3 4=B1 5=N/振って逆転器 6=P1 7=P2 8=P3 9=P4"),
+                "ホットバー: 持替=EB 1=B7 2=B5 3=B3 4=B1 5=N/振って逆転器 6=P1 7=P2 8=P3 9=P4", "Хотбар: смена рук=EB 1=B7 2=B5 3=B3 4=B1 5=N/взмах=реверсор 6=P1 7=P2 8=P3 9=P4"),
                 NamedTextColor.YELLOW));
     }
 
     private static String hotbarStatus(UiLanguage language, Train train) {
-        return localized(language, "热键驾驶: ", "Hotbar cab: ", "Barre rapide: ", "ホットバー: ")
+        return localized(language, "热键驾驶: ", "Hotbar cab: ", "Barre rapide: ", "ホットバー: ", "Хотбар: ")
                 + masterHandle(language, train);
     }
 
@@ -1086,7 +1094,7 @@ final class CabUiManager implements Listener {
         meta.setEnchantmentGlintOverride(active);
         if (unavailable) {
             meta.lore(List.of(Component.text(localized(language,
-                    "列车未停稳", "Train is moving", "Train en mouvement", "列車走行中"),
+                    "列车未停稳", "Train is moving", "Train en mouvement", "列車走行中", "Поезд движется"),
                     NamedTextColor.RED).decoration(TextDecoration.ITALIC, false)));
         }
         item.setItemMeta(meta);
@@ -1119,39 +1127,40 @@ final class CabUiManager implements Listener {
 
     private static String reverser(UiLanguage language, Reverser reverser) {
         return switch (reverser) {
-            case FORWARD -> localized(language, "前进", "Forward", "Avant", "前進");
-            case NEUTRAL -> localized(language, "中立", "Neutral", "Neutre", "中立");
-            case BACKWARD -> localized(language, "后退", "Reverse", "Arrière", "後進");
+            case FORWARD -> localized(language, "前进", "Forward", "Avant", "前進", "Вперёд");
+            case NEUTRAL -> localized(language, "中立", "Neutral", "Neutre", "中立", "Нейтраль");
+            case BACKWARD -> localized(language, "后退", "Reverse", "Arrière", "後進", "Назад");
         };
     }
 
     private static String masterHandle(UiLanguage language, Train train) {
         if (train.emergencyBrake) {
-            return localized(language, "紧急制动", "Emergency brake", "Freinage d'urgence", "非常制動");
+            return localized(language, "紧急制动", "Emergency brake", "Freinage d'urgence", "非常制動", "Экстренное торможение");
         }
         if (train.brakeNotch > 0) {
             return localized(language,
                     "制动" + train.brakeNotch + "级",
                     "Brake B" + train.brakeNotch,
                     "Frein B" + train.brakeNotch,
-                    "制動" + train.brakeNotch + "段");
+                    "制動" + train.brakeNotch + "段", "Тормоз B" + train.brakeNotch);
         }
         if (train.powerNotch > 0) {
             return localized(language,
                     "牵引" + train.powerNotch + "级",
                     "Power P" + train.powerNotch,
                     "Traction P" + train.powerNotch,
-                    "力行" + train.powerNotch + "段");
+                    "力行" + train.powerNotch + "段", "Тяга P" + train.powerNotch);
         }
-        return localized(language, "中立", "Neutral", "Neutre", "中立");
+        return localized(language, "中立", "Neutral", "Neutre", "中立", "Нейтраль");
     }
 
-    private static String localized(UiLanguage language, String zh, String en, String fr, String jp) {
+    private static String localized(UiLanguage language, String zh, String en, String fr, String jp, String ru) {
         return switch (language) {
             case ZH -> zh;
             case EN -> en;
             case FR -> fr;
             case JP -> jp;
+            case RU -> ru;
         };
     }
 

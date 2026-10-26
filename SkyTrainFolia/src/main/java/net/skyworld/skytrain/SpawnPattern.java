@@ -19,18 +19,18 @@ final class SpawnPattern {
     private int index;
     private Center center = Center.NONE;
     private SpawnPattern(String text, Collection<String> names) {
-        if (text.length() > 4096) throw new IllegalArgumentException("Spawn pattern too long");
+        if (text.length() > 4096) throw new UiException("Spawn pattern too long", "Шаблон создания слишком длинный");
         this.text = text;
         this.names = names.stream().sorted(Comparator.comparingInt(String::length).reversed()).toList();
     }
     static Parsed parse(String text, Collection<String> names) {
         SpawnPattern parser = new SpawnPattern(text, names);
         var parts = parser.sequence(0);
-        if (parts.isEmpty()) throw new IllegalArgumentException("Empty spawn pattern");
+        if (parts.isEmpty()) throw new UiException("Empty spawn pattern", "Пустой шаблон создания");
         return new Parsed(List.copyOf(parts), parser.center);
     }
     private List<Part> sequence(int depth) {
-        if (depth > 16) throw new IllegalArgumentException("Spawn nesting exceeds 16");
+        if (depth > 16) throw new UiException("Spawn nesting exceeds 16", "Вложенность spawn превышает 16");
         List<Part> result = new ArrayList<>();
         while (index < text.length()) {
             char c = text.charAt(index);
@@ -47,13 +47,13 @@ final class SpawnPattern {
             double weight = -1;
             if (index < text.length() && text.charAt(index)=='%') {
                 weight = Double.parseDouble(quantity);
-                if (!Double.isFinite(weight) || weight < 0) throw new IllegalArgumentException("Invalid spawn weight");
+                if (!Double.isFinite(weight) || weight < 0) throw new UiException("Invalid spawn weight", "Недопустимый вес spawn");
                 prefix = ++index;
                 while (index < text.length() && Character.isDigit(text.charAt(index))) index++;
                 quantity = text.substring(prefix, index);
             }
             int count = quantity.isEmpty() ? 1 : Integer.parseInt(quantity);
-            if (count < 0 || count > 1024 || index >= text.length()) throw new IllegalArgumentException("Invalid spawn count");
+            if (count < 0 || count > 1024 || index >= text.length()) throw new UiException("Invalid spawn count", "Недопустимое количество spawn");
             c = text.charAt(index);
             if ("[<({".indexOf(c)>=0) {
                 index++;
@@ -68,7 +68,7 @@ final class SpawnPattern {
             for (String candidate : names) if (text.startsWith(candidate,index)
                     && (candidate.length()>1 || "mspht".indexOf(c)<0)) { name=candidate; break; }
             if (name==null && "mspht".indexOf(c)>=0) name=String.valueOf(c);
-            if (name==null) throw new IllegalArgumentException("Unknown spawn pattern at: " + text.substring(index));
+            if (name==null) throw new UiException("Unknown spawn pattern at: " + text.substring(index), "Неизвестный элемент шаблона создания: " + text.substring(index));
             index+=name.length();
             result.add(new Part(name,count,weight,List.of()));
         }
@@ -76,7 +76,7 @@ final class SpawnPattern {
     }
     private static void expandParts(List<Part> parts, RandomGenerator random, int limit, List<String> out) {
         double total = parts.stream().filter(p->p.weight>=0).mapToDouble(Part::weight).sum();
-        if (!Double.isFinite(total)) throw new IllegalArgumentException("Spawn weight overflow");
+        if (!Double.isFinite(total)) throw new UiException("Spawn weight overflow", "Переполнение веса spawn");
         double chosen = total>0 ? random.nextDouble(total) : -1;
         Part selected = null;
         for (Part p: parts) if(p.weight>=0 && selected==null && chosen>=0) {
@@ -85,7 +85,7 @@ final class SpawnPattern {
         }
         for(Part p: parts) if(p.weight<0 || p==selected) for(int i=0;i<p.count;i++) {
             if(p.name==null) expandParts(p.children,random,limit,out);
-            else { if(out.size()>=limit) throw new IllegalArgumentException("Spawn exceeds cart limit " + limit); out.add(p.name); }
+            else { if(out.size()>=limit) throw new UiException("Spawn exceeds cart limit " + limit, "Создание превышает предел вагонеток " + limit); out.add(p.name); }
         }
     }
 }

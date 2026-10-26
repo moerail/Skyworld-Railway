@@ -77,7 +77,7 @@ Message と Packet は別の番号体系です。割当済み影方式 MA は **
 
 試験台の台帳診断は同一サーバーの railgraph と shadow-occupancy.json を読み取るだけで、空閑を証明しません。旧編成と全車両の消滅を確認した場合だけ、コンソールで `stcs ma clear <完全UUID> confirm` を実行します。その列車の全影方式記録が対象で、バックアップと監査を残し、M1 履歴は保持します。区画未読込だけでは消去しないでください。
 
-[ホーム](README.md) | [中文](README.zh.md) | [English](README.en.md) | [Nederlands](README.nl.md) | [Français](README.fr.md) | **日本語**
+[ホーム](README.md) | [中文](README.zh.md) | [English](README.en.md) | [Nederlands](README.nl.md) | [Français](README.fr.md) | **日本語** | [Русский](README.ru.md)
 
 **日本語完全版。本書だけで読めるため、補助文書は不要です。**
 

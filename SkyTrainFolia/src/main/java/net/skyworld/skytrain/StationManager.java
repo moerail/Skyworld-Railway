@@ -96,11 +96,11 @@ final class StationManager {
         RailInfo rail = railBlock!=null && railBlock.getBlockData() instanceof Rail data
                 ? new RailInfo(railBlock,data,false,false) : null;
         if (rail == null) {
-            throw new IllegalArgumentException("station 牌子附近找不到轨道。");
+            throw new UiException("station 牌子附近找不到轨道。", "Рядом с табличкой station нет рельса.");
         }
         if ((departure.equals("left") || departure.equals("right"))
                 && departureDirection(signBlock, rail, departure).lengthSquared() < EPSILON) {
-            throw new IllegalArgumentException("station 无法根据牌子朝向和轨道确定 " + departure + " 发车方向。");
+            throw new UiException("station 无法根据牌子朝向和轨道确定 " + departure + " 发车方向。", "station не может определить по табличке и рельсам направление отправления " + departure + ".");
         }
 
         SwitchBlockPosition sign = SwitchBlockPosition.of(signBlock);
@@ -250,6 +250,7 @@ final class StationManager {
             case EN -> ChatColor.AQUA + "Stop marker";
             case FR -> ChatColor.AQUA + "Point d'arrêt";
             case JP -> ChatColor.AQUA + "停止位置";
+            case RU -> ChatColor.AQUA + "Место остановки";
         };
     }
 

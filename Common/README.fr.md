@@ -77,7 +77,7 @@ L'alerte répète six paires Do5-Sol5 par salve jusqu'au franchissement du seuil
 
 L’inspecteur du banc lit railgraph et shadow-occupancy.json correspondants sans les modifier ni prouver la libération. Après vérification de la disparition de toute la rame d’origine seulement : `stcs ma clear <UUID-complet> confirm` dans la console. Toutes les preuves en mode ombre de cette identité sont effacées, avec sauvegarde et journal d’audit ; le registre historique M1 reste intact. Un train déchargé n’est pas nécessairement supprimé.
 
-[Accueil](README.md) | [中文](README.zh.md) | [English](README.en.md) | [Nederlands](README.nl.md) | **Français** | [日本語](README.ja.md)
+[Accueil](README.md) | [中文](README.zh.md) | [English](README.en.md) | [Nederlands](README.nl.md) | **Français** | [日本語](README.ja.md) | [Русский](README.ru.md)
 
 **Édition française complète et autonome : aucun document complémentaire n’est nécessaire pour lire ce manuel.**
 

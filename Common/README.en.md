@@ -1,5 +1,11 @@
 # SkyRail Suite
 
+## 为了同志 / Ради товарищей — STF 4.0.10 · 2026-10-26
+
+STF **4.0.10** / STCS **4.1.1** / STA **2.2.0** / SkyPCC **2.1.0**. [Chinese/Russian release notes](doc/releases/suite-v4.0.10.md).
+
+Use `/st lang ru` for Russian commands, cab/sidebar, MA/ATP displays, stop markers and driver guidance. The preference persists like the other languages; missing Russian entries in an older custom `driver-guide.yml` use bundled defaults. `/st help ru` selects Russian help temporarily. PCC web language is separate.
+
 ## Driver handover and MA — 2026-10-24
 
 Current sources: STCS **4.1.1** / STF **4.0.9** / STA **2.2.0** / SkyPCC **2.1.0**. Dismounting, disconnecting or releasing driving control revokes the previous MA and returns the onboard mode to `SB` with brakes held. Forward reservations clear after a confirmed stop, position and train integrity; body occupancy remains protected. The next driver uses `/st drive` and requests `/stcs ma fs` again without releasing the previous MA. `/stcs ma demand` remains a compatibility alias. Update STCS and STF together. **87 Java tests passed on each of 26.2 and 26.3; live-server acceptance is pending.** [Changelog](CHANGELOG.md)
@@ -77,7 +83,7 @@ Near-limit audio repeats six C5-G5 pairs per burst until speed clears the hyster
 
 The testbench ledger inspector reads matching railgraph and shadow-occupancy.json files without modifying them or proving clearance. Only after verifying the entire original train and all members are gone may the console operator use `stcs ma clear <full-UUID> confirm`. It clears all shadow evidence for that identity, backs up and audits the operation, and preserves historical M1 evidence. Unloaded trains must not be cleared merely because they are invisible.
 
-[Home](README.md) | [中文](README.zh.md) | **English** | [Nederlands](README.nl.md)
+[Home](README.md) | [中文](README.zh.md) | **English** | [Nederlands](README.nl.md) | [Русский](README.ru.md)
 
 **English edition. Self-contained: no companion documentation is required to read this manual.**
 
