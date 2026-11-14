@@ -1,5 +1,14 @@
 # Updates / 更新说明
 
+## STF 4.0.11 · SR/FS hotbar recovery and onboarding — 2026-11-14
+
+- 修复等待 SR 审批、SB/PT 或其他牵引联锁期间尝试加牵引，会将快捷栏驾驶静默关闭的问题。原来的错误处理把操作被拒绝误当作驾驶权丢失，导致后续 SR 获批或 release 后申请 FS 仍无法用快捷栏操纵。
+- 快捷栏牵引、换向及 EB 输入仅在驾驶权检查失败时关闭快捷栏；普通操作拒绝保留输入设备。获批后司机重新选档即可，无需重新上车；不重放先前被拒绝的牵引操作。驾驶权丢失、下车与掉线仍关闭输入。
+- Add regression coverage for pending SR → approval → power and release → FS → power with the same driver/input session, rejected traction preserving brakes, no automatic replay, other interlocks and ownership loss. Live-server acceptance remains pending.
+- FS 获批、停车且尚未开启热键驾驶时，库莉酱提醒先选快捷栏第 5 格（N），提供可点击的 `/st hotbar`。选错位置点击时，由库莉酱提示位置错误并要求选择第 5 格；不改变操纵状态。已开启时停止提示，TIMS/TR/PT 恢复提示仍优先。五语言文案可在 `driver-guide.yml` 自定义；旧词库自动回退内置新增条目。
+- Verify the clickable command, all nine slot positions, FS-only onboarding, enabled-device suppression, throttling and TIMS priority. Onboarding does not enable controls or apply traction automatically.
+- Validation: **89 Java test entry points passed on each of Shiroha 26.2 and 26.3**. The 4.0.11 JAR includes both display adapters. Server installations were not modified.
+
 ## 为了同志 / Ради товарищей — STF 4.0.10 · 2026-10-26
 
 [中俄双语发布说明 / Описание на китайском и русском](doc/releases/suite-v4.0.10.md) · STCS 4.1.1 / STA 2.2.0 / SkyPCC 2.1.0。

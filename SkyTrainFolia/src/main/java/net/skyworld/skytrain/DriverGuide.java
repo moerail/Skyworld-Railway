@@ -6,12 +6,13 @@ import java.util.EnumMap;
 final class DriverGuide {
     enum Hint { NONE, CLAIM, RECLAIM, REVERSER, DEMAND, SHADOW_DEMAND,
         SERVICE_UNAVAILABLE, POSITION_WAIT, MA_WAITING, SR_PENDING, BRAKE_HELD,
-        ACK_TIMS, ACK_TRIP, RELEASE_OLD_MA }
+        ACK_TIMS, ACK_TRIP, RELEASE_OLD_MA, ENABLE_HOTBAR, HOTBAR_SLOT_ERROR }
 
     record State(boolean manual, boolean stopped, boolean driver, boolean anotherDriver,
             Reverser reverser, OperatingMode operatingMode, ProtectionMode protectionMode,
             boolean formerDriver, boolean serviceAvailable, boolean positionKnown,
-            boolean demandAvailable, String authorityReason, boolean emergencyBrake, boolean timsHeld) {}
+            boolean demandAvailable, String authorityReason, boolean emergencyBrake, boolean timsHeld,
+            boolean hotbarEnabled) {}
 
     private final EnumMap<Hint, Long> lastSent = new EnumMap<>(Hint.class);
     private Hint previous = Hint.NONE;
@@ -23,6 +24,7 @@ final class DriverGuide {
         if (state.driver() && state.operatingMode() == OperatingMode.PT) return Hint.RELEASE_OLD_MA;
         if (!state.driver()) return state.anotherDriver() ? Hint.NONE
                 : state.formerDriver() ? Hint.RECLAIM : Hint.CLAIM;
+        if (state.operatingMode() == OperatingMode.FS && !state.hotbarEnabled()) return Hint.ENABLE_HOTBAR;
         if (state.reverser() == Reverser.NEUTRAL) return Hint.REVERSER;
         if (state.operatingMode() == OperatingMode.SB) {
             if (!state.serviceAvailable()) return Hint.SERVICE_UNAVAILABLE;

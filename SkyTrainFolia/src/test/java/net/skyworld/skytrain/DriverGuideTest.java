@@ -19,29 +19,29 @@ public final class DriverGuideTest {
         check(select(true, false, "IDLE", false, true) == DriverGuide.Hint.BRAKE_HELD,
                 "emergency brake reminder after MA");
         check(DriverGuide.select(new DriverGuide.State(true, true, true, false, Reverser.FORWARD,
-                OperatingMode.TR, ProtectionMode.ACTIVE, false, true, true, false, "TRIP", true, false))
+                OperatingMode.TR, ProtectionMode.ACTIVE, false, true, true, false, "TRIP", true, false, true))
                 == DriverGuide.Hint.ACK_TRIP, "trip acknowledgement first");
         check(DriverGuide.select(new DriverGuide.State(true, true, true, false, Reverser.FORWARD,
-                OperatingMode.PT, ProtectionMode.ACTIVE, false, true, true, false, "PT", true, false))
+                OperatingMode.PT, ProtectionMode.ACTIVE, false, true, true, false, "PT", true, false, true))
                 == DriverGuide.Hint.RELEASE_OLD_MA, "old MA release");
 
         var guide = new DriverGuide();
         for (var mode : OperatingMode.values()) {
             var tims = new DriverGuide.State(true, true, true, false, Reverser.NEUTRAL,
-                    mode, ProtectionMode.ACTIVE, false, false, false, false, "TIMS_HOLD", true, true);
+                    mode, ProtectionMode.ACTIVE, false, false, false, false, "TIMS_HOLD", true, true, true);
             check(DriverGuide.select(tims) == DriverGuide.Hint.ACK_TIMS,
                     "TIMS acknowledgement precedes mode/reverser/service hints in " + mode);
             check(guide.next(tims, 1_000, 60_000) == (mode == OperatingMode.SB
                     ? DriverGuide.Hint.ACK_TIMS : DriverGuide.Hint.NONE), "TIMS hint throttling");
         }
         check(DriverGuide.select(new DriverGuide.State(true, false, true, false, Reverser.FORWARD,
-                OperatingMode.TR, ProtectionMode.ACTIVE, false, true, true, false, "TIMS_HOLD", true, true))
+                OperatingMode.TR, ProtectionMode.ACTIVE, false, true, true, false, "TIMS_HOLD", true, true, true))
                 == DriverGuide.Hint.NONE, "No stationary recovery hint while moving");
         check(DriverGuide.select(new DriverGuide.State(true, true, false, true, Reverser.FORWARD,
-                OperatingMode.TR, ProtectionMode.ACTIVE, false, true, true, false, "TIMS_HOLD", true, true))
+                OperatingMode.TR, ProtectionMode.ACTIVE, false, true, true, false, "TIMS_HOLD", true, true, true))
                 == DriverGuide.Hint.NONE, "Passengers cannot acknowledge another driver's TIMS");
         check(guide.next(new DriverGuide.State(true, true, true, false, Reverser.FORWARD,
-                OperatingMode.TR, ProtectionMode.ACTIVE, false, true, true, false, "TRIP", true, false),
+                OperatingMode.TR, ProtectionMode.ACTIVE, false, true, true, false, "TRIP", true, false, true),
                 2_000, 60_000) == DriverGuide.Hint.ACK_TRIP, "TR follows TIMS clearance immediately");
         var ready = state(true, false, "IDLE", true, false, false);
         check(guide.next(ready, 1_000, 60_000) == DriverGuide.Hint.DEMAND, "first hint");
@@ -54,6 +54,7 @@ public final class DriverGuideTest {
             bundled.load(new InputStreamReader(resource, StandardCharsets.UTF_8));
         }
         var lexicon = DriverGuideLexicon.parse(new YamlConfiguration(), bundled);
+        hotbarGuide(lexicon);
         var oldLocal = new YamlConfiguration();
         oldLocal.loadFromString(bundled.saveToString());
         oldLocal.set("name.ru", null);
@@ -95,6 +96,43 @@ public final class DriverGuideTest {
         System.out.println("Driver guide states, throttling and multilingual word bank passed");
     }
 
+    private static void hotbarGuide(DriverGuideLexicon lexicon) {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+        for (var mode : OperatingMode.values()) {
+            var state = new DriverGuide.State(true, true, true, false, Reverser.FORWARD,
+                    mode, ProtectionMode.ACTIVE, false, true, true, false, "VALID", true, false, false);
+            check((DriverGuide.select(state) == DriverGuide.Hint.ENABLE_HOTBAR) == (mode == OperatingMode.FS),
+                    "Hotbar onboarding only after FS grant: " + mode);
+        }
+        var fs = new DriverGuide.State(true, true, true, false, Reverser.FORWARD,
+                OperatingMode.FS, ProtectionMode.ACTIVE, false, true, true, false, "VALID", false, false, false);
+        var guide = new DriverGuide();
+        check(guide.next(fs, 1000, 60000) == DriverGuide.Hint.ENABLE_HOTBAR, "Immediate FS onboarding");
+        check(guide.next(fs, 2000, 60000) == DriverGuide.Hint.NONE, "No onboarding spam");
+        check(DriverGuide.select(new DriverGuide.State(true, true, true, false, Reverser.FORWARD,
+                OperatingMode.FS, ProtectionMode.ACTIVE, false, true, true, false, "VALID", false, false, true))
+                == DriverGuide.Hint.NONE, "Enabled hotbar must not receive toggle-off button");
+        check(DriverGuide.select(new DriverGuide.State(true, true, true, false, Reverser.FORWARD,
+                OperatingMode.FS, ProtectionMode.ACTIVE, false, true, true, false, "VALID", true, true, false))
+                == DriverGuide.Hint.ACK_TIMS, "TIMS recovery precedes onboarding");
+        for (var language : UiLanguage.values()) {
+            var button = CabUiManager.guideAction(lexicon, language, DriverGuideLexicon.Action.HOTBAR, "/st hotbar");
+            check(net.kyori.adventure.text.event.ClickEvent.runCommand("/st hotbar").equals(button.clickEvent()),
+                    "Clickable hotbar command " + language);
+            for (int slot = 0; slot < 9; slot++) {
+                try {
+                    CabUiManager.requireNeutralHotbarSlot(lexicon, language, slot);
+                    check(slot == 4, "Only fifth slot enables hotbar");
+                } catch (IllegalArgumentException ex) {
+                    check(slot != 4 && ex.getMessage().contains(lexicon.name(language))
+                            && ex.getMessage().contains("5") && ex.getMessage().contains("/st hotbar"),
+                            "Character explains incorrect position " + language);
+                }
+            }
+        }
+    }
+
     private static DriverGuide.Hint select(boolean driver, boolean former, String reason,
             boolean demand, boolean brake) {
         return select(driver, former, reason, demand, brake, false);
@@ -109,7 +147,7 @@ public final class DriverGuideTest {
             boolean demand, boolean brake, boolean serviceDown) {
         return new DriverGuide.State(true, true, driver, false, Reverser.FORWARD,
                 brake ? OperatingMode.FS : OperatingMode.SB, ProtectionMode.ACTIVE,
-                former, !serviceDown, !"POSITION_UNCERTAIN".equals(reason), demand, reason, brake, false);
+                former, !serviceDown, !"POSITION_UNCERTAIN".equals(reason), demand, reason, brake, false, true);
     }
 
     private static void check(boolean condition, String message) {

@@ -14,7 +14,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 /** Editable driver-guide phrases. Commands remain fixed in CabUiManager. */
 final class DriverGuideLexicon {
-    enum Action { CLAIM, FORWARD, BACKWARD, DEMAND, ACK_TIMS, ACK, RELEASE }
+    enum Action { CLAIM, FORWARD, BACKWARD, DEMAND, ACK_TIMS, ACK, RELEASE, HOTBAR }
 
     private final Map<UiLanguage, String> names;
     private final Map<Action, Map<UiLanguage, String>> actions;

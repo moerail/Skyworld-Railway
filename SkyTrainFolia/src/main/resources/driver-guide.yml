@@ -16,7 +16,40 @@ actions:
   ack: {zh: '确认跳闸', en: 'Acknowledge trip', fr: 'Acquitter le déclenchement', jp: 'トリップ確認', ru: 'Подтвердить TR'}
   ack_tims: {zh: '确认 TIMS', en: 'Acknowledge TIMS', fr: 'Acquitter TIMS', jp: 'TIMS 確認', ru: 'Подтвердить TIMS'}
   release: {zh: '释放旧 MA', en: 'Release old MA', fr: 'Libérer l’ancienne MA', jp: '古い MA を解放', ru: 'Освободить старую MA'}
+  hotbar: {zh: '开启热键驾驶', en: 'Enable hotbar cab', fr: 'Activer la barre rapide', jp: 'ホットバー運転を有効化', ru: 'Включить хотбар'}
 scenarios:
+  enable_hotbar:
+    zh:
+      - 'FS 运行许可已到手啦！先把快捷栏选到第 5 格（N），再点击 /st hotbar 开启热键驾驶吧。'
+      - '司机大大，FS 已获批！请先选中快捷栏第 5 格（N），然后点这里开启 /st hotbar～'
+    en:
+      - 'FS permission is ready! Select hotbar slot 5 (N), then click /st hotbar to enable driving controls.'
+      - 'FS granted, driver! Select slot 5 (N) first, then click here to enable /st hotbar.'
+    fr:
+      - 'La permission FS est accordée ! Sélectionnez la case 5 (N), puis cliquez sur /st hotbar pour activer les commandes.'
+      - 'FS accordé ! Choisissez d’abord la case 5 (N), puis cliquez ici pour activer /st hotbar.'
+    jp:
+      - 'FS の運転許可が出たよ！ホットバーの5番スロット（N）を選んでから、/st hotbar をクリックしてね。'
+      - '運転士さん、FS が承認されたよ！まず5番スロット（N）を選んで、ここをクリックして /st hotbar を有効にしてね。'
+    ru:
+      - 'Разрешение FS получено! Выберите слот 5 (N), затем нажмите /st hotbar для включения управления.'
+      - 'Машинист, FS одобрен! Сначала выберите слот 5 (N), затем нажмите здесь для включения /st hotbar.'
+  hotbar_slot_error:
+    zh:
+      - '快捷栏位置错误啦！请先选中第 5 格（N），再点击 /st hotbar。'
+      - '司机大大，位置不对哦～先把快捷栏放到第 5 格（N），再点 /st hotbar 吧。'
+    en:
+      - 'Wrong hotbar slot! Select slot 5 (N), then click /st hotbar again.'
+      - 'Driver, that slot is incorrect. Move to hotbar slot 5 (N) before clicking /st hotbar.'
+    fr:
+      - 'Mauvaise case ! Sélectionnez la case 5 (N), puis cliquez à nouveau sur /st hotbar.'
+      - 'Conducteur, cette case ne convient pas. Choisissez la case 5 (N) avant de cliquer sur /st hotbar.'
+    jp:
+      - 'スロットの位置が違うよ！5番スロット（N）を選んでから、もう一度 /st hotbar をクリックしてね。'
+      - '運転士さん、そこじゃないよ～ホットバーの5番スロット（N）に合わせてから /st hotbar をクリックしてね。'
+    ru:
+      - 'Неверный слот хотбара! Выберите слот 5 (N), затем снова нажмите /st hotbar.'
+      - 'Машинист, выбран не тот слот. Сначала переключитесь на слот 5 (N), затем нажмите /st hotbar.'
   ack_tims:
     ru:
       - 'TIMS удерживает тормоза. Восстановите целостность и остановитесь, затем подтвердите TIMS до восстановления TR и старой MA.'

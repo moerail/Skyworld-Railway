@@ -190,7 +190,7 @@ final class CabUiManager implements Listener {
                     NamedTextColor.GRAY));
             return false;
         }
-        requireNeutralHotbarSlot(ui.language(player), player.getInventory().getHeldItemSlot());
+        requireNeutralHotbarSlot(plugin.driverGuideLexicon(), ui.language(player), player.getInventory().getHeldItemSlot());
         requireDrivingControl(player, train);
         activate(player, train, false);
         synchronized (sessions) {
@@ -202,12 +202,9 @@ final class CabUiManager implements Listener {
         return true;
     }
 
-    static void requireNeutralHotbarSlot(UiLanguage language, int slot) {
-        if (!DriverSafety.neutralHotbarSlot(slot)) throw new IllegalArgumentException(localized(language,
-                "请先选中快捷栏第 5 格（N），再输入 /st hotbar。当前操纵状态未改变。",
-                "Select hotbar slot 5 (N) before using /st hotbar. Current controls are unchanged.",
-                "Sélectionnez la case 5 (N) avant /st hotbar. Les commandes restent inchangées.",
-                "ホットバーの5番スロット（N）を選んでから /st hotbar を実行してください。操作状態は変更されていません。", "Перед /st hotbar выберите слот 5 (N). Текущее управление не изменено."));
+    static void requireNeutralHotbarSlot(DriverGuideLexicon lexicon, UiLanguage language, int slot) {
+        if (!DriverSafety.neutralHotbarSlot(slot)) throw new IllegalArgumentException(
+                "[" + lexicon.name(language) + "] " + lexicon.phrase(DriverGuide.Hint.HOTBAR_SLOT_ERROR, language));
     }
 
     private void activate(Player player, Train train, boolean openInventory) {
@@ -427,7 +424,7 @@ final class CabUiManager implements Listener {
             return;
         }
         try {
-            requireDrivingControl(player, train);
+            requireHotbarDrivingControl(player, train);
             if (!manager.canChangeReverser(train)) {
                 player.sendActionBar(Component.text(localized(ui.language(player),
                         "列车未停稳，不能切换换向器。",
@@ -444,8 +441,6 @@ final class CabUiManager implements Listener {
                     + reverser(ui.language(player), train.reverser), NamedTextColor.YELLOW));
         } catch (IllegalArgumentException ex) {
             plugin.send(player, "&c" + ui.error(player, ex));
-            hotbarDrivers.remove(playerId);
-            reverserSwingTicks.remove(playerId);
         }
     }
 
@@ -462,7 +457,7 @@ final class CabUiManager implements Listener {
             return;
         }
         try {
-            requireDrivingControl(player, train);
+            requireHotbarDrivingControl(player, train);
             manager.emergencyBrake(train);
             renderOpenCabIfPresent(player, train);
             playHandleSound(player);
@@ -472,7 +467,6 @@ final class CabUiManager implements Listener {
                     NamedTextColor.RED));
         } catch (IllegalArgumentException ex) {
             plugin.send(player, "&c" + ui.error(player, ex));
-            hotbarDrivers.remove(player.getUniqueId());
         }
     }
 
@@ -737,7 +731,7 @@ final class CabUiManager implements Listener {
                 train.reverser, train.operatingMode, train.protectionMode,
                 player.getUniqueId().equals(train.lastManualDriver), serviceAvailable,
                 positionKnown, mayDemand, authorityReason, train.emergencyBrake,
-                train.tims.view(System.currentTimeMillis()).brakeHeld());
+                train.tims.view(System.currentTimeMillis()).brakeHeld(), hotbarDrivers.contains(player.getUniqueId()));
         long repeat = Math.max(15, Math.min(600,
                 plugin.getConfig().getLong("settings.driver-guide-repeat-seconds", 60))) * 1000L;
         DriverGuide.Hint hint = session.guide().next(state, System.currentTimeMillis(), repeat);
@@ -758,6 +752,7 @@ final class CabUiManager implements Listener {
                 case ACK_TRIP -> DriverGuideLexicon.Action.ACK;
                 case ACK_TIMS -> DriverGuideLexicon.Action.ACK_TIMS;
                 case RELEASE_OLD_MA -> DriverGuideLexicon.Action.RELEASE;
+                case ENABLE_HOTBAR -> DriverGuideLexicon.Action.HOTBAR;
                 default -> null;
             };
             if (action != null) {
@@ -767,6 +762,7 @@ final class CabUiManager implements Listener {
                     case ACK -> "/stcs ma ack";
                     case ACK_TIMS -> "/st tims ack";
                     case RELEASE -> "/stcs ma release";
+                    case HOTBAR -> "/st hotbar";
                     default -> throw new IllegalStateException("Unexpected driver guide action");
                 };
                 message = message.append(Component.text(" 👉 ", NamedTextColor.WHITE))
@@ -776,7 +772,7 @@ final class CabUiManager implements Listener {
         player.sendMessage(message);
     }
 
-    private Component guideAction(DriverGuideLexicon lexicon, UiLanguage language,
+    static Component guideAction(DriverGuideLexicon lexicon, UiLanguage language,
             DriverGuideLexicon.Action action, String command) {
         return Component.text("[" + lexicon.action(action, language) + " " + command + "]", NamedTextColor.AQUA)
                 .decorate(TextDecoration.BOLD).clickEvent(ClickEvent.runCommand(command));
@@ -1030,6 +1026,13 @@ final class CabUiManager implements Listener {
         manager.requireDriver(player, train);
     }
 
+    private void requireHotbarDrivingControl(Player player, Train train) {
+        HotbarInputGate.requireDriver(() -> requireDrivingControl(player, train), () -> {
+            hotbarDrivers.remove(player.getUniqueId());
+            reverserSwingTicks.remove(player.getUniqueId());
+        });
+    }
+
     private void playControlSound(Player player, int slot) {
         if (slot == 8 || slot == 17 || slot == 26) {
             playReverserSound(player);
@@ -1040,7 +1043,7 @@ final class CabUiManager implements Listener {
 
     private void applyHotbarSlot(Player player, Train train, int slot) {
         try {
-            requireDrivingControl(player, train);
+            requireHotbarDrivingControl(player, train);
             switch (slot) {
                 case 0 -> manager.setBrakeNotch(train, 7);
                 case 1 -> manager.setBrakeNotch(train, 5);
@@ -1060,7 +1063,6 @@ final class CabUiManager implements Listener {
             player.sendActionBar(Component.text(hotbarStatus(ui.language(player), train), NamedTextColor.AQUA));
         } catch (IllegalArgumentException ex) {
             plugin.send(player, "&c" + ui.error(player, ex));
-            hotbarDrivers.remove(player.getUniqueId());
         }
     }
 

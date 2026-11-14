@@ -1,5 +1,5 @@
 name: SkyTrainFolia
-version: 4.0.10
+version: 4.0.11
 main: net.skyworld.skytrain.SkyTrainPlugin
 api-version: '1.13'
 folia-supported: true
