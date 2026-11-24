@@ -155,6 +155,7 @@ final class TrainDrivingControls {
     }
 
     void setPowerNotch(Train train, int notch) {
+        if (train.activeAtp.releasePending()) throw new IllegalArgumentException("ma.RELEASE_PENDING");
         if(train.tims.view(System.currentTimeMillis()).brakeHeld()) throw new IllegalArgumentException("error.tims-hold");
         train.protectionMode.requireTraction(train.operatingMode);
         if (train.driverEmergencyHold) throw new IllegalArgumentException("error.drive-declare");
@@ -213,7 +214,7 @@ final class TrainDrivingControls {
         synchronized (driverLock) {
             train.manualTakeover = true;
             train.manualReleaseConfirmed = false;
-            cancelStationMotion(train);
+            clearPause(train);
         }
     }
 
@@ -223,19 +224,6 @@ final class TrainDrivingControls {
         saveAction.run();
     }
 
-    static void authorizeAutomatic(Train train, boolean hasDriver, double stopThreshold) {
-        if (hasDriver) throw new UiException("请先 /st release 释放司机控制权，再设置 auto。", "Перед auto освободите управление командой /st release.");
-        if (train.manualTakeover && !train.manualReleaseConfirmed)
-            throw new UiException("手动接管尚未明确释放。请先 /st release，或 /st admin release <列车名>。", "Ручной перехват явно не освобождён. Выполните /st release или /st admin release <train>.");
-        if (Math.max(train.currentSpeed(), train.maxMemberSpeed()) > stopThreshold)
-            throw new UiException("列车尚未停稳，不能启用 auto。", "Поезд ещё не остановлен; auto включить нельзя.");
-        stopTrain(train);
-        train.driverEmergencyHold = false;
-        train.manualTakeover = false;
-        train.cabAtRear=false;train.cabMember=null;
-        train.reverser=train.reversed?Reverser.BACKWARD:Reverser.FORWARD;
-        train.properties().conductionMode = ConductionMode.AUTOMATIC;
-    }
 
     void startTrain(Train train, Double speed) {
         if (train.tims.view(System.currentTimeMillis()).brakeHeld())
@@ -244,7 +232,7 @@ final class TrainDrivingControls {
         if (speed != null) {
             train.targetSpeed = RailMath.clamp(speed, 0.0, train.maxSpeed);
         }
-        cancelStationMotion(train);
+        clearPause(train);
         train.driveControlEnabled = false;
         train.powerNotch = 0;
         train.brakeNotch = 0;
@@ -259,7 +247,7 @@ final class TrainDrivingControls {
     }
 
     static void stopTrain(Train train) {
-        cancelStationMotion(train);
+        clearPause(train);
         train.driveControlEnabled = false;
         train.powerNotch = 0;
         train.brakeNotch = 0;
@@ -272,9 +260,8 @@ final class TrainDrivingControls {
         train.moving = false;
     }
 
-    static void cancelStationMotion(Train train) {
-        train.automaticRun = null;
-        train.clearStationMotion();
+    static void clearPause(Train train) {
+
         train.pauseUntilMillis = 0L;
     }
 

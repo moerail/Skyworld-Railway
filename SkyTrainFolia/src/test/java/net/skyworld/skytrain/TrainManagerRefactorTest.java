@@ -126,18 +126,15 @@ public final class TrainManagerRefactorTest {
         train.driverEmergencyHold = true;
         rejects(() -> controls.setPowerNotch(train, 4));
         train.driverEmergencyHold = false;
-        train.automaticRun = new AutomaticRun("station",
-                AutomaticSignSpec.parse("station", "5", "continue", .4), 100, false, false);
         controls.setPowerNotch(train, 4);
         assert train.powerNotch == 4 && train.brakeNotch == 0 && train.manualTakeover;
-        assert !train.manualReleaseConfirmed && saves.get() == 1 && train.automaticRun == null;
+        assert !train.manualReleaseConfirmed && saves.get() == 1;
         controls.setBrakeNotch(train, 7);
         assert train.powerNotch == 0 && train.brakeNotch == 7;
         controls.emergencyBrake(train);
         assert train.emergencyBrake;
         controls.confirmManualRelease(train);
-        TrainDrivingControls.authorizeAutomatic(train, false, .001);
-        assert !train.emergencyBrake && !train.manualTakeover;
+        assert train.manualReleaseConfirmed;
         // COMPLETE describes current evidence, not permission to clear a latched stop.
         at = System.currentTimeMillis();
         train.tims.restore(train.members(), true, null, "GAP_SUSPECTED");
@@ -187,7 +184,7 @@ public final class TrainManagerRefactorTest {
                     return true;
                 });
         TrainMotionController motion = new TrainMotionController(null, null, host, null, null,
-                null, null, null, actuator, null);
+                null, null, actuator, null);
         motion.tickMember(null, cart, null);
         assert validations.get() == 1 : "Lifecycle validation still precedes the relocation gate";
         future.get().complete(true);

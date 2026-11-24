@@ -15,11 +15,27 @@ public interface RailNetworkService {
     }
     record Navigation(TrackPositionSnapshot position, String nextType, String nextName,
             Double nextMileageMeters, Double distanceMeters, String nextSwitchName,
-            Double nextSwitchMileageMeters, String nextSwitchPosition, Double nextSwitchDistanceMeters) {}
+            Double nextSwitchMileageMeters, String nextSwitchPosition, Double nextSwitchDistanceMeters,
+            String nextSwitchState, String nextSwitchDirection) {
+        /** Keep the previous constructor for existing providers; absent direction stays unknown. */
+        public Navigation(TrackPositionSnapshot position, String nextType, String nextName,
+                Double nextMileageMeters, Double distanceMeters, String nextSwitchName,
+                Double nextSwitchMileageMeters, String nextSwitchPosition, Double nextSwitchDistanceMeters) {
+            this(position, nextType, nextName, nextMileageMeters, distanceMeters, nextSwitchName,
+                    nextSwitchMileageMeters, nextSwitchPosition, nextSwitchDistanceMeters, "UNKNOWN", "UNKNOWN");
+        }
+    }
     default int protocolVersion() { return StaMessage.VERSION; }
     long graphRevision();
     double blocksPerMeter();
     String graphJson();
+    /** Capture exact edge geometry, endpoint topology and blocking faults at one immutable revision.
+     * Returns null for unsupported providers, unknown edges or a concurrent revision change.
+     * Unloaded known connections remain topology; this is never clearance or MA. */
+    default net.skyworld.sta.api.v9.TopologyDependency captureDependencies(long revision,java.util.List<String> edges) { return null; }
+    default net.skyworld.sta.api.v9.TopologyDependency.Check checkDependencies(net.skyworld.sta.api.v9.TopologyDependency dependency) {
+        return new net.skyworld.sta.api.v9.TopologyDependency.Check(graphRevision(),"UNAVAILABLE",java.util.List.of());
+    }
     Navigation query(RailQuery query);
     /** Read-only edge reference (e.g. EoA), not a live train observation. Returns null
      * for unsupported providers, revision mismatch, unknown edges or invalid offsets.

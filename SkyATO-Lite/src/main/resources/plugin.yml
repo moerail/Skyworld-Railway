@@ -1,0 +1,19 @@
+name: SkyATO-Lite
+version: 0.5.0
+main: net.skyworld.skyatolite.SkyATOLitePlugin
+api-version: '1.13'
+folia-supported: true
+author: SkyWorld
+depend: [SkyworldTrainAPI, SkyTrainFolia, STCS]
+description: Preset-route call, passenger messages and automatic depot return.
+commands:
+  sal:
+    description: SkyATO-Lite administration
+    aliases: [skyatol]
+    usage: /sal help
+permissions:
+  skyatolite.driver:
+    description: Release parked standby trains and confirm depot handover while driving.
+    default: true
+  skyatolite.admin:
+    default: op

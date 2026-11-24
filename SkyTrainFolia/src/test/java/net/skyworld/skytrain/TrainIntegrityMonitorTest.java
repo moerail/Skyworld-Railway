@@ -83,6 +83,14 @@ public final class TrainIntegrityMonitorTest {
         assert CabOrientation.reversed(true,Reverser.FORWARD);
         assert !CabOrientation.reversed(true,Reverser.BACKWARD);
         assert CabOrientation.reversed(false,Reverser.BACKWARD);
+        var automatic=new Train(UUID.randomUUID(),"automatic-reverse",.4,.8,1.5);
+        UUID front=UUID.randomUUID(),back=UUID.randomUUID();automatic.addMember(front);automatic.addMember(back);
+        for(boolean direction:List.of(false,true,false)) {
+            automatic.reversed=direction;CabOrientation.alignAutomatic(automatic);
+            assert CabOrientation.reversed(automatic.cabAtRear,automatic.reverser)==direction:
+                    "The ordinary reverser controller must not undo an automatic turnback";
+            assert automatic.cabMember.equals(direction?back:front);
+        }
         for(boolean rear:List.of(false,true)) {
             Reverser current=Reverser.NEUTRAL,lastSelected=Reverser.BACKWARD;
             for(Reverser expected:List.of(Reverser.FORWARD,Reverser.NEUTRAL,Reverser.BACKWARD,

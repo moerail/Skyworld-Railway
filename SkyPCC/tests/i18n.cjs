@@ -17,7 +17,7 @@ for (const [key, row] of Object.entries(i.catalog)) {
     assert.deepEqual(placeholders(row[lang]),placeholders(row.en),`${key}: ${lang} placeholders`);
   }
 }
-const app = fs.readFileSync(path.join(root,'app.js'),'utf8');
+const app = ['app.js','operating-map.js'].map(file=>fs.readFileSync(path.join(root,file),'utf8')).join('\n');
 const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
 for (const m of app.matchAll(/\bt\('([^']+)'/g)) assert(i.catalog[m[1]],`Missing dynamic key ${m[1]}`);
 for (const m of html.matchAll(/data-i18n(?:-title|-aria)?="([^"]+)"/g)) assert(i.catalog[m[1]],`Missing HTML key ${m[1]}`);

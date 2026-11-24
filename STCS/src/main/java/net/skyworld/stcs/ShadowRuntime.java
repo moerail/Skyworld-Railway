@@ -62,6 +62,99 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
     private volatile String integrityFailure;
     List<NodePassageMonitor.View> integritySnapshot() { return integrity.snapshot(); }
     String integrityFailure() { return integrityFailure; }
+    private record AutoPath(UUID lease,long revision,List<String> edges,long at,long generation) {}
+    private final Map<UUID,AutoPath> automaticPaths=new HashMap<>();
+    private record AutoFence(UUID lease,long sequence) {}
+    private final Map<UUID,AutoFence> automaticFences=new HashMap<>();
+    private boolean aligningAutomatic;
+    private final Map<UUID,Long> nextAutomaticPoint=new HashMap<>();
+    private record AutomaticPointLease(UUID train,UUID lease,long revision,long generation) {}
+    private final Map<UUID,AutomaticPointLease> automaticPointLeases=new HashMap<>();
+    synchronized String automaticRenew(UUID train,UUID driver,UUID lease,long revision,long sequence) {
+        if(closed||failed||model==null||model.graph.revision!=revision)return "GRAPH_CHANGED";
+        if(inputSource.get().desks().stream().noneMatch(d->d.trainId().equals(train)&&d.driverId().equals(driver)&&d.leaseId().equals(lease)&&d.atpMode().equals("ACTIVE")))return "NOT_OWNER";
+        var path=automaticPaths.get(train);var fence=automaticFences.get(train);
+        if(sequence<0||fence!=null&&fence.lease().equals(lease)&&sequence<=fence.sequence())return "STALE_REQUEST";
+        if(path==null||!path.lease().equals(lease)||path.revision()!=revision||!intents.containsKey(train)
+            ||System.currentTimeMillis()-path.at()>1500)return "NO_ROUTE";
+        automaticFences.put(train,new AutoFence(lease,sequence));
+        automaticPaths.put(train,new AutoPath(lease,revision,path.edges(),System.currentTimeMillis(),path.generation()));
+        return "RENEWED";
+    }
+    synchronized String automaticSr(UUID train,UUID driver,UUID lease,long revision,long sequence) {
+        tick();
+        if(model==null||model.graph.revision!=revision)return "GRAPH_CHANGED";
+        if(inputSource.get().desks().stream().noneMatch(d->d.trainId().equals(train)&&d.driverId().equals(driver)&&d.leaseId().equals(lease)&&d.atpMode().equals("ACTIVE")))return "NOT_OWNER";
+        var fence=automaticFences.get(train);
+        if(sequence<0||fence!=null&&fence.lease().equals(lease)&&sequence<=fence.sequence())return "STALE_REQUEST";
+        var existing=intents.get(train);
+        if(existing!=null&&existing.mode().equals("SR")&&existing.target()!=null)return "ALREADY_APPROVED";
+        automaticFences.put(train,new AutoFence(lease,sequence));
+        automaticPaths.put(train,new AutoPath(lease,revision,List.of(),System.currentTimeMillis(),sequence));
+        return command(driver,"sr","SkyATO-Lite recovery",train,lease,true);
+    }
+    synchronized String automaticRelease(UUID train,UUID driver,UUID lease,long sequence) {
+        if(inputSource.get().desks().stream().noneMatch(d->d.trainId().equals(train)&&d.driverId().equals(driver)&&d.leaseId().equals(lease)))return "NOT_OWNER";
+        var before=automaticFences.get(train);
+        if(before!=null&&before.lease().equals(lease)&&sequence<=before.sequence())return "STALE_REQUEST";
+        automaticFences.put(train,new AutoFence(lease,sequence));
+        String result=command(driver,"release","SkyATO-Lite",train,lease,true);
+        if(result.equals("RELEASED"))automaticPaths.remove(train);
+        return result;
+    }
+    synchronized String automaticRequest(UUID train,UUID driver,UUID lease,long revision,List<String> edges,long sequence) {
+        tick();
+        if(closed||failed||model==null||model.graph.revision!=revision)return "GRAPH_CHANGED";
+        if(edges.isEmpty()||edges.size()>256||edges.stream().distinct().count()!=edges.size())return "INVALID_PATH";
+        for(int i=0;i<edges.size();i++) {
+            var edge=model.edges.get(edges.get(i));if(edge==null)return "UNKNOWN_EDGE";
+            if(i>0) {
+                var previous=model.edges.get(edges.get(i-1));var node=model.nodes.get(edge.from());
+                if(!previous.to().equals(edge.from())||previous.targetPort().equals(edge.sourcePort())
+                        || ("switch".equals(node.type())&&(node.allowedTransitions()==null
+                        || !node.allowedTransitions().contains(previous.targetPort()+">"+edge.sourcePort()))))return "INVALID_TRANSITION";
+            }
+        }
+        var desks=inputSource.get().desks();
+        if(desks.stream().noneMatch(d->d.trainId().equals(train)&&d.driverId().equals(driver)&&d.leaseId().equals(lease)
+                && d.atpMode().equals("ACTIVE")))return "NOT_OWNER";
+        var fence=automaticFences.get(train);
+        if(sequence<0||fence!=null&&fence.lease().equals(lease)&&sequence<=fence.sequence())return "STALE_REQUEST";
+        automaticFences.put(train,new AutoFence(lease,sequence));
+        var previous=automaticPaths.get(train);var existing=intents.get(train);
+        if(previous!=null&&previous.lease().equals(lease)&&previous.revision()==revision&&previous.edges().equals(edges)
+            &&existing!=null&&existing.mode().equals("FS")&&System.currentTimeMillis()-previous.at()<=1500) {
+            automaticPaths.put(train,new AutoPath(lease,revision,previous.edges(),System.currentTimeMillis(),previous.generation()));
+            return "ROUTE_ACTIVE";
+        }
+        automaticPaths.put(train,new AutoPath(lease,revision,List.copyOf(edges),System.currentTimeMillis(),sequence));
+        return command(driver,"request","SkyATO-Lite",train,lease,true);
+    }
+
+    private void alignAutomaticRoutes(Inputs input,long now) {
+        if(aligningAutomatic)return;aligningAutomatic=true;
+        try {for(var entry:List.copyOf(automaticPaths.entrySet())) {
+            UUID train=entry.getKey();var path=entry.getValue();var intent=intents.get(train);
+            if(intent==null||!intent.mode().equals("FS")||path.revision()!=model.graph.revision||now-path.at()>1500
+                ||now<nextAutomaticPoint.getOrDefault(train,0L))continue;
+            var desk=input.desks().stream().filter(d->d.trainId().equals(train)&&d.leaseId().equals(path.lease())&&d.atpMode().equals("ACTIVE")).findFirst().orElse(null);
+            var report=input.reports().stream().filter(r->r.header().trainId().equals(train)).findFirst().orElse(null);
+            if(desk==null||report==null||report.tracking().quality()!=StaMessage.Quality.VALID
+                ||report.tracking().graphRevision()!=path.revision()||!fresh(report.physical().state().observedAtMillis(),now)
+                ||!report.tracking().telemetrySessionId().equals(input.driverSession()))continue;
+            var p=report.tracking().position();
+            var demand=AutomaticPointRouter.next(model,path.edges(),new ShadowGraph.Start(p.edgeId(),p.edgeOffsetMeters()),
+                dynamicLock.forSpeed(settings,report.physical().state().speedMetersPerSecond()).lockDistanceMeters(),input.switchStates());
+            if(demand==null||demand.node().rail()==null)continue;
+            var id=UUID.fromString(demand.node().id());var actual=input.switchStates().get(demand.node().id());
+            if(actual==null||!Set.of("straight","diverging").contains(actual.toLowerCase(Locale.ROOT))||pendingPoints.containsKey(id))continue;
+            var pos=demand.node().rail();var request=new Request(UUID.randomUUID(),id,path.revision(),actual,demand.desired(),
+                new SwitchControlService.Position(pos.world(),pos.x(),pos.y(),pos.z()));
+            nextAutomaticPoint.put(train,now+1000);
+            automaticPointLeases.put(request.requestId(),new AutomaticPointLease(train,path.lease(),path.revision(),path.generation()));
+            change(request).whenComplete((reply,error)->{synchronized(this){automaticPointLeases.remove(request.requestId());}});
+        }}finally{aligningAutomatic=false;}
+    }
     record Intent(UUID driver,UUID lease,UUID provider,String channel,String mode,UUID target,long requestedAt) {
         Intent target(UUID node) { return new Intent(driver,lease,provider,channel,mode,node,requestedAt); }
     }
@@ -91,14 +184,9 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                 MaSettings.load(plugin.getConfig()),
                 () -> inputs(plugin, manager), (request,guard,progress) -> {
                     try {
-                        var stf=plugin.getServer().getPluginManager().getPlugin("SkyTrainFolia");
-                        @SuppressWarnings("unchecked") var future=(CompletionStage<String>)stf.getClass()
-                                .getMethod("changeSwitchById",String.class,String.class,String.class,String.class,int.class,int.class,int.class,
-                                        java.util.function.BooleanSupplier.class,java.util.function.Consumer.class)
-                                .invoke(stf,request.switchId().toString(),request.expectedState(),request.targetState(),request.position().world(),
-                                        request.position().x(),request.position().y(),request.position().z(),guard,progress);
-                        return future;
-                    } catch(ReflectiveOperationException|RuntimeException ex) {return CompletableFuture.completedFuture("FAILED_INCOMPATIBLE_STF");}
+                        var actuator=plugin.getServer().getServicesManager().load(net.skyworld.sta.api.v8.SwitchActuatorService.class);
+                        return actuator==null?CompletableFuture.completedFuture("FAILED_INCOMPATIBLE_STF"):actuator.change(net.skyworld.sta.api.v8.AtoProtocol.Packet.SWITCH_CHANGE.header(),request,guard,progress);
+                    } catch(RuntimeException|LinkageError ex) {return CompletableFuture.completedFuture("FAILED_INCOMPATIBLE_STF");}
                 });
         plugin.getLogger().info("Shadow MA distances (metres): look-ahead=" + settings.lookAheadMeters()
                 + ", point-lock eligibility=" + settings.lockDistanceMeters()
@@ -107,6 +195,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
         plugin.getLogger().info("FS dynamic point eligibility: enabled=" + dynamicLock.enabled()
                 + ", lead-seconds=" + dynamicLock.leadSeconds() + ", deceleration-mps2=" + dynamicLock.decelerationMps2()
                 + ", buffer-metres=" + dynamicLock.bufferMeters() + "; search and MA caps still apply.");
+        plugin.getLogger().info("MA whole-train exit-capacity check: " + settings.checkExitCapacity());
         if (plugin.getConfig().contains("ma.horizon-meters", true))
             plugin.getLogger().info("Legacy ma.horizon-meters supplies missing distance settings; explicit new keys take priority.");
         var services=plugin.getServer().getServicesManager();
@@ -131,7 +220,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                             : event.action().equals("unavailable") ? RailwayEvent.Type.MA_UNAVAILABLE
                             : RailwayEvent.Type.MA_REQUESTED,
                     event.train(), event.trainName(), event.driver(), event.driverName(), event.reason(),
-                    Map.of("state", event.state(), "mode", event.mode(),
+                    Map.of("state", event.executable()&&event.state().equals("ALLOCATED_SHADOW")?"ALLOCATED":event.state(), "mode", event.mode(),
                             "simulationOnly", Boolean.toString(!event.executable()),
                             "executable", Boolean.toString(event.executable())));
         };
@@ -178,6 +267,12 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
         return command(driver, action, "");
     }
     synchronized String command(UUID driver,String action,String driverName) {
+        return command(driver, action, driverName, null, null);
+    }
+    synchronized String command(UUID driver,String action,String driverName,UUID expectedTrain,UUID expectedLease) {
+        return command(driver,action,driverName,expectedTrain,expectedLease,false);
+    }
+    private synchronized String command(UUID driver,String action,String driverName,UUID expectedTrain,UUID expectedLease,boolean automatic) {
         tick();
         if(closed||failed) return "UNAVAILABLE";
         var input=inputSource.get();
@@ -185,9 +280,11 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
         var matches=input.desks().stream().filter(d->d.driverId().equals(driver)).toList();
         if(matches.size()!=1) return "DECLARE_DRIVE";
         var desk=matches.getFirst(); UUID train=desk.trainId();
+        if ((expectedTrain != null || expectedLease != null)
+                && (!train.equals(expectedTrain) || !desk.leaseId().equals(expectedLease))) return "DECLARE_DRIVE";
         var report=input.reports().stream().filter(m -> m.header().trainId().equals(train)
                 && m.header().kind()==StaMessage.Kind.TRACK_REPORT).findFirst().orElse(null);
-        if (report != null && report.physical().state().mode()==net.skyworld.sta.api.v1.TrainMode.AUTOMATIC)
+        if (!automatic && report != null && report.physical().state().mode()==net.skyworld.sta.api.v1.TrainMode.AUTOMATIC)
             return "AUTOMATIC_TRAIN";
         if (report == null && !action.equals("request") && !action.equals("release")) return "NO_REPORT";
         if(action.equals("release")) {
@@ -247,7 +344,10 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
         var input=inputSource.get();
         var report=input.reports().stream().filter(m -> m.header().trainId().equals(trainId)
                 && m.header().kind()==StaMessage.Kind.TRACK_REPORT).findFirst().orElse(null);
-        if(report==null || report.physical().state().mode()!=net.skyworld.sta.api.v1.TrainMode.MANUAL
+        var automatic=automaticPaths.get(trainId);
+        boolean supported=report!=null&&(report.physical().state().mode()==net.skyworld.sta.api.v1.TrainMode.MANUAL
+                ||automatic!=null&&automatic.lease().equals(intent.lease())&&report.physical().state().mode()==net.skyworld.sta.api.v1.TrainMode.AUTOMATIC);
+        if(!supported
                 || report.physical().state().speedMetersPerSecond()>.05) return "STOP_FIRST";
         if (report.tracking().graphRevision()!=model.graph.revision
                 || !fresh(report.physical().state().observedAtMillis(),System.currentTimeMillis())
@@ -570,9 +670,11 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                 if(desk!=null&&Set.of("ISOLATED","RECOVERING").contains(desk.atpMode())) {
                     reason=desk.atpMode();intents.remove(id);eligible=false;
                 }
-                if (eligible && m != null
-                        && m.physical().state().mode()==net.skyworld.sta.api.v1.TrainMode.AUTOMATIC) {
-                    reason="AUTOMATIC_TRAIN";intents.remove(id);eligible=false;
+                var automaticPath=automaticPaths.get(id);
+                boolean automaticTrain=m!=null && m.physical().state().mode()==net.skyworld.sta.api.v1.TrainMode.AUTOMATIC;
+                if (eligible && automaticTrain && (automaticPath==null || !automaticPath.lease().equals(desk.leaseId())
+                        || automaticPath.revision()!=graph.revision || !intent.mode().equals("SR")&&now-automaticPath.at()>1500)) {
+                    reason="AUTOMATIC_ROUTE_UNAVAILABLE";intents.remove(id);eligible=false;
                 }
                 boolean provenance=m!=null&&m.tracking().graphRevision()==graph.revision
                         && fresh(m.physical().state().observedAtMillis(),now)&&fresh(m.header().emittedAtMillis(),now)
@@ -617,10 +719,18 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                     if(!intent.mode().equals("FS")) {
                         double distance=setting(intent.mode().equals("SH")
                                 ? "ma.sh.look-ahead-meters" : "ma.sr.max-distance-meters",120,10,10000);
-                        routeSettings=MaSettings.legacy(distance,intent.mode().equals("SR")?0:settings.marginMeters());
+                        routeSettings=MaSettings.legacy(distance,intent.mode().equals("SR")?0:settings.marginMeters(),
+                                settings.checkExitCapacity());
                     }
-                    var result=ShadowPlanner.plan(model,position.edge(),position.offset(),m.physical().state().lengthMeters()+1/graph.blocksPerMeter,
-                            routeSettings,switchStates,obstacles);
+                    List<String> required=List.of();
+                    if(automaticTrain && automaticPath!=null && !intent.mode().equals("SR")) {
+                        int cursor=automaticPath.edges().indexOf(position.edge());
+                        required=cursor<0?List.of("INVALID"):automaticPath.edges().subList(cursor,automaticPath.edges().size());
+                    }
+                    var result=!required.isEmpty() && !required.getFirst().equals(position.edge())
+                            ?new ShadowPlanner.Result(List.of(),Set.of(),null,null,null,"ROUTE_MISMATCH")
+                            :ShadowPlanner.plan(model,position.edge(),position.offset(),m.physical().state().lengthMeters()+1/graph.blocksPerMeter,
+                            routeSettings,switchStates,obstacles,required);
                     if(intent.mode().equals("SR")) result=clipSr(result,intent.target(),position);
                     reason=result.reason();
                     var old=liveGrants.get(id);
@@ -696,6 +806,7 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
                 if (!cue.isEmpty()) sound(new SoundNotice(intent.driver(), intent.lease(), cue));
             }
             if(plugin!=null)plugin.notifyPccUpdate();
+            alignAutomaticRoutes(input,now);
         } catch(Exception|LinkageError ex) {
             failed=true;
             restartable=ex instanceof java.io.IOException;
@@ -875,6 +986,8 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
         dispatcherSuspended.remove(id);dispatcherTripped.remove(id);dispatcherRetainedPoints.remove(id);
         reversed.remove(id); reasons.remove(id); soundTracker.reset(id);
         driverReleases.remove(id);
+        liveGrants.remove(id);acknowledgedGrants.remove(id);warnedLostGrants.remove(id);
+        automaticPaths.remove(id);nextAutomaticPoint.remove(id);
     }
 
     synchronized String clearArchived(UUID id, String actor) {
@@ -965,6 +1078,13 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
     }
     private synchronized boolean pointGuard(Request request) {
         String rejection=pointRejection(request);
+        var automatic=automaticPointLeases.get(request.requestId());
+        if(automatic!=null) {
+            var path=automaticPaths.get(automatic.train());
+            if(path==null||!path.lease().equals(automatic.lease())||path.revision()!=automatic.revision()
+                ||path.generation()!=automatic.generation()||System.currentTimeMillis()-path.at()>1500
+                ||!intents.containsKey(automatic.train()))rejection="AUTOMATIC_ROUTE_CHANGED";
+        }
         UUID train=rerouteTrains.get(request.requestId());
         if(train!=null && !heldStopped(train,request.requestId())) rejection="STOP_FIRST";
         if(rejection!=null) switchProgress.put(request.requestId(),rejection);

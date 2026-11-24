@@ -242,10 +242,23 @@ public final class ShadowRuntimeTest {
                 Path srFile=activeDir.resolve("sr.json");
                 try(var runtime=new ShadowRuntime(null,null,srFile,600,2,
                         ShadowRuntimeTest::input,r->CompletableFuture.completedFuture("COMPLETED"))) {
+                    assert runtime.command(driver,"request").equals("REQUESTED_ACTIVE");
+                    var oldFs = runtime.operationalSnapshot().grants().getFirst();
+                    assert oldFs.mode().equals("FS") && oldFs.remainingMeters()>120;
+                    assert runtime.command(driver,"release","driver",UUID.randomUUID(),lease).equals("DECLARE_DRIVE");
+                    assert runtime.command(driver,"release","driver",train,UUID.randomUUID()).equals("DECLARE_DRIVE");
+                    assert runtime.operationalSnapshot().grants().getFirst().id().equals(oldFs.id())
+                            : "A queued release must not target a different train or driving lease";
+                    assert runtime.command(driver,"release","driver",train,lease).equals("RELEASED");
+                    assert runtime.operationalSnapshot().grants().isEmpty()
+                            : "Release completion must already expose a snapshot without old FS";
+                    runtime.tick();
+                    assert runtime.operationalSnapshot().grants().isEmpty() : "Old FS intent must not regenerate";
                     assert runtime.command(driver,"sr").equals("SR_PENDING");
                     assert runtime.approveSr(train,UUID.fromString(srTarget.id()),"dispatcher").equals("APPROVED");
                     var granted=runtime.operationalSnapshot().grants();
                     assert granted.size()==1 && granted.getFirst().mode().equals("SR")
+                            && !granted.getFirst().id().equals(oldFs.id())
                             && granted.getFirst().remainingMeters()>0 && granted.getFirst().remainingMeters()<=120
                             : "Distant SR target needs a short, locally verified initial MA: "+granted;
                     reverse=true;runtime.tick();

@@ -149,16 +149,6 @@ settings:
   tick-interval: 1
   autosave-interval-ticks: 6000
   default-speed: 0.35
-  # Automatic signs use the selected vehicle's real P1-P4 / B1-B7 notches.
-  # Optional STA/STCS graph advice; not MA/ATP protection.
-  station-look-ahead-blocks: 8192.0
-  # Unmarked-track station search, checked every 200 ms, in blocks (0 disables, max 1024).
-  # Follows current rail geometry; stops at unloaded or foreign-region rails.
-  # Does not load chunks. This range is a maximum, not a guaranteed braking distance.
-  station-local-look-ahead-blocks: 256.0
-  # TC launch speed syntax uses blocks/tick when no unit is written.
-  station-launch-speed: 0.4
-  sign-spawn-max-carts: 64
   max-speed-change-per-tick: 0.035
   powered-rail-boost-speed: 0.60
   unpowered-powered-rail-brake: true
@@ -233,15 +223,6 @@ settings:
   scan-radius: 8.0
   sign-cooldown-ms: 1000
   reverse-sign-cooldown-ms: 3000
-  default-station-wait-ticks: 100
-  # Final station docking is distance-controlled. Long-range approach braking belongs to SkyATO.
-  station-docking-stop-offset: 0.0
-  station-docking-max-distance: 64.0
-  station-docking-min-speed: 0.020
-  station-departure-distance: 8.0
-  station-departure-min-speed: 0.012
-  # A station can trigger again only after every member of the previous train clears this radius.
-  station-release-distance: 4.0
   station-marker-rail-search-radius: 3.0
   auto-link-enabled: true
   auto-link-radius: 2.75
@@ -275,7 +256,7 @@ settings:
   # STF also reconciles immediately near an edge end and on start/stop/reverser changes.
   stcs-telemetry-reconcile-interval-ticks: 100
 messages:
-  prefix: "&6[SkyTrain]&r "
+  prefix: "&7[SkyTrain]&r "
 infrastructure:
   # Distance from a marker sign to the rail it belongs to.
   marker-rail-search-radius: 2.5

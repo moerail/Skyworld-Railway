@@ -20,7 +20,7 @@ final class ShadowGraph {
         guard=1/graph.blocksPerMeter;
         graph.nodes.forEach(n->nodes.put(n.id(),n));
         if(nodes.size()!=graph.nodes.size())throw new IllegalArgumentException("Duplicate node ID");
-        graph.unresolved.forEach(i->{
+        GraphIncremental.blocking(graph.unresolved,graph.edges).forEach(i->{
             unresolved.add(i.source());
             unresolvedPorts.computeIfAbsent(i.source(),key->new HashSet<>())
                     .add(i.sourcePort()==null?"none":i.sourcePort().toLowerCase(Locale.ROOT));

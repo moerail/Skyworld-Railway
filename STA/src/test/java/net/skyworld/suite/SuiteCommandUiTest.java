@@ -61,11 +61,11 @@ public final class SuiteCommandUiTest {
         assert output.stream().anyMatch(s->s.contains("Non installé"));
         output.clear();
         SuiteCommandUi.handle(plugin,sender,"st",new String[]{"help","2","en"});
-        assert output.getFirst().equals("/st Help 2/5");
+        assert output.getFirst().equals("§7[SkyTrain] §f/st Help 2/5");
         assert SuiteCommandUi.language(plugin,sender).equals("fr");
         output.clear();
         SuiteCommandUi.handle(plugin,sender,"st",new String[]{"help","1","ru"});
-        assert output.getFirst().equals("/st Справка 1/5");
+        assert output.getFirst().equals("§7[SkyTrain] §f/st Справка 1/5");
         assert output.stream().anyMatch(s -> s.contains("Получить управление"));
         assert SuiteCommandUi.language(plugin,sender).equals("fr");
         output.clear();
@@ -75,6 +75,14 @@ public final class SuiteCommandUiTest {
         SuiteCommandUi.handle(plugin,sender,"st",new String[]{"help","999"});
         assert output.getFirst().contains("Arguments invalides");
         assert !SuiteCommandUi.handle(plugin,sender,"st",new String[]{"p1"});
+        for (String lang : List.of("zh", "en", "fr", "ja", "ru")) {
+            output.clear();
+            SuiteCommandUi.handle(plugin,sender,"stcs",new String[]{"version",lang});
+            assert output.stream().allMatch(line -> line.startsWith("§e[STCS] §f"));
+            assert output.stream().anyMatch(line -> line.contains("SkyATO-Lite"));
+            assert output.stream().anyMatch(line -> line.contains("STA: v1–v10") && line.contains("FS") && line.contains("ATP") && line.contains("MA"));
+            assert output.stream().noneMatch(line -> line.contains("ATP 不动作") || line.contains("no ATP intervention"));
+        }
         System.out.println("PASS five-language pages, live metadata, optional plugins, language preference/override and completion");
     }
 }

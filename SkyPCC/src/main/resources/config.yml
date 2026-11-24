@@ -7,8 +7,15 @@ web:
   # Remote mutations require control-enabled and a matching Bearer token.
   # Use a private token of at least 32 characters; never put it in a URL.
   control-enabled: false
+  # Browser control policy: true requires HTTPS (or a trusted localhost context).
+  # false allows HTTP control; Bearer authentication and control-enabled still apply.
+  # This does not enable TLS on SkyPCC's HTTP listener. Restart and refresh the page after changing it.
+  require-https-for-control: true
   control-token: ''
   # auto: prefer SSE and fall back to polling; sse: SSE only; poll: polling only.
+  # Both modes download topology once per page visit, then only when the STCS
+  # graph revision changes (e.g. a completed /stcs rebuild). Live switch states
+  # travel in snapshots without downloading the full graph again.
   update-mode: auto
   poll-interval-millis: 1000
   sse-keepalive-seconds: 15

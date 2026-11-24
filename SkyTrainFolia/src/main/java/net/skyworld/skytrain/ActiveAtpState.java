@@ -2,7 +2,7 @@ package net.skyworld.skytrain;
 
 import java.util.UUID;
 
-/** Conservative onboard state for manual trains; no Bukkit or STA types. */
+/** Conservative onboard protection for manual and automatic control; no Bukkit or STA types. */
 final class ActiveAtpState {
     record Settings(double stopMarginMeters, double approachDistanceMeters, double approachMps,
             double serviceDecelerationMps2, double reactionSeconds, double overspeedToleranceMps,
@@ -27,6 +27,7 @@ final class ActiveAtpState {
     }
 
     private UUID grantId, lease, controlSession;
+    private UUID releaseToken;
     private String mode, reverser;
     private boolean reversed;
     private boolean overspeedEmergencyLatched;
@@ -36,6 +37,9 @@ final class ActiveAtpState {
     synchronized Decision evaluate(OperationalPermission permission, UUID currentLease,
             OperatingMode operating, boolean stopped, boolean currentReversed, String currentReverser,
             double speedMps, int driverBrakeNotch, long now, Settings settings) {
+        if (releaseToken != null) return Decision.hold(
+                operating == OperatingMode.TR || operating == OperatingMode.PT ? operating : OperatingMode.SB,
+                "RELEASE_PENDING");
         if (operating == OperatingMode.TR || operating == OperatingMode.PT)
             return Decision.hold(operating, operating.name());
         if (overspeedEmergencyLatched)
@@ -112,6 +116,22 @@ final class ActiveAtpState {
     }
 
     synchronized Double remainingMeters() { return grantId == null ? null : remainingMeters; }
+
+    /** Fence every grant until STCS has removed the old intent and published its new snapshot. */
+    synchronized UUID beginRelease() {
+        releaseToken = UUID.randomUUID();
+        clear();
+        return releaseToken;
+    }
+
+    synchronized boolean releasePending() { return releaseToken != null; }
+
+    synchronized boolean completeRelease(UUID token, boolean released) {
+        if (token == null || !token.equals(releaseToken) || !released) return false;
+        clear();
+        releaseToken = null;
+        return true;
+    }
 
     synchronized void clear() {
         grantId = null; lease = null; controlSession = null; mode = null; reverser = null;

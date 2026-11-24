@@ -3,6 +3,7 @@ package net.skyworld.skytrain;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -27,6 +28,10 @@ public final class SkyTrainPlugin extends JavaPlugin {
     private CabUiManager cabUiManager;
     private UiMessages uiMessages;
     private TelemetrySink telemetrySink;
+    private AutomationController automation;
+    AutomationController automation() { return automation; }
+    boolean registerAutomation(Train train,Runnable claim) { return manager!=null && manager.registerAutomation(train,claim); }
+    java.util.Collection<DriverDeskSnapshot> manualDesks() { return manager == null ? List.of() : manager.driverDesks(); }
     private TrainDisplaySync displaySync;
     private volatile VehicleProfile vehicleProfile;
     private volatile boolean railInfrastructureReady;
@@ -179,7 +184,6 @@ public final class SkyTrainPlugin extends JavaPlugin {
                     train.activeAtp.clear();
                     train.activeAtpLimitMps = null;
                     train.activeAtpBrakeLevel = 0;
-                    train.automaticRun = null;
                     train.moving = false;
                     train.powerNotch = 0;
                     train.brakeNotch = 7;
@@ -215,26 +219,51 @@ public final class SkyTrainPlugin extends JavaPlugin {
 
     /** Withdraw onboard permission before STCS releases any forward reservation. */
     public String releaseOperationalAuthority(Player player) {
-        if (!(player.getVehicle() instanceof org.bukkit.entity.Minecart cart)) return "NOT_ON_TRAIN";
+        return beginOperationalAuthorityRelease(player).get("status");
+    }
+
+    /** Player-region first phase. No stale control snapshot may reinstall a grant while release is in flight. */
+    public Map<String, String> beginOperationalAuthorityRelease(Player player) {
+        if (!(player.getVehicle() instanceof org.bukkit.entity.Minecart cart)) return Map.of("status", "NOT_ON_TRAIN");
         Train train = manager.trainForCart(cart);
-        if (train == null || train.properties().conductionMode.automatic()) return "MANUAL_ONLY";
-        if (!manager.isDriver(player, train)) return "NOT_DRIVER";
+        if (train == null || train.properties().conductionMode.automatic()) return Map.of("status", "MANUAL_ONLY");
+        if (!manager.isDriver(player, train)) return Map.of("status", "NOT_DRIVER");
+        var desk = manager.driverDesks().stream().filter(d -> d.trainId().equals(train.id())
+                && d.driverId().equals(player.getUniqueId())).findFirst().orElse(null);
+        if (desk == null) return Map.of("status", "NOT_DRIVER");
         synchronized (train) {
-            if (train.currentSpeed() > .001 || train.maxMemberSpeed() > .001) return "STOP_FIRST";
-            if (train.tims.view(System.currentTimeMillis()).brakeHeld()) return "TIMS_HOLD";
-            if (train.operatingMode == OperatingMode.TR) return "ACK_TRIP_FIRST";
-            if (train.dispatcherBrake.held() && !train.dispatcherBrake.trip()) return "DISPATCHER_BUSY";
+            if (train.currentSpeed() > .001 || train.maxMemberSpeed() > .001) return Map.of("status", "STOP_FIRST");
+            if (train.tims.view(System.currentTimeMillis()).brakeHeld()) return Map.of("status", "TIMS_HOLD");
+            if (train.operatingMode == OperatingMode.TR) return Map.of("status", "ACK_TRIP_FIRST");
+            if (train.dispatcherBrake.held() && !train.dispatcherBrake.trip()) return Map.of("status", "DISPATCHER_BUSY");
             train.dispatcherBrake.clear();
-            if (train.protectionMode != ProtectionMode.ACTIVE) { train.operatingMode=OperatingMode.SB; return "SHADOW"; }
-            train.operatingMode = train.operatingMode.release(true);
-            train.activeAtp.clear();
+            UUID token = train.activeAtp.beginRelease();
+            train.operatingMode = OperatingMode.SB;
             train.activeAtpLimitMps = null;
             train.activeAtpBrakeLevel = 0;
+            train.activeAtpReason = "RELEASE_PENDING";
             train.powerNotch = 0;
             train.brakeNotch = 7;
             train.moving = false;
             manager.save();
-            return "RELEASED";
+            return Map.of("status", "RELEASE_PENDING", "trainId", train.id().toString(),
+                    "leaseId", desk.leaseId().toString(), "token", token.toString());
+        }
+    }
+
+    /** Second phase, after STCS command completion. A late completion cannot finish a newer release. */
+    public boolean completeOperationalAuthorityRelease(UUID trainId, UUID token, boolean released) {
+        Train train = manager.train(trainId);
+        if (train == null) return false;
+        synchronized (train) {
+            if (!train.activeAtp.completeRelease(token, released)) return false;
+            // A trip or integrity fault may have occurred while the async command was running.
+            if (train.operatingMode == OperatingMode.SB) {
+                train.activeAtpLimitMps = null;
+                train.activeAtpBrakeLevel = 0;
+                train.activeAtpReason = "RELEASED";
+            }
+            return true;
         }
     }
 
@@ -243,7 +272,8 @@ public final class SkyTrainPlugin extends JavaPlugin {
         if (!(player.getVehicle() instanceof org.bukkit.entity.Minecart cart)) return "NOT_ON_TRAIN";
         Train train = manager.trainForCart(cart);
         if (train == null || train.properties().conductionMode.automatic()) return "MANUAL_ONLY";
-        return manager.isDriver(player, train) ? "ELIGIBLE" : "NOT_DRIVER";
+        if (!manager.isDriver(player, train)) return "NOT_DRIVER";
+        return train.activeAtp.releasePending() ? "RELEASE_PENDING" : "ELIGIBLE";
     }
     private volatile double serverSpeedLimit;
 
@@ -309,7 +339,9 @@ public final class SkyTrainPlugin extends JavaPlugin {
     java.util.Collection<Train> observedTrains() { return manager == null ? List.of() : manager.trains(); }
 
     java.util.Collection<DriverDeskSnapshot> driverDesks() {
-        return manager == null ? List.of() : manager.driverDesks();
+        var desks = new java.util.ArrayList<DriverDeskSnapshot>(manualDesks());
+        if (automation != null) desks.addAll(automation.desks());
+        return List.copyOf(desks);
     }
 
     public java.util.concurrent.CompletionStage<String> changeSwitchById(String id, String expected, String target) {
@@ -389,6 +421,9 @@ public final class SkyTrainPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        if ("&6[SkyTrain]&r ".equals(getConfig().getString("messages.prefix"))) {
+            getConfig().set("messages.prefix", "&7[SkyTrain]&r "); saveConfig();
+        }
         try {
             for (String id : VehicleProfiles.BUNDLED) {
                 String resource = "vehicles/" + id + ".yml";
@@ -417,6 +452,7 @@ public final class SkyTrainPlugin extends JavaPlugin {
         infrastructureManager = new LineInfrastructureManager(this);
         stationManager = new StationManager(this);
         manager = new TrainManager(this, switchManager, infrastructureManager, stationManager);
+        if (getServer().getPluginManager().isPluginEnabled("SkyworldTrainAPI")) automation = new TrainAutomation(this);
         cabUiManager = new CabUiManager(this, manager, infrastructureManager, uiMessages);
 
         getServer().getPluginManager().registerEvents(
@@ -444,6 +480,7 @@ public final class SkyTrainPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (automation != null) automation.close();
         railInfrastructureReady = false;
         ledgerResetChallenge.clear();
         if (displaySync != null) displaySync.close();
@@ -471,9 +508,6 @@ public final class SkyTrainPlugin extends JavaPlugin {
         }
     }
 
-    void announceStationBraking(Train train, AutomaticRun run) {
-        if (cabUiManager != null) cabUiManager.announceStationBraking(train, run);
-    }
 
     void announceAutomaticTargetSpeed(Train train, double targetSpeed) {
         if (cabUiManager != null) cabUiManager.announceAutomaticTargetSpeed(train, targetSpeed);
@@ -484,9 +518,6 @@ public final class SkyTrainPlugin extends JavaPlugin {
         if (cabUiManager != null) cabUiManager.announceIntegrityHold(train, reason);
     }
 
-    String automaticStatus(Train train) {
-        return manager == null ? "unavailable" : manager.automaticStatus(train);
-    }
 
     void send(CommandSender sender, String message) {
         sender.sendMessage(prefix() + color(message));
@@ -516,7 +547,7 @@ public final class SkyTrainPlugin extends JavaPlugin {
     }
 
     private String prefix() {
-        return color(getConfig().getString("messages.prefix", "&6[SkyTrain]&r "));
+        return color(getConfig().getString("messages.prefix", "&7[SkyTrain]&r "));
     }
 
 

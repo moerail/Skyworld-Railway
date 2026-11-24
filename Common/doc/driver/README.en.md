@@ -1,139 +1,92 @@
-# SkyRail Driver Manual
+# SkyRail — Your first manually driven train
 
-TIMS brake-hold notices provide a clickable `/st tims ack`. While stopped, driver guidance prioritizes TIMS acknowledgement, then guides you through `/stcs ma ack`, `/stcs ma release` and `/stcs ma fs` as required. Restore the original consist and stop the whole train first; clicking preserves integrity checks and keeps the brakes held after acknowledgement.
+**[CHANGED · 2026-11-21]** STA2.7.0 / STF5.0.2 / STCS4.3.5 / SAL0.5.0 / PCC2.4.1
 
-## Current update: STF 4.0.8 / STCS 4.1.0
+[Detailed English manual](../../README.en.md) · [README](../../../README.md)
 
-STA is now 2.1.1 and SkyPCC 2.0.3. The maintainer confirmed STCS 4.1.0 testing passed. Kuri-chan gives language-aware hints to stopped manual drivers, including localisation, MA and SR waiting states; editable phrases never operate the train. FS checks points earlier as speed rises, but driving still requires a current valid MA. Conflicts, unknown states and MA caps still apply. The older baseline below is historical. [Version overview](../../README.en.md).
+Default FS request does not mean FS has already been granted. Manual driving explicitly acquires a driving lease; SAL also needs executable authority. SB, recovery or unavailable authority keeps brakes held.
 
-Local development candidate **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3** adds TIMS checks for a fixed roster, fresh member samples and adjacent spacing along the rail path. Unknown or lost integrity commands a brake hold and retains occupancy and MA protection. `/st info <train>` shows a current position or the last reported world coordinates and time when uncertain. Only riders in the outermost cart at either end may use `/st drive`; forward/backward are relative to that cab end. After restoring the original consist and stopping, use `/st tims ack`; for TR then use `/stcs ma ack`, `/stcs ma release` and request a new MA. Existing saved trains need a one-time manifest check and TIMS acknowledgement. This candidate is not published or live-tested. [4.0.8 development notes](../releases/suite-v4.0.8.md)
+FS supervises speed/EoA against the granted curve. SH/SR default to40km/h, subject to any lower curve. After a TR stop: ack→PT, release→SB, inspect and request again. TIMS holds first require genuine integrity restoration and acknowledgment.
 
-This patch uses **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. For a stopped manual train, a dispatcher point change first obtains an onboard brake-hold acknowledgement, then withdraws the affected forward reservation, changes the point and replans MA; no driver release is needed first. Web PCC adds “Revoke MA → TR”. A moving or stopped manual train enters TR and brakes after onboard confirmation. Moving-train reservations remain until the complete train is confirmed stopped; body occupancy is retained. This explicit dispatcher command also holds trains in the shadow channel. Recovery: stop, `/stcs ma ack`, `/stcs ma release`, then request MA again. Timeout is not confirmation. Update installed plugins together and refresh clients; retain certificates and tokens. Live-server acceptance is pending. [4.0.7 release notes](../releases/suite-v4.0.7.md)
+After the initial path submission, silent renewal keeps the route lease while STCS extends MA. Do not submit a new visible request every half-second. Changed path/version, lost control or expired lease needs a new valid request; a late heartbeat cannot revive it.
 
-[中文](README.zh.md) | [English](README.en.md) | [Français](README.fr.md) | [日本語](README.ja.md) | [Русский](README.ru.md) · [Project home](../../README.md)
+Explicit shadow testing remains simulationOnly=true/executable=false and cannot stand in for executable authority. BYPASS, ISOLATED and RECOVERING retain their separate interlocks.
 
-For ordinary players aboard a manual train. Published release: STF 4.0.7, STCS 4.0.5, STA 2.1.3, SkyPCC 2.0.2 on Shiroha 26.2 or 26.3. Administrators handle train creation, track construction and plugin configuration; live-server acceptance of this combination is pending.
+MA release keeps body occupancy and releases only eligible forward reservations. Unloading, timeout and disconnection do not prove clearance. Explicit train removal needs complete STF destruction receipts and virtual-driver cleanup before scoped evidence release; other trains remain protected.
 
-> **In an emergency, use `/st eb`.** Shadow MA and ATP limits remain advisory. The separate experimental `Enforced` channel can brake a manual train only after an administrator explicitly enables it and STCS issues an executable MA. Do not assume it is enabled or live-validated. This is a game guide, not a real railway rulebook.
 
-## A Few Terms Before You Drive
+**[CHANGED · 2026-11-21]** Default FS request does not mean FS has already been granted. Manual driving explicitly acquires a driving lease; SAL also needs executable authority. SB, recovery or unavailable authority keeps brakes held.
 
-**MA tells you how far you are currently authorized to move; EoA is the end of that authority; ATP limit is the current permitted speed.** Claiming driving control, submitting a request and receiving a valid MA are separate steps.
+Place several minecarts on a straight, loaded test track with no other trains nearby. Use a small scan radius to avoid including a cart on an adjacent track.
 
-| Term | Meaning for the driver |
-| --- | --- |
-| MA · Movement Authority | Authority for a bounded part of the track ahead. It can change with conditions and is not a complete route to your destination. Shadow MA is observational. |
-| EoA · End of Authority | The endpoint of that authority; stop before it. More track beyond it does not grant permission to continue. |
-| ATP · Automatic Train Protection | Train protection. SkyRail's Shadow channel only advises; the admin-enabled Enforced channel provides experimental brake supervision. |
-| ATO · Automatic Train Operation | Automatic driving. STF's sign-driven pseudo-ATO trains are separate from this manual-driving state machine. |
-| HMI / PCC | HMI is the onboard display; PCC is the dispatch web interface. Interpret authority and status together with their channel and validity. |
-| P / N / B / EB | Power notch, controller neutral, service-brake notch and emergency brake. B7 is the highest service-brake notch. |
-| Balise | A track-graph position reference used for line and mileage calibration; the marker itself does not authorize movement. |
-
-Mode codes stay unchanged: `SB` Stand By, `FS` Full Supervision, `SH` Shunting, `SR` Staff Responsible (dispatcher approval in SkyRail), `TR` Trip hold after an overrun, and `PT` Post Trip after stopping and acknowledging. These are simplified experimental SkyRail modes.
-
-## Manual-Train Operating Modes
-
-The sidebar's ATP mode is two fields: **channel | operating mode**, for example `Enforced | SR`. Channel names are translated; `SB/FS/SH/SR/TR/PT` remain unchanged across languages. After `/st drive`, the manual train starts in `SB` (brake hold) in the enforced channel. `/stcs ma fs` requests `FS`; `/stcs ma sh` requests a bounded shunting permission after stopping; `/stcs ma sr` requests SR after stopping and waits for PCC or administrator approval to a selected balise, switch, origin or end. A pending request is not permission to move. If EoA overrun trips the train to `TR`, stop, use `/stcs ma ack` to enter `PT`, then `/stcs ma release` before demanding a new authority. The shadow channel never enforces these modes. Contact dispatch on lost MA; stop at the last confirmed EoA.
-
-**This state machine applies only to manual trains.** STF's built-in pseudo-ATO automatic trains keep their existing sign-driven behaviour. Boarding one or entering MA/mode commands does not turn it into an `FS/SH/SR` train.
-
-In the enforced channel, SH/SR default to **40 km/h**, configurable by the administrator. Exceeding the ceiling beyond a small detection tolerance applies B7 without the relaxed FS overspeed delay. Near EoA, follow the lower ATP limit; 40 km/h is not a guaranteed speed throughout the authority.
-
-An approved SR target may be farther away than the current MA. Each rolling grant is capped at 120 m by default, updates with conditions ahead and cannot authorize travel beyond the approved target. **Drive only within the currently valid MA.** Target approval does not mean every point and section along the route is open. Saved geometry may cover unloaded chunks, but unknown points, uncertain occupancy or graph gaps can prevent extension.
-
-## Earlier 4.0.2 Update: Warnings and Service Recovery
-
-Near-limit audio uses the current ATP limit, not actual speed, to select its band. At limits **<= 40 km/h**, including SH's default ceiling, warning starts **5 km/h below** and clears **8 km/h below**. Above 40, new-install defaults are **15 / 18 km/h**; existing normal-band settings remain unchanged. Overspeed priority, minimum-speed silence and ATP braking are unchanged.
-
-Administrators can use `/stcs admin ma restart` (`stcs.admin`, console supported) after an MA-service I/O failure. Recovery checks source availability, requires fresh stationary reports for outstanding executable authorities, backs up the ledger and pending snapshot, and verifies a real write. Occupancy is retained; drivers must demand MA again. It does not release brakes. Persistent I/O faults remain fail-closed; other runtime faults require investigation/server restart.
-
-## 1. Board and Claim Control
-
-Use a registered manual train that you are allowed to drive. Do not casually use `/st drive` aboard an automatic service: it is not a dedicated supervisor-only mode.
-
-1. Sit in a minecart and remain aboard.
-2. Use `/st lang en`; optionally `/st speedunit kph` for km/h.
-3. Enter `/st drive`, wait for confirmation and check the train name.
-4. Enter `/st b7`, apply service braking and verify that speed reaches zero.
-5. At standstill, select `/st forward` or `/st backward` as required.
-
-Forward/backward refers to the train, not the direction your camera faces. For a first test, use P1 briefly on an administrator-provided clear test track to check direction.
-
-Every new boarding requires `/st drive` again. Other controls do not implicitly claim ownership. Passengers do not automatically become drivers; contact the current driver or an administrator if the train is occupied. Basic commands require `skytrain.use`; MA requests also require `stcs.ma`. Both default to ordinary players, but servers can change permissions.
-
-Dismounting, disconnecting or releasing driving control automatically revokes the old MA and returns the onboard mode to `SB` with brakes held. Forward reservations clear after a confirmed stop, position and train integrity; body occupancy remains protected. The next driver claims control and requests `/stcs ma fs` again without releasing the previous driver's MA. `/stcs ma demand` remains a compatibility alias for `fs`.
-
-## 2. Does Your Server Use MA?
-
-**STF alone:** manual traction, braking, cab and hotbar controls work, but there is no STCS MA, EoA or shadow ATP curve. Check track and points according to local rules; do not expect automatic collision protection.
-
-**With STCS/STA:** after claiming control, stopping and selecting direction, enter:
+As administrator:
 
 ```text
-/stcs ma fs
+/st scan 6
+/st create demo 6
+/st info demo
+/st property demo trainnumber T001
+/st property demo mode manual
 ```
 
-This requests an authority; it does not guarantee allocation. Check the HMI's remaining MA, EoA, allocation reason and infrastructure state before departing under server rules. Driving control is separate from MA; MA is neither destination routing nor automatic driving.
+Board a cart, then:
 
-Waiting, unallocated, expired, unknown position, `SWITCH_UNKNOWN` and `RESOURCE_CONFLICT` are not proof of clear track. Stay stopped and contact dispatch/an administrator. Do not isolate protection, clear ledgers or drive past EoA to bypass a problem. An unavailable STCS on a server that normally uses it is not permission to switch to standalone operation.
+```text
+/st lang en
+/st drive
+/st forward
+/p1
+/n
+/b3
+/b7
+```
 
-## 3. Move and Stop
+- `P1..P4`: power notches; `B1..B7`: service-brake notches; `EB`: emergency brake.
+- `/n` is neutral on the master controller; `/st neutral` is neutral on the reverser.
+- Reversing is subject to a low-speed/standstill check. It is not a substitute for braking.
+- Claim control with `/st drive` after every boarding. Other driving commands do not claim it implicitly.
+- Leaving, disconnecting, dying, changing trains or losing the driving-seat entity revokes the driver's control, removes traction and applies EB. Control is not handed to another passenger automatically.
+- `/st release` explicitly releases control and holds the brakes. Automatic handover requires prior SAL consent at a depot berth.
 
-| Command | Meaning |
-| --- | --- |
-| `/st p1` to `/st p4` | Power notches; higher numbers request more traction, not a fixed speed |
-| `/st n` | Controller neutral: no traction and controller brakes released; the train may coast |
-| `/st b1` to `/st b7` | Service-brake notches; higher numbers request stronger braking |
-| `/st eb` | Emergency braking; stopping still takes distance |
-| `/st neutral` | Reverser neutral; not the same as `/st n` and not a brake |
+### Hotbar Control
 
-When cleared to start under local rules, enter `/st p1` separately and watch the speed before increasing power. Brake early, adjust B1/B3 or other notches as necessary, and hold B7 once stopped. Do not wait until the EoA or station stopping point to begin braking.
-
-**Power notches release controller braking; N releases controller braking and controller EB too.** Neither overrides an independent protection brake hold. N is not a reset button that keeps the brakes applied.
-
-Shortcuts such as `/p1`, `/n`, `/b7` and `/eb` also exist; use `/st ...` if another plugin conflicts. Brake to a standstill before reversing; do not use reverse traction to stop.
-
-## 4. Cab and Hotbar
-
-After claiming control, `/st cab` opens the graphical cab. `/st hotbar` toggles hotbar driving; **select slot 5 before enabling it**.
+Select **slot 5** before enabling `/st hotbar`. Enabling it does not input N or release an existing brake application. Subsequent slot changes select notches:
 
 | Slot | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Notch | B7 | B5 | B3 | B1 | N | P1 | P2 | P3 | P4 |
 
-Enabling it does not change the current handle or release brakes. Subsequent slot changes apply the selected notch; number keys help avoid accidental scroll-wheel inputs. While enabled, the swap-hands key (default F) applies EB instead of swapping items.
+Disabling with `/st hotbar` does not require slot 5. `/st cab` opens the graphical cab. Both require driving control first.
 
-Enter `/st hotbar` again to disable it; slot 5 is not required for disabling. Disabling an input method does not stop the train or release driving control. Brake to a stop first. `/st eb` remains available for emergencies.
 
-## 5. Read the Displays
 
-- Sidebar: actual speed, the current channel's ATP limit on line two, line/mileage, reverser, handle, driver and protection state. Enforced intervention also shows ATP B7/EB and its reason.
-- Driver-only BossBar: the current channel's remaining MA and ATP limit, plus ATP B7/EB during enforced intervention. Other passengers do not receive this driver MA bar.
-- EoA is the End of Authority, not your destination. Valid calibration can provide line/mileage; otherwise an edge/offset or unavailable indication may appear.
-- `--`, unallocated and expired mean unavailable information, not unlimited speed or MA. The default shadow curve reaches zero 1 m before EoA; within the final 5 m it is at most 5 km/h and continues down to zero. Server settings may differ; you must still brake manually.
-- Sounds may indicate allocation, sudden MA changes, release or approaching the limit. Sounds and thresholds are configurable and may be muted; silence is not permission to proceed.
+## Manual/automatic handover
 
-Near-limit and overspeed alarms work in both Shadow and Enforced; overspeed takes priority. Entering TR in Enforced sends a driver message and emergency-brake cue. The TR ATP EB indication remains visible after stopping. Service and emergency intervention cues are separately configurable. Resolve the cause before resuming; for TR, follow the TR → PT → SB procedure above rather than trying to reset it with N.
+Automatic→manual: `/sal release` only for a completely stopped, complete PARKED depot-standby train without a running job or fault hold. Wait for release, then `/st drive` from an end cart. A train still returning cannot use this shortcut.
 
-## 6. Finish or Handle an Emergency
+Manual→automatic: keep the driving lease, stop at a valid berth continuously for3seconds, confirm SAL handover, then explicitly `/st release` within30seconds or click the second button. Success assigns the actual depot and enters standby; it does not depart.
 
-For a normal handover, stop fully and keep brakes applied. With STCS, you may use `/stcs ma release` to release forward reservations, then `/st release` to hand back driving control, then dismount.
+Release without prior confirmation, leaving, disconnecting, movement, another driver, leaving the berth or expiration cannot complete handover. Manual state persists. Drivers need skyatolite.driver and skytrain.use; route/home administration needs skyatolite.admin.
 
-**The two release commands differ:** `/stcs ma release` requires a stop in `Enforced`, returns to `SB` with B7 brake hold and releases forward reservations; in shadow it retains the legacy non-braking behaviour. It never releases driving control or clears train-body occupancy. `/st release` relinquishes driving control and applies EB; it does not resume automatic operation.
+## Permissions, persistence and diagnosis
 
-Dismounting, disconnecting, dying or losing the driving-seat entity revokes control and applies EB, without transferring control to a passenger. After boarding again, repeat `/st drive`, check direction/braking and, with STCS, confirm or request MA again.
+- No call: check publication, the awake rising edge, depot/route names, manual standby, freshness, TIMS and existing jobs. Opposite train orientation alone should not require manually turning the train.
+- Disconnected stop: inspect RailGraph/routingIssues and locally rescan new loaded track. A chunk_not_loaded entry in unresolved alone is not a broken route.
+- Depot hold: check available berth, whole-train space, path, physical point confirmation and MA reason; do not spam awake or clear ledgers.
+- Occupancy after removal: verify the removed UUID, full destruction receipt and virtual-driver cleanup. A missing/unknown entity is not proof of safe deletion.
+- Operating display unavailable: check SAL/STA services, graph revision and freshness; hard-refresh scripts. Infrastructure and operational display have distinct semantics.
 
-For an emergency, immediately use `/st eb` and notify dispatch. Resume only after stopping, resolving the cause and rechecking authority. If `RECOVERING` or brake hold remains, contact an administrator; do not repeatedly apply power or isolate protection to bypass it.
+~~Shadow MA only; ATP inactive / 默认影子MA，ATP不动作~~
 
-## 7. Troubleshooting
+[Complete previous manual (historical baseline, not current instructions)](../manual-baseline-20261120/driver/README.en.md)
 
-| Symptom | Action |
-| --- | --- |
-| No train found | Sit in a registered train; an ordinary loose minecart may not belong to STF |
-| Driving declaration required | Remain aboard, use `/st drive` and check confirmation |
-| Power selected but no movement | Check reverser, EB/brake hold and mode; do not simply select P4; report the HMI |
-| MA requested but still waiting | Request acceptance is not allocation; inspect the reason and contact dispatch |
-| Permission denied | Ask an administrator to check `skytrain.use` / `stcs.ma`; ordinary drivers do not need admin access |
 
-Report the train name/service number, time, location, recent actions and an HMI screenshot. `/st help` and `/st version` show help and versions. Do not delete trains or occupancy records to resolve a driving problem.
+## **[2026-11-24] Added / fixed: PCC 2.4.1 map display**
+
+~~Browser-native focus outlines around selected track or devices.~~ Selection now follows the actual track polyline or a small device ring with screen-sized strokes. Map zoom cannot inflate the outline; mouse selection and keyboard focus retain visible feedback.
+
+Beside the A− / A+ text controls, **H− / H+** adjusts highlight size (50%–250%). Click its percentage to reset to100%; use the colour swatch to change colour. Size and colour are stored in this browser; controls still work if storage is unavailable.
+
+Infrastructure devices has **Balise, END, ORIGIN and Switch** children. The parent selects or clears all; children can be toggled independently, with an indeterminate parent for a partial selection. Markers, labels and switch-direction arrows are filtered together. Base track and SAL layers remain independent.
+
+These are display settings only: they do not edit RailGraph, devices, routes, MA or occupancy. Use Ctrl+F5 when updating an old browser page.

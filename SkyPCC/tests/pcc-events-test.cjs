@@ -27,6 +27,7 @@ let rows = [
   { sequence: 3, type: 'DRIVER_RELEASED', reason: 'EXPLICIT_RELEASE', driverName: '<img src=x onerror=window.xss=1>' }
 ];
 const payload = () => ({ schemaVersion:5, serverTimeMillis: Date.now(), graphRevision: 1, serviceStatus: 'AVAILABLE',
+  switchStates: { b: graph.nodes[1].state },
   trains: awaitingPosition ? [{ trainId: tid, name: 'test1', quality: 'AWAITING_POSITION',
     stale: true, graphCurrent: false, mode: 'unknown', memberCount: 3 }] : [{ trainId: tid, name: 'test1', line: 'A', edgeId: 'e1', edgeOffsetMeters: offset,
     edgeLengthMeters: 100, graphCurrent: true, stale, moving: false, speedMetersPerSecond: 0,
@@ -45,7 +46,7 @@ const server = http.createServer((req, res) => {
   if (req.url === '/api/v5/graph') json = graph;
   if (req.url === '/api/v5/trains') json = payload();
   if (json) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(json)); return; }
-  const file = ({ '/': 'index.html', '/assets/app.js': 'app.js', '/assets/styles.css': 'styles.css',
+  const file = ({ '/': 'index.html', '/assets/app.js': 'app.js', '/assets/i18n.js': 'i18n.js', '/assets/styles.css': 'styles.css',
     '/assets/day_logo.png': 'day_logo.png', '/assets/night_logo.png': 'night_logo.png' })[req.url];
   if (!file) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { 'Content-Type': file.endsWith('.png') ? 'image/png' : file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html' });

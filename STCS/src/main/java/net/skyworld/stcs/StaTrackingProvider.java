@@ -62,6 +62,12 @@ final class StaTrackingProvider implements StaIntegration, TrackingService, Rail
     public long graphRevision() { return manager.revision(); }
     public double blocksPerMeter() { return manager.graphBlocksPerMeter(); }
     public String graphJson() { return manager.graphJson(); }
+    public net.skyworld.sta.api.v9.TopologyDependency captureDependencies(long revision,java.util.List<String> edges) {
+        return manager.captureDependencies(revision,edges);
+    }
+    public net.skyworld.sta.api.v9.TopologyDependency.Check checkDependencies(net.skyworld.sta.api.v9.TopologyDependency dependency) {
+        return manager.checkDependencies(dependency);
+    }
     public TrackPositionSnapshot edgePosition(long revision, String edgeId, double offsetMeters) {
         return closed ? null : manager.edgePosition(revision, edgeId, offsetMeters);
     }
@@ -83,7 +89,8 @@ final class StaTrackingProvider implements StaIntegration, TrackingService, Rail
                 System.currentTimeMillis(), revision == manager.revision(), false);
         return new Navigation(p, text(m,"nextMarkerType"), text(m,"nextMarkerName"), number(m,"nextMarkerMileageMeters"),
                 number(m,"distanceMeters"), text(m,"nextSwitchName"), number(m,"nextSwitchMileageMeters"),
-                text(m,"nextSwitchPosition"), number(m,"distanceToSwitchMeters"));
+                text(m,"nextSwitchPosition"), number(m,"distanceToSwitchMeters"),
+                text(m,"nextSwitchState"), text(m,"nextSwitchDirection"));
     }
     private static String text(Map<String,Object> m, String k) { Object v = m.get(k); return v == null ? null : v.toString(); }
     private static Double number(Map<String,Object> m, String k) { Object v=m.get(k); return v instanceof Number n ? n.doubleValue() : null; }

@@ -70,7 +70,8 @@ public final class OptionalStaClasspathTest {
     private static int inspect(String name, byte[] data) throws ReflectiveOperationException {
         if(name.startsWith("net.skyworld.skytrain.StaTelemetryPublisher")
                 || name.startsWith("net.skyworld.skytrain.StaCabIntegration")
-                || name.startsWith("net.skyworld.skytrain.StaOperationalIntegration")) return 0;
+                || name.startsWith("net.skyworld.skytrain.StaOperationalIntegration")
+                || name.startsWith("net.skyworld.skytrain.TrainAutomation")) return 0; // optional v8 adapter
         String bytes=new String(data,StandardCharsets.ISO_8859_1);
         assert !bytes.contains("net/skyworld/sta/") && !bytes.contains("net.skyworld.sta.") : name;
         Class<?> type=Class.forName(name,false,OptionalStaClasspathTest.class.getClassLoader());

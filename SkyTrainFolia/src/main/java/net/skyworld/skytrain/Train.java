@@ -34,11 +34,11 @@ final class Train {
     volatile boolean manualReleaseConfirmed = true;
     volatile boolean driverEmergencyHold;
     volatile UUID lastManualDriver;
-    volatile AutomaticRun automaticRun;
     volatile Reverser reverser = Reverser.FORWARD;
     volatile int powerNotch;
-    volatile ProtectionMode protectionMode = ProtectionMode.SHADOW;
+    volatile ProtectionMode protectionMode = ProtectionMode.ACTIVE;
     volatile OperatingMode operatingMode = OperatingMode.SB;
+    volatile boolean integrityTrip;
     final ActiveAtpState activeAtp = new ActiveAtpState();
     final DispatcherBrake dispatcherBrake = new DispatcherBrake();
     final TrainIntegrityMonitor tims = new TrainIntegrityMonitor();
@@ -71,7 +71,6 @@ final class Train {
     private long controlledSpeedTickMillis;
     private long speedUpdatedAtMillis;
     private TrainRailPath trackPath;
-    private volatile StationMotion stationMotion;
     private volatile double directionX;
     private volatile double directionY;
     private volatile double directionZ;
@@ -171,25 +170,9 @@ final class Train {
         this.trackPath = trackPath;
     }
 
-    StationMotion stationMotion() {
-        return stationMotion;
-    }
 
-    void beginStationMotion(String signKey, double dockingDistance, double startSpeed,
-            long dwellMillis, boolean reverseOnDeparture, long nowMillis) {
-        stationMotion = new StationMotion(signKey, dockingDistance, startSpeed, dwellMillis,
-                reverseOnDeparture, reversed, nowMillis);
-    }
 
-    void clearStationMotion() {
-        stationMotion = null;
-    }
 
-    void clearStationMotion(StationMotion expected) {
-        if (stationMotion == expected) {
-            stationMotion = null;
-        }
-    }
 
     synchronized void loadMileage(String lineName, boolean known, double meters,
             int travelSign, Vector travelDirection, String lastBaliseName,

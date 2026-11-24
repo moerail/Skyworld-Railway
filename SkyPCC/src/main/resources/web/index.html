@@ -28,13 +28,41 @@
         <h1 data-i18n="Network">Network</h1>
         <button id="fitButton" type="button" title="Fit the complete network in view" data-i18n-title="Fit the complete network in view" data-i18n="Fit">Fit</button>
       </div>
+      <fieldset id="layerControls"><legend data-i18n="Map layers">Map layers</legend>
+        <label><input type="checkbox" id="layerInfrastructure" checked><span data-i18n="Infrastructure devices">Infrastructure devices</span></label><div class="infrastructure-children"><label><input type="checkbox" id="layerBalise" checked><span data-i18n="Balise">Balise</span></label><label><input type="checkbox" id="layerEnd" checked><span data-i18n="End">End</span></label><label><input type="checkbox" id="layerOrigin" checked><span data-i18n="Origin">Origin</span></label><label><input type="checkbox" id="layerSwitch" checked><span data-i18n="Switch">Switch</span></label></div>
+        <label><input type="checkbox" id="layerSal" checked><span data-i18n="SAL devices">SAL devices</span></label>
+        <label><input type="checkbox" id="layerRoutes" checked><span data-i18n="Operating routes">Operating routes</span></label>
+        <label><input type="checkbox" id="layerLive" checked><span data-i18n="Live trains and MA">Live trains and MA</span></label>
+      </fieldset>
+      <button id="enterRouteEditor" type="button" data-i18n="Enter route editor">Enter route editor</button>
+      <div id="infrastructureFilters">
       <label class="field-label" for="lineFilter" data-i18n="Line">Line</label>
       <select id="lineFilter"><option value="" data-i18n="All lines">All lines</option></select>
       <label class="field-label" for="areaFilter" data-i18n="Station area">Station area</label>
       <select id="areaFilter"><option value="" data-i18n="Hide station areas">Hide station areas</option></select>
       <p id="areaStatus" class="area-status" role="status"></p>
+      </div>
+      <div id="operatingPanel">
+        <label class="field-label" for="operatingRoute" data-i18n="Operating route">Operating route</label>
+        <select id="operatingRoute"><option value="" data-i18n="All operating routes">All operating routes</option></select>
+        <label class="field-label" for="operatingDepot" data-i18n="Depot">Depot</label>
+        <select id="operatingDepot"><option value="" data-i18n="All depots">All depots</option></select>
+        <div id="operatingWorldField" hidden><label class="field-label" for="operatingWorld" data-i18n="World">World</label><select id="operatingWorld"></select></div>
+        <p id="operatingStatus" class="area-status" role="status"></p>
+        <div id="operatingRoutesList"></div>
+        <div id="depotSummary" hidden>
+          <h2 id="depotName" class="operating-heading"></h2>
+          <details open><summary><span data-i18n="Total berths">Total berths</span> <b id="berthCount">--</b></summary><ul id="berthList" class="operating-list"></ul></details>
+          <details open><summary><span data-i18n="Parked trains">Parked trains</span> <b id="parkedCount">--</b></summary><ul id="parkedList" class="operating-list"></ul></details>
+          <details open><summary><span data-i18n="Operating trains">Operating trains</span> <b id="operatingCount">--</b></summary><ul id="operatingList" class="operating-list"></ul></details>
+          <details><summary><span data-i18n="Other / unknown trains">Other / unknown trains</span> <b id="otherCount">--</b></summary><ul id="otherList" class="operating-list"></ul></details>
+          <p class="operating-note" data-i18n="Operating trains have an active SAL task, including station stops and recovery holds.">Operating trains have an active SAL task, including station stops and recovery holds.</p>
+        </div>
+      </div>
+      <div id="infrastructureFleet">
       <div class="section-title"><span data-i18n="Rolling stock">Rolling stock</span><span id="activeCount">0 active</span></div>
       <div id="trainList" class="train-list"></div>
+      </div>
       <div id="srControls" class="sr-controls" hidden>
         <label class="field-label" for="srTrainSelect" data-i18n="Pending SR">Pending SR</label>
         <select id="srTrainSelect" aria-label="Pending SR"></select>
@@ -49,25 +77,32 @@
         <g id="nodeLayer"></g>
         <g id="labelLayer"></g>
         <g id="authorityLayer"></g>
-        <g id="trainLayer"></g>
+        <g id="trainLayer"></g><g id="infrastructureSelectionLayer" pointer-events="none"></g>
       </svg>
       <div class="map-tools">
         <div class="tool-group" aria-label="Map zoom" data-i18n-aria="Map zoom">
           <button id="zoomIn" type="button" title="Zoom in" data-i18n-title="Zoom in" aria-label="Zoom in" data-i18n-aria="Zoom in">+</button>
           <button id="zoomOut" type="button" title="Zoom out" data-i18n-title="Zoom out" aria-label="Zoom out" data-i18n-aria="Zoom out">-</button>
         </div>
-        <div class="tool-group font-tools" aria-label="Map label size" data-i18n-aria="Map label size">
+        <div class="label-highlight-tools"><div class="tool-group font-tools" aria-label="Map label size" data-i18n-aria="Map label size">
           <button id="fontDecrease" type="button" title="Decrease label size" data-i18n-title="Decrease label size" aria-label="Decrease label size" data-i18n-aria="Decrease label size">A−</button>
           <button id="fontSizeValue" type="button" title="Reset label size" data-i18n-title="Reset label size" aria-label="Reset label size" data-i18n-aria="Reset label size">150%</button>
           <button id="fontIncrease" type="button" title="Increase label size" data-i18n-title="Increase label size" aria-label="Increase label size" data-i18n-aria="Increase label size">A+</button>
-        </div>
+        </div><div class="tool-group highlight-tools" role="group" aria-label="Selection highlight" data-i18n-aria="Selection highlight"><button id="highlightDecrease" type="button" title="Decrease highlight size" data-i18n-title="Decrease highlight size" aria-label="Decrease highlight size" data-i18n-aria="Decrease highlight size">H−</button><button id="highlightSizeValue" type="button" title="Reset highlight size" data-i18n-title="Reset highlight size" aria-label="Reset highlight size" data-i18n-aria="Reset highlight size">100%</button><button id="highlightIncrease" type="button" title="Increase highlight size" data-i18n-title="Increase highlight size" aria-label="Increase highlight size" data-i18n-aria="Increase highlight size">H+</button><input id="highlightColor" type="color" value="#56c7d9" title="Highlight colour" data-i18n-title="Highlight colour" aria-label="Highlight colour" data-i18n-aria="Highlight colour"></div></div>
       </div>
-      <div class="map-legend">
+      <div class="map-legend" id="infrastructureLegend">
         <span><i class="legend-line"></i><span data-i18n="Unallocated">Unallocated</span></span>
         <span><i class="legend-line occupied"></i><span data-i18n="Observed occupancy">Observed occupancy</span></span>
         <span><i class="legend-line uncertain"></i><span data-i18n="Frozen / uncertain">Frozen / uncertain</span></span>
-        <span><i class="legend-line reserved"></i><span data-i18n="Shadow reservation">Shadow reservation</span></span>
+        <span><i class="legend-line reserved"></i><span data-i18n="MA reservation">MA reservation</span></span>
         <span id="maStatus">MA unavailable</span>
+      </div>
+      <div class="map-legend" id="operatingLegend" hidden>
+        <span><i class="legend-line op-draft"></i><span data-i18n="Route draft">Route draft</span></span>
+        <span><i class="legend-line op-closed"></i><span data-i18n="Closed draft">Closed draft</span></span>
+        <span><i class="legend-line op-validated"></i><span data-i18n="Route validated">Route validated</span></span>
+        <span><i class="legend-line op-published"></i><span data-i18n="Route published">Route published</span></span>
+        <span><i class="legend-berth"></i><span data-i18n="Depot berth">Depot berth</span></span>
       </div>
       <div id="emptyState" class="empty-state" hidden data-i18n="No RailGraph data">No RailGraph data</div>
     </section>
@@ -78,6 +113,20 @@
         <button id="inspectorBack" class="icon-button" type="button" title="Back to overview" data-i18n-title="Back to overview"
           aria-label="Back to overview" data-i18n-aria="Back to overview" hidden>←</button>
       </div>
+      <section id="routeEditorPanel" hidden>
+        <h2 data-i18n="Operating route editor">Operating route editor</h2>
+        <p id="routeEditorStatus" role="status"></p>
+        <label class="field-label" for="editRoute" data-i18n="Operating route">Operating route</label><select id="editRoute"></select>
+        <div class="route-actions"><button id="routeBegin" data-i18n="Edit selected route">Edit selected route</button><button id="routeExit" data-i18n="Exit editor">Exit editor</button></div>
+        <label class="field-label" for="routeName" data-i18n="New route name">New route name</label><input id="routeName" maxlength="64" autocomplete="off">
+        <button id="routeCreate" data-i18n="Create draft">Create draft</button>
+        <label class="field-label" for="routeDepots" data-i18n="Bound depots (at least one)">Bound depots (at least one)</label><select id="routeDepots" multiple size="3"></select>
+        <label class="field-label" for="routeDirection" data-i18n="Initial direction">Initial direction</label><select id="routeDirection"><option value="east">east →</option><option value="west">west ←</option><option value="north">north ↑</option><option value="south">south ↓</option></select>
+        <p class="operating-note" data-i18n="Click a balise, track segment or matching SAL station to append a visit. Existing signs are not rewritten.">Click a balise, track segment or matching SAL station to append a visit. Existing signs are not rewritten.</p>
+        <ol id="routeVisits" class="route-visits"></ol>
+        <div class="route-actions"><button id="routeSave" data-i18n="Save draft">Save draft</button><button id="routeValidate" data-i18n="Validate draft">Validate draft</button><button id="routePublish" data-i18n="Publish version">Publish version</button><button id="routeRetire" data-i18n="Retire route">Retire route</button><button id="routeDelete" data-i18n="Delete route">Delete route</button></div>
+        <div id="routeConflict" hidden><h3 data-i18n="Editing frozen">Editing frozen</h3><p data-i18n="Both editors are frozen. Choose a proposal or discard pending edits; resolution does not publish.">Both editors are frozen. Choose a proposal or discard pending edits; resolution does not publish.</p><select id="routeResolution"></select><button id="routeResolve" data-i18n="Resolve conflict">Resolve conflict</button><div id="routeConflictDiff"></div></div>
+      </section>
       <div id="inspectorEmpty" class="inspector-empty" data-i18n="Select a train on the map or in the list.">Select a train on the map or in the list.</div>
       <div id="cameraControls" class="camera-controls" hidden>
         <button id="followTrain" type="button" title="Follow this train" data-i18n-title="Follow this train" aria-label="Follow this train" data-i18n-aria="Follow this train">◎</button>
@@ -89,7 +138,7 @@
         <div><dt data-i18n="Status">Status</dt><dd id="detailStatus">--</dd></div>
         <div><dt data-i18n="Mode">Mode</dt><dd id="detailMode">--</dd></div>
         <div><dt data-i18n="ATP mode">ATP mode</dt><dd id="detailAtp">--</dd></div>
-        <div><dt data-i18n="Shadow MA">Shadow MA</dt><dd id="detailMa">--</dd></div>
+        <div><dt data-i18n="Movement authority (MA)">Movement authority (MA)</dt><dd id="detailMa">--</dd></div>
         <div><dt data-i18n="EoA">EoA</dt><dd id="detailEoa">--</dd></div>
         <div><dt data-i18n="MA reason">MA reason</dt><dd id="detailMaReason">--</dd></div>
         <div><dt data-i18n="Direction">Direction</dt><dd id="detailDirection">--</dd></div>
@@ -132,6 +181,7 @@
   <dialog id="srDialog" aria-labelledby="srTitle">
     <div class="panel-heading"><h2 id="srTitle" data-i18n="SR approval">SR approval</h2><button id="srClose" type="button" title="Close" data-i18n-title="Close" aria-label="Close" data-i18n-aria="Close">×</button></div>
     <p id="srTarget"></p>
+    <p data-i18n="For automatic recovery, this approval also authorizes stopped Trip acknowledgement. TIMS must be complete; each further segment needs approval.">For automatic recovery, this approval also authorizes stopped Trip acknowledgement. TIMS must be complete; each further segment needs approval.</p>
     <label class="field-label" for="srToken" data-i18n="Operator token">Operator token</label>
     <input id="srToken" type="password" autocomplete="off" spellcheck="false">
     <p id="srResult" role="status"></p>
@@ -147,7 +197,9 @@
     <button id="revokeConfirm" type="button" data-i18n="Revoke MA → TR">Revoke MA → TR</button>
     <button id="revokeClose" type="button" data-i18n="Close">Close</button>
   </dialog>
+  <dialog id="routeAuthDialog"><h2 data-i18n="Enter route editor">Enter route editor</h2><label for="routeToken" data-i18n="Operator token">Operator token</label><input id="routeToken" type="password" autocomplete="off"><p id="routeAuthResult" role="status"></p><button id="routeAuthConfirm" data-i18n="Authenticate">Authenticate</button><button id="routeAuthClose" data-i18n="Cancel">Cancel</button></dialog>
   <script src="/assets/i18n.js"></script>
+  <script src="/assets/operating-map.js"></script>
   <script src="/assets/app.js"></script>
 </body>
 </html>

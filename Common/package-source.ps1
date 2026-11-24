@@ -4,11 +4,11 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression
 $root = Split-Path $PSScriptRoot -Parent
 $files = @()
-foreach ($directory in @('SkyTrainFolia','STCS','STA','SkyPCC','Common/shared','Common/doc')) {
+foreach ($directory in @('SkyTrainFolia','STCS','STA','SkyPCC','SkyATO-Lite','Common/shared','Common/doc')) {
     $files += Get-ChildItem -LiteralPath (Join-Path $root $directory) -Recurse -File |
         Where-Object { $_.FullName.Substring($root.Length + 1) -notmatch '(^|[\\/])(target|artifacts|dist|node_modules|__pycache__|\.git)([\\/]|$)' }
 }
-foreach ($name in @('.gitignore','.gitattributes','README.md','Common/LICENSE','Common/ASSET-LICENSE.md','Common/logo.png','Common/CHANGELOG.md','Common/README.zh.md','Common/README.en.md','Common/README.fr.md','Common/README.nl.md','Common/README.ja.md','Common/README.ru.md','Common/README.ja.classical.md','Common/build.ps1','Common/package-source.ps1')) {
+foreach ($name in @('.gitignore','.gitattributes','README.md','VALIDATION.md','Latest/SHA256.json','Common/LICENSE','Common/ASSET-LICENSE.md','Common/logo.png','Common/CHANGELOG.md','Common/README.zh.md','Common/README.en.md','Common/README.fr.md','Common/README.nl.md','Common/README.ja.md','Common/README.ru.md','Common/README.ja.classical.md','Common/build.ps1','Common/package-source.ps1','Common/package-release.ps1','Common/validate-docs.cjs')) {
     $files += Get-Item -LiteralPath (Join-Path $root $name)
 }
 $allowed = @('.java','.yml','.yaml','.js','.cjs','.css','.html','.png','.py','.json','.md','.ps1','.txt','.cmd','.bat')

@@ -16,14 +16,16 @@ final class TrainChunkLoader {
     private final Object lock = new Object();
     private final Map<UUID, Set<ChunkKey>> trainTickets = new HashMap<>();
     private final Map<ChunkKey, Integer> references = new HashMap<>();
+    private final Set<ChunkKey> loaded = new HashSet<>();
+    private boolean closed;
 
     TrainChunkLoader(SkyTrainPlugin plugin) {
         this.plugin = plugin;
     }
 
-    void update(Train train, Location leaderLocation, int radius) {
+    boolean update(Train train, Location leaderLocation, int radius) {
         if (train == null || leaderLocation == null || leaderLocation.getWorld() == null) {
-            return;
+            return false;
         }
 
         Set<ChunkKey> desired = new HashSet<>();
@@ -36,7 +38,11 @@ final class TrainChunkLoader {
             addCorridor(desired, snapshot.worldName, ((int) Math.floor(snapshot.x)) >> 4,
                     ((int) Math.floor(snapshot.z)) >> 4, radius);
         }
+        if(plugin.automation()!=null) {
+            for(var chunk:plugin.automation().corridor(train)) desired.add(new ChunkKey(chunk.world(),chunk.x(),chunk.z()));
+        }
         replace(train.id(), desired);
+        synchronized(lock) { return loaded.containsAll(desired); }
     }
 
     void release(UUID trainId) {
@@ -45,8 +51,10 @@ final class TrainChunkLoader {
 
     void shutdown() {
         synchronized (lock) {
+            closed=true;
             trainTickets.clear();
             references.clear();
+            loaded.clear();
         }
         for (World world : Bukkit.getWorlds()) {
             world.removePluginChunkTickets(plugin);
@@ -55,6 +63,7 @@ final class TrainChunkLoader {
 
     private void replace(UUID trainId, Set<ChunkKey> desired) {
         synchronized (lock) {
+            if(closed) return;
             Set<ChunkKey> previous = trainTickets.getOrDefault(trainId, Set.of());
             if (previous.equals(desired)) {
                 return;
@@ -69,7 +78,15 @@ final class TrainChunkLoader {
                 if (count == 0) {
                     World world = Bukkit.getWorld(key.worldName());
                     if (world != null) {
-                        world.addPluginChunkTicket(key.x(), key.z(), plugin);
+                        world.getChunkAtAsync(key.x(),key.z(),true).whenComplete((chunk,error)->{
+                            if(error!=null || chunk==null)return;
+                            try { Bukkit.getRegionScheduler().run(plugin,world,key.x(),key.z(),task->{
+                                synchronized(lock) {
+                                    if(closed||!references.containsKey(key))return;
+                                    world.addPluginChunkTicket(key.x(),key.z(),plugin);loaded.add(key);
+                                }
+                            }); } catch(RuntimeException ignored) { /* Unready chunks keep traction inhibited. */ }
+                        });
                     }
                 }
             }
@@ -80,9 +97,12 @@ final class TrainChunkLoader {
                 int count = references.getOrDefault(key, 0) - 1;
                 if (count <= 0) {
                     references.remove(key);
+                    loaded.remove(key);
                     World world = Bukkit.getWorld(key.worldName());
                     if (world != null) {
-                        world.removePluginChunkTicket(key.x(), key.z(), plugin);
+                        Bukkit.getRegionScheduler().run(plugin,world,key.x(),key.z(),task->{
+                            synchronized(lock) { if(!references.containsKey(key))world.removePluginChunkTicket(key.x(),key.z(),plugin); }
+                        });
                     }
                 } else {
                     references.put(key, count);

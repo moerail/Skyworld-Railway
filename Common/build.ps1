@@ -44,7 +44,7 @@ function Compile-Java([string[]]$Sources, [string]$Classpath, [string]$Output, [
 }
 
 # Each build starts with STA from source; no prebuilt suite JAR is required.
-foreach ($module in @('STA','SkyTrainFolia','STCS','SkyPCC')) {
+foreach ($module in @('STA','SkyTrainFolia','STCS','SkyPCC','SkyATO-Lite')) {
     $root = Join-Path $suiteRoot $module
     $metadata = Get-Content -LiteralPath (Join-Path $root 'src/main/resources/plugin.yml') -Raw
     $nameMatch = [regex]::Match($metadata, '(?m)^name:\s*([A-Za-z0-9_-]+)\s*$')
@@ -105,7 +105,7 @@ foreach ($module in @('STA','SkyTrainFolia','STCS','SkyPCC')) {
 # Recompile the same sources against 26.3 and run an independent test suite. The
 # distributable JARs above already contain both protocol adapters; this pass only validates.
 $validated26_3 = @()
-foreach ($module in @('STA','SkyTrainFolia','STCS','SkyPCC')) {
+foreach ($module in @('STA','SkyTrainFolia','STCS','SkyPCC','SkyATO-Lite')) {
     $root = Join-Path $suiteRoot $module
     $classes = Join-Path $build "$module/classes-26.3"
     $classpath = ($dependencies26_3 + $validated26_3) -join $separator
@@ -155,7 +155,7 @@ $latest = Join-Path $suiteRoot 'Latest'
 New-Item -ItemType Directory -Force -Path $latest | Out-Null
 # Publish only after both server-version test passes. Preserve earlier outputs.
 $previous = @(Get-ChildItem -LiteralPath $latest -File | Where-Object {
-    $_.Name -match '^(SkyTrainFolia|STCS|SkyworldTrainAPI|SkyPCC)-.*\.jar$' -or $_.Name -eq 'SHA256.json'
+    $_.Name -match '^(SkyTrainFolia|STCS|SkyworldTrainAPI|SkyPCC|SkyATO-Lite)-.*\.jar$' -or $_.Name -eq 'SHA256.json'
 })
 if ($previous.Count -gt 0) {
     $history = Join-Path $artifacts ('latest-history/' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8))
@@ -172,5 +172,5 @@ if ($previous.Count -gt 0) {
 }
 foreach ($built in $builtJars) { Copy-Item -LiteralPath $built -Destination $latest }
 Copy-Item -LiteralPath (Join-Path $artifacts 'SHA256.json') -Destination $latest
-Write-Output "Latest successful four-plugin build: $latest"
-Write-Output "Complete: four plugins, $testCount tests on 26.2 and $testCount26_3 tests on 26.3. No server files were modified."
+Write-Output "Latest successful five-plugin build: $latest"
+Write-Output "Complete: five plugins, $testCount tests on 26.2 and $testCount26_3 tests on 26.3. No server files were modified."

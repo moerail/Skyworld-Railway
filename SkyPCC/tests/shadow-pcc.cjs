@@ -39,7 +39,7 @@ const server = http.createServer(async (req, res) => {
     pointState = 'diverging'; return json({ requestId: data.requestId, status: 'COMPLETED', reason: 'APPLIED' });
   }
   const asset = req.url === '/' ? 'index.html' : req.url.replace('/assets/', '');
-  if (!['index.html', 'styles.css', 'app.js', 'i18n.js', 'day_logo.png', 'night_logo.png'].includes(asset)) { res.statusCode = 404; return res.end(); }
+  if (!['index.html', 'styles.css', 'app.js','operating-map.js', 'i18n.js', 'day_logo.png', 'night_logo.png'].includes(asset)) { res.statusCode = 404; return res.end(); }
   res.setHeader('Content-Type', asset.endsWith('.js') ? 'text/javascript' : asset.endsWith('.css') ? 'text/css' : asset.endsWith('.png') ? 'image/png' : 'text/html');
   res.end(fs.readFileSync(path.join(web, asset)));
 });

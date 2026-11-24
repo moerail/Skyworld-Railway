@@ -65,6 +65,15 @@ final class RailGraphManager {
     private final SkyTrainSwitchBridge switchBridge;
     private final SkyTrainStationBridge stationBridge;
     private volatile boolean shuttingDown;
+    private GraphBuild activeBuild;
+    private boolean pendingFull, drainScheduled;
+    private RailGraph.Position rebuildCentre;
+    private final Map<RailGraph.Position,Boolean> pendingChanges = new LinkedHashMap<>();
+    private final Set<RailGraph.Position> brokenRails = ConcurrentHashMap.newKeySet();
+    private volatile List<RailGraph.Issue> scanDiagnostics = List.of();
+    private volatile long lastCheckedMillis;
+    private long nextReview;
+    private final AtomicBoolean reviewing = new AtomicBoolean();
 
     RailGraphManager(StcsPlugin plugin) {
         this.plugin = plugin;
@@ -139,6 +148,84 @@ final class RailGraphManager {
 
     void start() {
         reconcileStartup(0);
+        nextReview=System.nanoTime()+reviewIntervalSeconds()*1_000_000_000L;
+        Bukkit.getAsyncScheduler().runAtFixedRate(plugin,t->{
+            if(shuttingDown||!infrastructureReady())return;
+            synchronized(this) {
+                var positions=infrastructureChanges();
+                for(var p:positions)pendingChanges.put(p,true);
+                if(pendingFull||!pendingChanges.isEmpty())scheduleDrain();
+            }
+            if(System.nanoTime()>=nextReview) {
+                nextReview=System.nanoTime()+reviewIntervalSeconds()*1_000_000_000L;
+                reviewLoadedRails();
+            }
+        },1,1,java.util.concurrent.TimeUnit.SECONDS);
+    }
+
+    private long reviewIntervalSeconds() { return Math.max(1,Math.min(86400,plugin.getConfig().getLong("graph.review-interval-seconds",60))); }
+
+    private void reviewLoadedRails() {
+        synchronized(this){if(activeBuild!=null)return;}
+        if(!reviewing.compareAndSet(false,true))return;
+        var snapshot=graph;
+        try {LoadedRailReview.start(plugin,snapshot,observations->{
+            try {synchronized(this) {
+                if(shuttingDown||graph!=snapshot)return;
+                var changed=new ArrayList<RailGraph.Position>();
+                observations.forEach((p,valid)->{
+                    boolean different=valid?brokenRails.remove(p):brokenRails.add(p);
+                    if(different)changed.add(p);
+                });
+                // Retry genuinely unresolved, currently loaded sources, including repaired disconnected tracks.
+                var ids=GraphIncremental.blocking(snapshot.unresolved,snapshot.edges).stream().map(RailGraph.Issue::source).collect(java.util.stream.Collectors.toSet());
+                snapshot.nodes.stream().filter(n->ids.contains(n.id())&&loaded(n.rail())).map(RailGraph.Node::rail).forEach(changed::add);
+                for(var p:changed)pendingChanges.put(p,true);
+                if(!changed.isEmpty())scheduleDrain();
+                lastCheckedMillis=System.currentTimeMillis();
+            }}finally{reviewing.set(false);}
+        });}catch(RuntimeException ex){reviewing.set(false);plugin.getLogger().log(Level.WARNING,"Rail review failed",ex);}
+    }
+
+    net.skyworld.sta.api.v9.TopologyDependency captureDependencies(long revision,List<String> ids) {
+        var snapshot=graph;if(snapshot.revision!=revision)return null;
+        var result=GraphIncremental.capture(snapshot,List.copyOf(ids));return graph==snapshot?result:null;
+    }
+    net.skyworld.sta.api.v9.TopologyDependency.Check checkDependencies(net.skyworld.sta.api.v9.TopologyDependency dependency) {
+        var snapshot=graph;var result=GraphIncremental.check(snapshot,dependency);
+        return graph==snapshot?result:new net.skyworld.sta.api.v9.TopologyDependency.Check(graph.revision,"UNAVAILABLE",List.of());
+    }
+
+    private List<RailGraph.Position> infrastructureChanges() {
+        var current=currentNodes();var old=new java.util.HashMap<String,RailGraph.Node>();graph.nodes.forEach(n->old.put(n.id(),n));
+        var changes=new ArrayList<RailGraph.Position>();
+        for(var n:current) {var before=old.remove(n.id());if(!GraphIncremental.nodeStamp(n).equals(GraphIncremental.nodeStamp(before))) {
+            if(n.rail()!=null)changes.add(n.rail());if(before!=null&&before.rail()!=null)changes.add(before.rail());
+        }}
+        old.values().forEach(n->{if(n.rail()!=null)changes.add(n.rail());});return changes;
+    }
+
+    private List<StcsMarker> currentMarkers() {
+        var result=new ArrayList<>(markers.values());var known=result.stream().map(StcsMarker::id).collect(java.util.stream.Collectors.toSet());
+        for(var s:stationBridge.snapshots())if(known.add(s.id()))result.add(s);return List.copyOf(result);
+    }
+    private List<RailGraph.Node> currentNodes() {
+        var nodes=new ArrayList<>(currentMarkers().stream().map(this::node).toList());
+        switchBridge.snapshots().stream().map(this::switchNode).forEach(nodes::add);
+        return importsAvailable()?nodes:graph.nodes;
+    }
+    private boolean importsAvailable() {
+        return Bukkit.getPluginManager().getPlugin("SkyTrainFolia")==null||switchBridge.available()&&stationBridge.available();
+    }
+
+    synchronized void updateAround(BlockPosition p) {
+        if(p!=null){pendingChanges.put(position(p),true);scheduleDrain();}
+    }
+
+    private void scheduleDrain() {
+        if(shuttingDown||drainScheduled||activeBuild!=null)return;
+        drainScheduled=true;
+        Bukkit.getGlobalRegionScheduler().runDelayed(plugin,t->{synchronized(this){drainScheduled=false;beginPending();}},2);
     }
 
     private boolean infrastructureReady() {
@@ -236,7 +323,8 @@ final class RailGraphManager {
         markers.put(id, marker);
         addIndexes(marker);
         queueSave();
-        rebuildGraph();
+        if(previous!=null)updateAround(previous.rail());
+        updateAround(marker.rail());
         return new Registration(marker, previous == null);
     }
 
@@ -251,7 +339,7 @@ final class RailGraphManager {
         }
         removeIndexes(marker);
         queueSave();
-        rebuildGraph();
+        updateAround(marker.rail());
         return true;
     }
 
@@ -315,12 +403,26 @@ final class RailGraphManager {
     Map<String, Object> query(String world, int railX, int railY, int railZ,
             double directionX, double directionY, double directionZ) {
         return graph.query(world, railX, railY, railZ, directionX, directionY, directionZ,
-                this::liveSwitchState);
+                this::liveSwitchState, this::navigationSwitchState);
+    }
+
+    private String navigationSwitchState(RailGraph.Node node) {
+        var p = node == null ? null : node.rail();
+        var live = p == null ? null : switchBridge.snapshotAt(p.world(), p.x(), p.y(), p.z());
+        if (live == null) return "UNKNOWN";
+        String physical = live.physicalState();
+        if (!("straight".equalsIgnoreCase(physical) || "diverging".equalsIgnoreCase(physical))) return "UNKNOWN";
+        return physical.equalsIgnoreCase(live.commandedState()) ? physical : "PENDING";
     }
 
     String graphJson() {
+        RailGraph snapshot=graph;
         Gson gson = new Gson();
-        JsonObject root = gson.toJsonTree(graph).getAsJsonObject();
+        JsonObject root = gson.toJsonTree(snapshot).getAsJsonObject();
+        root.addProperty("topologySemantics",1);
+        root.add("routingIssues",gson.toJsonTree(GraphIncremental.blocking(snapshot.unresolved,snapshot.edges)));
+        root.add("scanDiagnostics",gson.toJsonTree(scanDiagnostics));
+        root.addProperty("lastCheckedMillis",lastCheckedMillis);
         JsonArray nodes = root.getAsJsonArray("nodes");
         if (nodes != null) {
             for (JsonElement element : nodes) {
@@ -329,7 +431,7 @@ final class RailGraphManager {
                     continue;
                 }
                 String id = nodeJson.get("id").getAsString();
-                RailGraph.Node railwaySwitch = graph.nodes.stream()
+                RailGraph.Node railwaySwitch = snapshot.nodes.stream()
                         .filter(node -> node.id().equals(id)).findFirst().orElse(null);
                 String liveState = liveSwitchState(railwaySwitch);
                 if (liveState != null && !liveState.isBlank()) {
@@ -381,7 +483,15 @@ final class RailGraphManager {
         return live == null ? railwaySwitch.state() : live.effectiveState();
     }
 
-    synchronized void rebuildGraph() {
+    synchronized void rebuildGraph() { rebuildGraph(null); }
+
+    synchronized void rebuildGraph(Location centre) {
+        pendingFull=true;
+        rebuildCentre=centre==null?null:new RailGraph.Position(centre.getWorld().getName(),centre.getBlockX(),centre.getBlockY(),centre.getBlockZ());
+        scheduleDrain();
+    }
+
+    private void beginPending() {
         if (!infrastructureReady()) {
             plugin.getLogger().warning("RailGraph rebuild deferred: STF infrastructure not ready; existing graph retained.");
             return;
@@ -389,27 +499,41 @@ final class RailGraphManager {
         if (shuttingDown) {
             return;
         }
+        if(activeBuild!=null||!pendingFull&&pendingChanges.isEmpty())return;
         long buildId = nextBuildId(buildSequence, graph.revision);
-        List<StcsMarker> snapshot = List.copyOf(markers.values());
-        List<StcsMarker> importedStations = stationBridge.snapshots();
-        if (!importedStations.isEmpty()) {
-            List<StcsMarker> combined = new ArrayList<>(snapshot);
-            Set<UUID> knownIds = combined.stream().map(StcsMarker::id).collect(java.util.stream.Collectors.toSet());
-            importedStations.stream().filter(station -> knownIds.add(station.id())).forEach(combined::add);
-            snapshot = List.copyOf(combined);
-        }
+        List<StcsMarker> snapshot = currentMarkers();
         List<SkyTrainSwitchBridge.SwitchSnapshot> switches = switchBridge.snapshots();
-        GraphBuild build = new GraphBuild(buildId, snapshot.size() + switches.size(), snapshot, switches);
-        if (snapshot.isEmpty() && switches.isEmpty()) {
-            publish(build);
-            return;
+        if(!importsAvailable())return; // An unavailable producer is not an empty/deleted infrastructure catalogue.
+        var nodes=new ArrayList<>(snapshot.stream().map(this::node).toList());switches.stream().map(this::switchNode).forEach(nodes::add);
+        var affected=pendingFull?nodes.stream().map(RailGraph.Node::id).collect(java.util.stream.Collectors.toSet())
+            :GraphIncremental.affected(graph,nodes,List.copyOf(pendingChanges.keySet()));
+        var centre=rebuildCentre;pendingFull=false;rebuildCentre=null;pendingChanges.clear();
+        var loaded=nodes.stream().filter(n->affected.contains(n.id())&&loaded(n.rail()))
+            .sorted(Comparator.comparingDouble(n->priority(n.rail(),centre))).map(RailGraph.Node::id).toList();
+        GraphBuild build = new GraphBuild(buildId, loaded.size(), snapshot, switches);
+        build.scanned.addAll(loaded);activeBuild=build;
+        if(loaded.isEmpty()){publish(build);return;}
+        var actions=new ArrayList<Runnable>();
+        for(var id:loaded) {
+            var marker=snapshot.stream().filter(m->m.id().toString().equals(id)).findFirst().orElse(null);
+            if(marker!=null)actions.add(()->scanMarker(build,marker));
+            else {var sw=switches.stream().filter(s->s.id().toString().equals(id)).findFirst().orElseThrow();actions.add(()->scanSwitch(build,sw));}
         }
-        for (StcsMarker marker : snapshot) {
-            scanMarker(build, marker);
-        }
-        for (SkyTrainSwitchBridge.SwitchSnapshot railwaySwitch : switches) {
-            scanSwitch(build, railwaySwitch);
-        }
+        scanBatch(build,actions,0);
+    }
+
+    private static boolean loaded(RailGraph.Position p) {
+        if(p==null)return false;var w=Bukkit.getWorld(p.world());return w!=null&&w.isChunkLoaded(p.x()>>4,p.z()>>4);
+    }
+    private static double priority(RailGraph.Position p,RailGraph.Position centre) {
+        if(centre==null)return 0;
+        return !centre.world().equals(p.world())?Double.MAX_VALUE:square(p.x()-centre.x())+square(p.y()-centre.y())+square(p.z()-centre.z());
+    }
+    private void scanBatch(GraphBuild build,List<Runnable> actions,int offset) {
+        if(!build.active())return;
+        int end=Math.min(actions.size(),offset+Math.max(1,Math.min(64,plugin.getConfig().getInt("graph.sources-per-tick",4))));
+        for(int i=offset;i<end;i++)actions.get(i).run();
+        if(end<actions.size())Bukkit.getGlobalRegionScheduler().runDelayed(plugin,t->scanBatch(build,actions,end),1);
     }
 
     void exportGraph() {
@@ -528,26 +652,13 @@ final class RailGraphManager {
         }
         int chunkX = nextX >> 4;
         int chunkZ = nextZ >> 4;
-        if (onlyLoadedChunks() && !world.isChunkLoaded(chunkX, chunkZ)) {
+        if (!world.isChunkLoaded(chunkX, chunkZ)) {
             build.issue(sourceId, sourcePort, "chunk_not_loaded", distanceMeters);
             completion.run();
             return;
         }
 
         Location nextLocation = new Location(world, nextX, current.y(), nextZ);
-        if (!onlyLoadedChunks() && !world.isChunkLoaded(chunkX, chunkZ)) {
-            world.getChunkAtAsync(chunkX, chunkZ, true).whenComplete((chunk, error) -> {
-                if (error != null || chunk == null) {
-                    build.issue(sourceId, sourcePort, "chunk_load_failed", distanceMeters);
-                    completion.run();
-                    return;
-                }
-                scheduleLoadedStep(build, sourceId, sourcePort, excludedMarker, current,
-                        exitFace, distanceMeters, path, visited, completion,
-                        world, nextX, nextZ, chunkX, chunkZ, nextLocation);
-            });
-            return;
-        }
         scheduleLoadedStep(build, sourceId, sourcePort, excludedMarker, current,
                 exitFace, distanceMeters, path, visited, completion,
                 world, nextX, nextZ, chunkX, chunkZ, nextLocation);
@@ -630,8 +741,19 @@ final class RailGraphManager {
     private void addEdge(GraphBuild build, String sourceId, String sourcePort,
             String targetId, String targetPort, double distance, List<RailGraph.Point> path) {
         String edgeId = sourceId + ':' + sourcePort + ':' + targetId + ':' + targetPort;
-        build.edges.add(new RailGraph.Edge(edgeId, sourceId, targetId, sourcePort,
-                targetPort == null ? "unknown" : targetPort, distance, List.copyOf(path)));
+        var edge=new RailGraph.Edge(edgeId, sourceId, targetId, sourcePort,
+                targetPort == null ? "unknown" : targetPort, distance, List.copyOf(path));
+        build.edges.add(edge);
+        // Extend a local edit only as far as changed boundary connections, not through the whole graph.
+        if(build.base.edges.stream().noneMatch(edge::equals)&&!build.scanned.contains(targetId)) {
+            var marker=build.markers.stream().filter(m->m.id().toString().equals(targetId)).findFirst().orElse(null);
+            var sw=build.switches.values().stream().filter(s->s.id().toString().equals(targetId)).findFirst().orElse(null);
+            var pos=marker!=null?position(marker.rail()):sw==null?null:position(sw.pivot());
+            if(loaded(pos)&&build.scanned.add(targetId)) {
+                build.remainingTasks.incrementAndGet();
+                Bukkit.getGlobalRegionScheduler().runDelayed(plugin,t->{if(marker!=null)scanMarker(build,marker);else scanSwitch(build,sw);},1);
+            }
+        }
     }
 
     private Block connectedRail(World world, int x, int y, int z, BlockFace entryFace) {
@@ -663,16 +785,36 @@ final class RailGraphManager {
         List<RailGraph.Edge> freshEdges = build.edges.stream()
                 .sorted(Comparator.comparing(RailGraph.Edge::from).thenComparing(RailGraph.Edge::sourcePort))
                 .toList();
-        List<RailGraph.Edge> edges = preserveIncompleteEdges(graph.edges, freshEdges, build.issues,
-                nodes.stream().map(RailGraph.Node::id).collect(java.util.stream.Collectors.toSet()));
+        List<RailGraph.Edge> edges = GraphIncremental.merge(build.base,nodes,build.scanned,freshEdges,build.issues);
+        var issues=new ArrayList<RailGraph.Issue>();
+        var nodeIds=nodes.stream().map(RailGraph.Node::id).collect(java.util.stream.Collectors.toSet());
+        build.base.unresolved.stream().filter(i->nodeIds.contains(i.source())&&!build.scanned.contains(i.source())&&!i.reason().equals("rail_broken")).forEach(issues::add);
+        issues.addAll(build.issues);
+        // A completed physical walk is newer repair evidence than an earlier periodic break observation.
+        for(var edge:freshEdges)for(var p:edge.path())brokenRails.remove(new RailGraph.Position(p.world(),p.x(),p.y(),p.z()));
+        // A confirmed break remains a fault even when its source node is currently unloaded.
+        for(var e:edges)for(var p:e.path())if(brokenRails.contains(new RailGraph.Position(p.world(),p.x(),p.y(),p.z()))) {
+            issues.add(new RailGraph.Issue(e.from(),e.sourcePort(),"rail_broken",p.distanceMeters()));break;
+        }
+        scanDiagnostics=List.copyOf(issues);lastCheckedMillis=System.currentTimeMillis();
         RailGraph completed = new RailGraph(build.id, maxDistanceMeters(), blocksPerMeter(),
-                nodes, edges, List.copyOf(build.issues), lineDefinitions(build.markers));
-        graph = completed;
+                nodes, edges, List.copyOf(issues), lineDefinitions(build.markers));
+        boolean changed=!GraphIncremental.same(graph,completed);
+        if(changed){graph=completed;exportGraphAsync(completed);}
+        activeBuild=null;
         plugin.notifyPccUpdate();
-        exportGraphAsync(completed);
-        plugin.getLogger().info("RailGraph revision " + completed.revision + " built with "
-                + completed.nodes.size() + " node(s), " + completed.edges.size()
-                + " edge(s), and " + completed.unresolved.size() + " unresolved port(s).");
+        // Retried unresolved endpoints are not new faults on every review.
+        var previousProblems=new HashSet<>(GraphIncremental.blocking(build.base.unresolved,build.base.edges));
+        var problems=GraphIncremental.blocking(issues,edges).stream().filter(i->!previousProblems.contains(i)).toList();
+        String summary="RailGraph "+(changed?"revision "+completed.revision+" updated":"unchanged at revision "+graph.revision)
+            +"; scanned "+build.scanned.size()+" local loaded source(s), "+edges.size()+" edge(s). Unloaded paths retained.";
+        if(!problems.isEmpty()) {
+            plugin.getLogger().warning(summary+" Routing problem(s): "+problems.size()+"; "
+                +problems.stream().limit(8).map(i->i.source()+"/"+i.sourcePort()+": "+i.reason()).collect(java.util.stream.Collectors.joining("; ")));
+        } else if(plugin.getConfig().getBoolean("graph.log-successful-reviews",false)) {
+            plugin.getLogger().info(summary);
+        }
+        if(pendingFull||!pendingChanges.isEmpty())scheduleDrain();
     }
 
     static List<RailGraph.Edge> preserveIncompleteEdges(List<RailGraph.Edge> previous,
@@ -754,7 +896,7 @@ final class RailGraphManager {
     }
 
     private void schedule(Location location, Runnable action, java.util.function.Consumer<String> rejected) {
-        if (onlyLoadedChunks() && !location.getWorld().isChunkLoaded(
+        if (!location.getWorld().isChunkLoaded(
                 location.getBlockX() >> 4, location.getBlockZ() >> 4)) {
             rejected.accept("chunk_not_loaded");
             return;
@@ -865,6 +1007,11 @@ final class RailGraphManager {
                 buildSequence.accumulateAndGet(stored.revision, Math::max);
                 legacyGraphLoaded = decoded.legacy();
                 legacyRevision = decoded.legacy() ? stored.revision : -1L;
+                scanDiagnostics=graph.unresolved;
+                for(var issue:graph.unresolved)if(issue.reason().equals("rail_broken"))
+                    for(var edge:graph.edges)if(GraphIncremental.matches(issue,edge))
+                        for(var p:edge.path())if(Math.abs(p.distanceMeters()-issue.scannedMeters())<.001)
+                            brokenRails.add(new RailGraph.Position(p.world(),p.x(),p.y(),p.z()));
             }
         } catch (IOException | RuntimeException ex) {
             plugin.getLogger().log(Level.WARNING, "Failed to restore the previous STCS RailGraph; it will be rebuilt.", ex);
@@ -961,10 +1108,6 @@ final class RailGraphManager {
         return clamp(plugin.getConfig().getDouble("scan.marker-rail-search-radius", 3.0), 1.0, 6.0);
     }
 
-    private boolean onlyLoadedChunks() {
-        return plugin.getConfig().getBoolean("scan.only-loaded-chunks", true);
-    }
-
     private static String clean(String value, int maxLength) {
         if (value == null) {
             return null;
@@ -1030,10 +1173,13 @@ final class RailGraphManager {
                 new ConcurrentHashMap<>();
         private final List<RailGraph.Edge> edges = new CopyOnWriteArrayList<>();
         private final List<RailGraph.Issue> issues = new CopyOnWriteArrayList<>();
+        private final Set<String> scanned = ConcurrentHashMap.newKeySet();
+        private final RailGraph base;
 
         private GraphBuild(long id, int taskCount, List<StcsMarker> markers,
                 List<SkyTrainSwitchBridge.SwitchSnapshot> switchSnapshots) {
             this.id = id;
+            this.base=graph;
             this.remainingTasks = new AtomicInteger(taskCount);
             this.markers = markers;
             for (StcsMarker marker : markers) {
@@ -1070,6 +1216,7 @@ final class RailGraphManager {
                 return false;
             }
             remainingTasks.incrementAndGet();
+            scanned.add(railwaySwitch.id().toString());
             return true;
         }
 

@@ -38,7 +38,7 @@ const graph = { revision: 12, nodes, edges: [0, 1].map(i => ({ id: `edge${i}`, f
             status: complete ? 'COMPLETED' : 'PENDING', reason: complete ? 'COMPLETED' : 'LOADING_CHUNKS' }) });
         }
         const name = url.pathname === '/' ? 'index.html' : url.pathname.replace('/assets/', '');
-        if (['index.html', 'app.js', 'styles.css', 'day_logo.png', 'night_logo.png'].includes(name))
+        if (['index.html', 'app.js','operating-map.js', 'styles.css', 'day_logo.png', 'night_logo.png'].includes(name))
           return route.fulfill({ path: path.join(web, name) });
         return route.fulfill({ status: 404, body: '' });
       });

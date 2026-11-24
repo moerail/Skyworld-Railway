@@ -39,11 +39,10 @@ public final class DriverSafetyTest {
         var train = new Train(UUID.randomUUID(), "driver-loss", .4, 1, 1.1);
         train.seedCurrentSpeed(.4); train.powerNotch = 4; train.brakeNotch = 0;
         train.pauseUntilMillis = Long.MAX_VALUE;
-        train.automaticRun = new AutomaticRun("station", AutomaticSignSpec.parse("station", "5", "continue", .4), 100, false, false);
         DriverSafety.brake(train);
         assert train.powerNotch == 0 && train.brakeNotch == 7 && train.emergencyBrake;
         assert train.driverEmergencyHold && train.driveControlEnabled && train.manualTakeover && !train.manualReleaseConfirmed;
-        assert train.pauseUntilMillis == 0 && train.automaticRun == null;
+        assert train.pauseUntilMillis == 0;
         assert train.currentSpeed() == .4 : "EB uses physics, must not fake zero speed";
         train.powerNotch = 4; train.emergencyBrake = false;
         DriverSafety.maintainBrake(train);
@@ -52,8 +51,7 @@ public final class DriverSafetyTest {
         DriverSafety.maintainBrake(train);
         assert train.manualReleaseConfirmed : "Brake maintenance must not revoke explicit release";
         train.seedCurrentSpeed(0);
-        TrainManager.authorizeAutomatic(train, false, .001);
-        assert !train.driverEmergencyHold && !train.emergencyBrake;
-        System.out.println("Ride ownership, driver-loss braking, late updates and explicit auto rearm passed");
+        assert train.driverEmergencyHold && train.manualReleaseConfirmed;
+        System.out.println("Ride ownership, driver-loss braking, late updates and explicit release passed");
     }
 }

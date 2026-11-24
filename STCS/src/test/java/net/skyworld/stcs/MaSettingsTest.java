@@ -16,6 +16,10 @@ public final class MaSettingsTest {
 
     public static void main(String[] args) throws Exception {
         assert load("").equals(new MaSettings(600, 150, 300, 2));
+        assert load("").checkExitCapacity();
+        assert !load("ma: {check-exit-capacity: false}").checkExitCapacity();
+        assert load("ma: {check-exit-capacity: true}").checkExitCapacity();
+        reject("ma: {check-exit-capacity: 'false'}", "ma.check-exit-capacity");
         assert load("ma: {horizon-meters: 240, margin-meters: 3}").equals(new MaSettings(240, 240, 240, 3));
         assert load("ma: {horizon-meters: 240, look-ahead-meters: 500, lock-distance-meters: 60, max-authority-distance-meters: 120}")
                 .equals(new MaSettings(500, 60, 120, 2));

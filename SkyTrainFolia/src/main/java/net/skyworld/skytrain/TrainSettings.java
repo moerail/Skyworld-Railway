@@ -242,39 +242,6 @@ final class TrainSettings {
         return reverseSignCooldownMillis() + reverseMaxBrakeTicks() * 50L;
     }
 
-    long defaultStationWaitTicks() {
-        return Math.max(0L, configuration.get().getLong("settings.default-station-wait-ticks", 100L));
-    }
-
-    double stationDockingStopOffset() {
-        return RailMath.clamp(configuration.get().getDouble("settings.station-docking-stop-offset", 0.0),
-                -8.0, 8.0);
-    }
-
-    double stationDockingMaxDistance() {
-        return RailMath.clamp(configuration.get().getDouble("settings.station-docking-max-distance", 64.0),
-                1.0, 256.0);
-    }
-
-    double stationDockingMinSpeed() {
-        return RailMath.clamp(configuration.get().getDouble("settings.station-docking-min-speed", 0.020),
-                0.001, 0.20);
-    }
-
-    double stationDepartureDistance() {
-        return RailMath.clamp(configuration.get().getDouble("settings.station-departure-distance", 8.0),
-                0.25, 128.0);
-    }
-
-    double stationDepartureMinSpeed() {
-        return RailMath.clamp(configuration.get().getDouble("settings.station-departure-min-speed", 0.012),
-                0.001, 0.20);
-    }
-
-    double stationReleaseDistance() {
-        return RailMath.clamp(configuration.get().getDouble("settings.station-release-distance", 4.0), 2.0, 16.0);
-    }
-
     long tickInterval() {
         return Math.max(1L, configuration.get().getLong("settings.tick-interval", 1L));
     }

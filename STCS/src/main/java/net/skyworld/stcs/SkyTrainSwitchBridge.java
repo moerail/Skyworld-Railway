@@ -19,6 +19,8 @@ final class SkyTrainSwitchBridge {
     private Method queryMethod;
     private Method listMethod;
     private Method changeNearestMethod;
+    private volatile boolean available;
+    boolean available(){return available;}
 
     SkyTrainSwitchBridge(StcsPlugin plugin) {
         this.plugin = plugin;
@@ -28,10 +30,12 @@ final class SkyTrainSwitchBridge {
         try {
             Plugin current = resolvePlugin();
             if (current == null) {
+                available=false;
                 return List.of();
             }
             Object result = listMethod.invoke(current);
             if (!(result instanceof List<?> list)) {
+                available=false;
                 return List.of();
             }
             List<SwitchSnapshot> snapshots = new ArrayList<>();
@@ -43,7 +47,8 @@ final class SkyTrainSwitchBridge {
                     }
                 }
             }
-            return List.copyOf(snapshots);
+            if(snapshots.size()!=list.size()){available=false;return List.of();}
+            available=true;return List.copyOf(snapshots);
         } catch (ReflectiveOperationException | RuntimeException ex) {
             unavailable(ex);
             return List.of();
@@ -122,6 +127,7 @@ final class SkyTrainSwitchBridge {
     }
 
     private void unavailable(Exception ex) {
+        available=false;
         plugin.getLogger().fine("SkyTrain switch geometry query unavailable: " + ex.getMessage());
         skyTrain = null;
         queryMethod = null;

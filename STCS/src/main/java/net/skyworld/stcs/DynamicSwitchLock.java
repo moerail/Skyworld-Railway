@@ -28,7 +28,8 @@ record DynamicSwitchLock(boolean enabled, double leadSeconds, double deceleratio
         double v = Math.abs(speedMps);
         double distance = Math.max(base.lockDistanceMeters(),
                 Math.min(10000, v * v / (2 * decelerationMps2) + v * leadSeconds + bufferMeters));
-        return new MaSettings(base.lookAheadMeters(), distance, base.maxAuthorityDistanceMeters(), base.marginMeters());
+        return new MaSettings(base.lookAheadMeters(), distance, base.maxAuthorityDistanceMeters(), base.marginMeters(),
+                base.checkExitCapacity());
     }
 
     private static double read(ConfigurationSection config, String key, double fallback) {

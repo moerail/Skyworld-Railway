@@ -1,5 +1,9 @@
 # Deletion clearance patch
 
+2026-11-19 更新：STF 4.1.2 修复自动列车退役后的孤立虚拟驾驶台，STCS 4.3.1 配套清理对应自动进路，
+SAL 0.2.1 根据完整回执结束归属与任务。此前回执完整但“仍有司机”的残留会重新按回执处理。
+详见 [出入库与退役修复](SAL-DEPOT-AND-RETIREMENT.md)。下文版本与 shadow-only 说明为历史记录。
+
 Matching versions: STF 2.1.1, STCS 2.2.1, STA 0.8.1; SkyPCC remains 0.8.1.
 The version numbers no longer use alpha suffixes, but MA remains shadow-only:
 this release does not implement ATP supervision or certify safety.

@@ -38,7 +38,12 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        if ("&6[STCS]&r ".equals(getConfig().getString("messages.prefix"))) {
+            getConfig().set("messages.prefix", "&e[STCS]&r "); saveConfig();
+        }
         getConfig().options().copyDefaults(true);
+        getConfig().set("scan.only-loaded-chunks",true);
+        saveConfig();
         trainPositions = new TrainPositionRegistry(
                 getConfig().getLong("telemetry.stale-after-seconds", 15L) * 1_000L,
                 getConfig().getLong("telemetry.expire-after-seconds", 60L) * 1_000L);
@@ -48,6 +53,7 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
         occupancy = OccupancyMonitor.create(this, manager);
         if (getConfig().getBoolean("ma.enabled", true)) try {
             shadow = new ShadowRuntime(this, manager);
+            new AutomaticAuthorityBridge(this,shadow);
         } catch (Exception | LinkageError ex) {
             getLogger().log(Level.SEVERE, "Shadow MA unavailable; no ATP action", ex);
         }
@@ -82,6 +88,9 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
 
     /**
      * Read-only integration point used by SkyTrain without a hard plugin dependency.
+     * Next-switch fields include nextSwitchState (STRAIGHT/DIVERGING/PENDING/UNKNOWN)
+     * and nextSwitchDirection (STRAIGHT/LEFT/RIGHT/UNKNOWN), relative to the approach.
+     * These are display observations, not proof of a movement authority.
      */
     public Map<String, Object> queryTrack(String world, int railX, int railY, int railZ,
             double directionX, double directionY, double directionZ) {
@@ -291,13 +300,15 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
                     send(sender, "&e" + protectionText(sender, "ma.usage")); return true;
                 }
                 var driver = player.getUniqueId(); String driverName = player.getName(); String action = args[1].toLowerCase(java.util.Locale.ROOT);
+                Map<?, ?> releaseTicket = Map.of();
                 if (!action.equals("ack")) {
                     var stf = getServer().getPluginManager().getPlugin("SkyTrainFolia");
                     if (stf == null || !stf.isEnabled()) { send(player, "&c" + protectionText(player, "ma.NO_STF")); return true; }
                     try {
                         String eligibility = String.valueOf(stf.getClass()
                                 .getMethod("manualDrivingEligibility", Player.class).invoke(stf, player));
-                        if (!eligibility.equals("ELIGIBLE")) {
+                        if (!eligibility.equals("ELIGIBLE")
+                                && !(action.equals("release") && eligibility.equals("RELEASE_PENDING"))) {
                             send(player, "&c" + protectionText(player, "ma." + eligibility)); return true;
                         }
                     } catch (ReflectiveOperationException ex) {
@@ -307,12 +318,16 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
                 if (action.equals("release")) {
                     var stf = getServer().getPluginManager().getPlugin("SkyTrainFolia");
                     if (stf != null && stf.isEnabled()) try {
-                        String onboard = String.valueOf(stf.getClass()
-                                .getMethod("releaseOperationalAuthority", Player.class).invoke(stf, player));
-                        if (!onboard.equals("RELEASED") && !onboard.equals("SHADOW")) {
+                        // Require the paired STF bridge; never silently fall back to an unfenced release.
+                        stf.getClass().getMethod("completeOperationalAuthorityRelease", UUID.class, UUID.class, boolean.class);
+                        Object ticket = stf.getClass().getMethod("beginOperationalAuthorityRelease", Player.class).invoke(stf, player);
+                        if (!(ticket instanceof Map<?, ?> details)) throw new ReflectiveOperationException("Invalid release ticket");
+                        String onboard = String.valueOf(details.get("status"));
+                        if (!onboard.equals("RELEASE_PENDING")) {
                             send(player, "&c" + protectionText(player, "ma." + onboard));
                             return true;
                         }
+                        releaseTicket = details;
                     } catch (ReflectiveOperationException ex) {
                         send(player, "&c" + protectionText(player, "ma.releaseUnavailable"));
                         return true;
@@ -327,8 +342,32 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
                     } catch(ReflectiveOperationException ex) {send(player,"&c"+protectionText(player,"ma.ackUnavailable"));}
                     return true;
                 }
+                Map<?, ?> ticket = releaseTicket;
+                var releaseProvider = getServer().getPluginManager().getPlugin("SkyTrainFolia");
                 Bukkit.getAsyncScheduler().runNow(this, task -> {
-                    String result = shadow == null ? "UNAVAILABLE" : shadow.command(driver, action.equals("fs") || action.equals("demand") ? "request" : action, driverName);
+                    String outcome;
+                    try {
+                        outcome = shadow == null ? "UNAVAILABLE" : action.equals("release")
+                                ? shadow.command(driver, action, driverName, UUID.fromString(String.valueOf(ticket.get("trainId"))),
+                                        UUID.fromString(String.valueOf(ticket.get("leaseId"))))
+                                : shadow.command(driver, action.equals("fs") || action.equals("demand") ? "request" : action, driverName);
+                    } catch (RuntimeException ex) {
+                        getLogger().log(Level.WARNING, "MA command failed", ex);
+                        outcome = "UNAVAILABLE";
+                    }
+                    if (action.equals("release")) {
+                        try {
+                            boolean completed = Boolean.TRUE.equals(releaseProvider.getClass()
+                                    .getMethod("completeOperationalAuthorityRelease", UUID.class, UUID.class, boolean.class)
+                                    .invoke(releaseProvider, UUID.fromString(String.valueOf(ticket.get("trainId"))),
+                                            UUID.fromString(String.valueOf(ticket.get("token"))), outcome.equals("RELEASED")));
+                            if (outcome.equals("RELEASED") && !completed) outcome = "RELEASE_PENDING";
+                        } catch (ReflectiveOperationException | RuntimeException ex) {
+                            getLogger().log(Level.WARNING, "Onboard MA release confirmation failed; hold retained", ex);
+                            outcome = "RELEASE_PENDING";
+                        }
+                    }
+                    String result = outcome;
                     var diagnostics = shadow == null ? null : shadow.diagnostics();
                     player.getScheduler().run(this, reply -> {
                         if (player.isOnline()) {
@@ -454,8 +493,8 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
                     send(sender, "&cYou do not have permission.");
                     return true;
                 }
-                manager.rebuildGraph();
-                send(sender, "&aRailGraph rebuild started. Previous routes across unloaded chunks will be retained.");
+                manager.rebuildGraph(sender instanceof Player p?p.getLocation():null);
+                send(sender, "&aLoaded RailGraph review queued, nearest sources first. Unloaded connections are retained.");
                 return true;
             }
             case "export" -> {
@@ -759,7 +798,7 @@ public final class StcsPlugin extends JavaPlugin implements CommandExecutor, Tab
     }
 
     void send(CommandSender sender, String message) {
-        String prefix = getConfig().getString("messages.prefix", "&6[STCS]&r ");
+        String prefix = getConfig().getString("messages.prefix", "&e[STCS]&r ");
         sender.sendMessage(ChatColor.translateAlternateColorCodes('&', prefix + message));
     }
 

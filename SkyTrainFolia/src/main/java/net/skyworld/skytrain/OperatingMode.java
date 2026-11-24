@@ -1,6 +1,6 @@
 package net.skyworld.skytrain;
 
-/** SkyRail manual-train operating modes. Automatic trains do not enter this state machine. */
+/** Shared protected modes for declared human drivers and fenced automatic tasks. */
 enum OperatingMode {
     SB, FS, SH, SR, TR, PT;
 

@@ -77,7 +77,7 @@ final class TrainPersistence {
                             train.moving = section.getBoolean("moving", false);
                             train.reversed = section.getBoolean("reversed", false);
                             train.driveControlEnabled = section.getBoolean("drive-control-enabled", false);
-                            train.protectionMode = ProtectionMode.restore(section.getString("protection-mode", "SHADOW"));
+                            train.protectionMode = ProtectionMode.restore(section.getString("protection-mode", "ACTIVE"));
                             train.manualTakeover = section.getBoolean("manual-takeover", train.driveControlEnabled);
                             train.manualReleaseConfirmed = section.getBoolean("manual-release-confirmed", !train.manualTakeover);
                             String lastDriver = section.getString("last-manual-driver", "");
@@ -94,14 +94,10 @@ final class TrainPersistence {
                             train.brakeNotch = Math.max(0, Math.min(7, section.getInt("brake-notch", 0)));
                             train.emergencyBrake = section.getBoolean("emergency-brake", false);
                             train.driverEmergencyHold = section.getBoolean("driver-emergency-hold", false);
-                            if (!section.getString("automatic-action", "").isEmpty()
-                                    && train.properties().conductionMode.automatic()) {
-                                // A prior process's station/route observation must not authorize a restart.
-                                train.moving = false;
-                                train.powerNotch = 0;
-                                train.brakeNotch = 0;
+                            train.pauseUntilMillis = 0L;
+                            if(ConductionMode.parse(section.getString("properties.conduction-mode","manual")).automatic()) {
+                                train.moving=false;train.powerNotch=0;train.brakeNotch=7;
                             }
-                            train.pauseUntilMillis = section.getLong("pause-until-millis", 0L);
                             if (train.manualTakeover && !train.manualReleaseConfirmed) DriverSafety.brake(train);
                             train.loadMileage(
                                     section.getString("mileage.line"),
@@ -181,7 +177,6 @@ final class TrainPersistence {
                 config.set(path + ".brake-notch", train.brakeNotch);
                 config.set(path + ".emergency-brake", train.emergencyBrake);
                 config.set(path + ".driver-emergency-hold", train.driverEmergencyHold);
-                config.set(path + ".automatic-action", train.automaticRun == null ? "" : train.automaticRun.phase.name());
                 config.set(path + ".target-speed", train.targetSpeed);
                 config.set(path + ".max-speed", train.maxSpeed);
                 config.set(path + ".spacing", train.spacing);

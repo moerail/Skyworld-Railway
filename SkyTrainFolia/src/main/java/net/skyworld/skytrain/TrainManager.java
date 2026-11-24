@@ -42,11 +42,9 @@ final class TrainManager implements TrainMotionController.Host {
     private final TrainAudio audio;
     private final ConsistLabels labels;
     private final TrainMemberActuator actuator;
-    private final TrainSignActions signActions;
     private final TrainDrivingControls controls;
     private final TrainMotionController motion;
     private final SwitchManager switchManager;
-    private final AutomaticSigns automaticSigns;
     private final NamespacedKey trainIdKey;
     private final NamespacedKey trainNameKey;
     private final NamespacedKey memberIndexKey;
@@ -72,7 +70,6 @@ final class TrainManager implements TrainMotionController.Host {
             LineInfrastructureManager infrastructureManager, StationManager stationManager) {
         this.plugin = plugin;
         this.switchManager = switchManager;
-        this.automaticSigns = new AutomaticSigns(plugin, this, stationManager);
         this.chunkLoader = new TrainChunkLoader(plugin);
         this.stcsTelemetry = new StcsBridge(plugin);
 
@@ -87,9 +84,8 @@ final class TrainManager implements TrainMotionController.Host {
         this.labels = new ConsistLabels(plugin, settings, managedCarts::get);
         this.controls = new TrainDrivingControls(settings, driverLock, this::requireTrain,
                 this::save, this::refreshMemberIndexes);
-        this.signActions = new TrainSignActions(plugin, this, settings, stationManager);
         this.motion = new TrainMotionController(plugin, settings, this, switchManager,
-                infrastructureManager, chunkLoader, stcsTelemetry, signActions, actuator, audio);
+                infrastructureManager, chunkLoader, stcsTelemetry, actuator, audio);
     }
 
     int trainCount() {
@@ -149,7 +145,6 @@ final class TrainManager implements TrainMotionController.Host {
     }
 
     void startAutosave() {
-        automaticSigns.start();
         ScheduledTask previous = autosaveTask;
         if (previous != null && !previous.isCancelled()) {
             previous.cancel();
@@ -165,7 +160,6 @@ final class TrainManager implements TrainMotionController.Host {
     }
 
     void shutdown() {
-        automaticSigns.stop();
         if (plugin.displaySync() != null) plugin.displaySync().reset();
         actuator.clearRecoveries();
         ScheduledTask autosave = autosaveTask;
@@ -236,55 +230,12 @@ final class TrainManager implements TrainMotionController.Host {
         return train;
     }
 
-    AutomaticSigns automaticSigns() { return automaticSigns; }
 
-    @Override
-    public boolean automaticEligible(Train train) {
-        if (train != null && (train.protectionMode == ProtectionMode.ISOLATED || train.protectionMode == ProtectionMode.RECOVERING)) return false;
-        return automaticStatus(train).equals("ready");
-    }
 
-    String automaticStatus(Train train) {
-        synchronized (driverLock) {
-            if (train == null || trains.get(train.id()) != train) return "unavailable";
-            return automaticStatus(train.properties().conductionMode.automatic(),
-                    drivers.hasDriver(train.id()), train.manualTakeover,
-                    train.manualReleaseConfirmed, train.driveControlEnabled, train.emergencyBrake);
-        }
-    }
 
-    static String automaticStatus(boolean auto, boolean driver, boolean takeover,
-            boolean released, boolean handle, boolean eb) {
-        if (driver) return "driver";
-        if (takeover && !released) return "release";
-        if (takeover) return "rearm";
-        if (eb) return "eb";
-        if (handle) return "handle";
-        return auto ? "ready" : "manual";
-    }
 
-    static boolean automaticAllowed(boolean auto, boolean driver, boolean takeover, boolean handle, boolean eb) {
-        return auto && !driver && !takeover && !handle && !eb;
-    }
 
-    boolean destroyAutomatic(Train train) {
-        synchronized (driverLock) {
-            if (!automaticEligible(train)) return false;
-            retireTrain(train);
-            return true;
-        }
-    }
 
-    void stationOutput(String signKey,java.util.function.Consumer<Boolean> update) {
-        synchronized(driverLock) {
-            boolean waiting=trains.values().stream().anyMatch(train -> {
-                AutomaticRun run=train.automaticRun;
-                return run!=null && run.signKey.startsWith(signKey+":")
-                        && run.phase==AutomaticRun.Phase.WAIT && automaticEligible(train);
-            });
-            update.accept(waiting);
-        }
-    }
 
     boolean switchLever(Block block) {
         var position=SwitchBlockPosition.of(block);
@@ -297,106 +248,8 @@ final class TrainManager implements TrainMotionController.Host {
         return false;
     }
 
-    void validateSpawnPattern(String pattern) {
-        SpawnPattern.Parsed parsed = SpawnPattern.parse(pattern,
-                savedTrains.values().stream().map(s -> s.name).toList());
-        validateSpawnParts(parsed.parts());
-    }
 
-    private void validateSpawnParts(List<SpawnPattern.Part> parts) {
-        for (var part : parts) {
-            if (part.name() == null) { validateSpawnParts(part.children()); continue; }
-            if (part.name().length() == 1 && "mspht".contains(part.name())) continue;
-            SavedTrainDefinition saved = savedTrains.get(Train.normalizeName(part.name()));
-            if (saved == null || !saved.properties.conductionMode.automatic()) {
-                throw new UiException("Spawn template must be explicitly saved in auto mode: " + part.name(), "Шаблон создания должен быть явно сохранён в auto: " + part.name());
-            }
-        }
-    }
 
-    void spawnAutomatic(AutomaticSignSpec spec, Block rail, Vector preferred, boolean centered) {
-        validateSpawnPattern(spec.pattern());
-        int limit = Math.max(1, Math.min(1024, plugin.getConfig().getInt("settings.sign-spawn-max-carts", 64)));
-        var parsed = SpawnPattern.parse(spec.pattern(), savedTrains.values().stream().map(s -> s.name).toList());
-        var tokens = parsed.expand(java.util.concurrent.ThreadLocalRandom.current(), limit);
-        List<Class<? extends Minecart>> types = new ArrayList<>();
-        SavedTrainDefinition template = null;
-        for (String token : tokens) {
-            Class<? extends Minecart> type = switch (token) {
-                case "m" -> Minecart.class;
-                case "s" -> org.bukkit.entity.minecart.StorageMinecart.class;
-                case "p" -> org.bukkit.entity.minecart.PoweredMinecart.class;
-                case "h" -> org.bukkit.entity.minecart.HopperMinecart.class;
-                case "t" -> org.bukkit.entity.minecart.ExplosiveMinecart.class;
-                default -> null;
-            };
-            if (type != null) types.add(type);
-            else {
-                SavedTrainDefinition saved = savedTrains.get(Train.normalizeName(token));
-                if (saved == null || !saved.properties.conductionMode.automatic()) throw new UiException("Template no longer automatic", "Шаблон больше не автоматический");
-                if (template == null) template = saved;
-                if (types.size() + saved.memberCount > limit) throw new UiException("Spawn cart limit exceeded", "Превышен предел создаваемых вагонеток");
-                for (int i = 0; i < saved.memberCount; i++) types.add(Minecart.class);
-            }
-        }
-        if (types.isEmpty() || types.size() > limit) throw new UiException("Invalid spawn length", "Недопустимая длина создаваемого состава");
-        double spacing = template == null ? settings.defaultSpacing() : template.spacing;
-        double length = spacing * (types.size() - 1);
-        VanillaRailWalker walker = VanillaRailWalker.at(rail.getLocation().add(.5,.0625,.5), preferred);
-        if (walker == null) throw new UiException("No spawn rail", "Нет рельса для создания");
-        double forward = switch (parsed.center()) {
-            case MIDDLE -> length * .5;
-            case LEFT -> 0;
-            case RIGHT -> length;
-            case NONE -> centered ? length * .5 : length;
-        };
-        if (!walker.move(forward)) throw new UiException("Insufficient loaded rail ahead", "Недостаточно загруженного пути впереди");
-        List<Location> locations = new ArrayList<>();
-        Vector travel = walker.direction();
-        walker.invert();
-        for (int i = 0; i < types.size(); i++) {
-            if (i > 0 && !walker.move(spacing)) throw new UiException("Insufficient loaded rail behind", "Недостаточно загруженного пути позади");
-            Location location = walker.position();
-            for (int dx : new int[]{-2,2}) for (int dz : new int[]{-2,2}) {
-                if (!RailSignAccess.readable(location.getBlock().getRelative(dx,0,dz)))
-                    throw new UiException("Spawn area crosses unavailable region", "Область создания пересекает недоступный регион");
-            }
-            if (!location.getWorld().getNearbyEntities(location, 1, 1, 1, e -> e instanceof Minecart).isEmpty())
-                throw new UiException("Spawn track occupied", "Путь создания занят");
-            Vector facing = walker.direction().multiply(-1);
-            location.setYaw(actuator.yawFromDirection(facing));
-            locations.add(location);
-        }
-        List<Minecart> carts = new ArrayList<>();
-        Train created = null;
-        try {
-            for (int i = 0; i < types.size(); i++) {
-                Minecart cart = locations.get(i).getWorld().spawn(locations.get(i), types.get(i));
-                if (!cart.isValid()) throw new UiException("Minecart spawn was cancelled", "Создание вагонетки отменено");
-                carts.add(cart);
-            }
-            TrainProperties properties = template == null ? TrainProperties.defaults() : template.properties.copy();
-            properties.conductionMode = ConductionMode.AUTOMATIC;
-            created = new Train(UUID.randomUUID(), generateAutoTrainName(),
-                    template == null ? settings.defaultSpeed() : template.targetSpeed,
-                    template == null ? settings.maxSpeed() : template.maxSpeed, spacing, properties);
-            trains.put(created.id(), created); nameIndex.put(created.key(), created.id());
-            appendCarts(created, carts);
-            created.reversed = spec.speed() < 0;
-            created.reverser = created.reversed ? Reverser.BACKWARD : Reverser.FORWARD;
-            created.rememberDirection(created.reversed ? travel.clone().multiply(-1) : travel);
-            double speed = Math.min(created.maxSpeed, Math.abs(spec.speed()));
-            created.targetSpeed = speed > 0 ? speed : created.targetSpeed;
-            created.seedCurrentSpeed(speed);
-            created.moving = speed > 0;
-            created.tims.expected(created.members());created.manifestReady=true;
-            persistence.save();
-        } catch (RuntimeException ex) {
-            if (created != null) retireTrain(created);
-            else for (Minecart cart : carts) cart.remove();
-            throw ex;
-        }
-    }
 
     int appendCarts(String name, List<Minecart> carts) {
         Train train = requireTrain(name);
@@ -529,8 +382,8 @@ final class TrainManager implements TrainMotionController.Host {
         java.util.function.Consumer<UUID> confirmed = sink == null ? id -> {} : sink.beginRemoval(train);
         UUID driver = drivers.driverId(train.id());
         if (driver != null) drivers.revokeDriver(driver, null, "VEHICLE_REMOVED");
-        automaticSigns.forget(train.id());
         trains.remove(train.id());
+        if(plugin.automation()!=null)plugin.automation().retired(train.id());
         stcsTelemetry.remove(train.id());
         switchManager.releaseTrain(train.id());
         chunkLoader.release(train.id());
@@ -743,6 +596,12 @@ final class TrainManager implements TrainMotionController.Host {
     List<DriverDeskSnapshot> driverDesks() {
         return drivers.driverDesks();
     }
+    boolean registerAutomation(Train train,Runnable claim) {
+        synchronized(driverLock) {
+            if(trains.get(train.id())!=train || drivers.hasDriver(train.id()))return false;
+            claim.run();return true;
+        }
+    }
 
     void requireDriver(Player player, Train train) {
         drivers.requireDriver(player, train);
@@ -875,9 +734,6 @@ final class TrainManager implements TrainMotionController.Host {
         drivers.releaseManualControl(player, train);
     }
 
-    static void authorizeAutomatic(Train train, boolean hasDriver, double stopThreshold) {
-        TrainDrivingControls.authorizeAutomatic(train, hasDriver, stopThreshold);
-    }
 
     SavedTrainDefinition saveTrainTemplate(String trainName, String savedName) {
         Train train = requireTrain(trainName);
@@ -946,8 +802,6 @@ final class TrainManager implements TrainMotionController.Host {
         switch (key) {
             case "vtarget" -> {
                 properties.setAutomaticTargetSpeed(cleanValue);
-                if (train.automaticRun!=null && train.automaticRun.phase==AutomaticRun.Phase.CRUISE)
-                    train.automaticRun.inheritTargetSpeed=true;
             }
             case "name" -> renameTrain(train, cleanValue);
             case "displayname" -> properties.displayName = cleanValue;
@@ -966,10 +820,9 @@ final class TrainManager implements TrainMotionController.Host {
             case "conduction", "conductionmode", "operationmode", "controlmode", "mode" -> {
                 ConductionMode mode=ConductionMode.parse(cleanValue);
                 synchronized(driverLock) {
-                    if(mode.automatic()) {
-                        TrainDrivingControls.authorizeAutomatic(train, drivers.hasDriver(train.id()), settings.driveDirectionChangeSpeed());
-                        automaticSigns.forget(train.id());
-                    } else {
+                    if(mode.automatic())throw new UiException("旧STF自动驾驶已移除，请通过SAL纳管。", "Legacy STF automation was removed; use SAL.");
+                    if(plugin.automation()!=null&&plugin.automation().owns(train))throw new UiException("请先 /sal release 释放自动待命。", "Release SAL standby first.");
+                    {
                         train.manualTakeover=true;
                         TrainDrivingControls.stopTrain(train);
                     }
@@ -1090,14 +943,7 @@ final class TrainManager implements TrainMotionController.Host {
         return UiMessages.literal(language, "&aRoute: &f", "&aМаршрут: &f") + String.join(" -> ", properties.route());
     }
 
-    int activateSignForNearbyTrain(Player player, Block signBlock, String actionLine,
-            String valueLine, String modifierLine) {
-        return signActions.activateSignForNearbyTrain(player, signBlock, actionLine, valueLine, modifierLine);
-    }
 
-    void activateStationsFromRedstone(Block poweredBlock) {
-        signActions.activateStationsFromRedstone(poweredBlock);
-    }
 
     Train requireTrain(String name) {
         Train train = train(name);
@@ -1119,16 +965,13 @@ final class TrainManager implements TrainMotionController.Host {
                 + " &7| 速度: &f" + trim(train.targetSpeed)
                 + " &7/ &f" + trim(plugin.trainSpeedLimit(train))
                 + " &7| 间距: &f" + trim(train.spacing)
-                + " &7| 驾驶: &f" + (train.driveControlEnabled || train.automaticRun != null
+                + " &7| 驾驶: &f" + (train.driveControlEnabled
                         ? train.reverser.displayName() + " P" + train.powerNotch + " "
                                 + (train.emergencyBrake ? "EB" : "B" + train.brakeNotch)
                         : "自动")
                 + " " + train.properties().summary()
-                + " &7| Auto armed: &f" + automaticEligible(train)
                 + " &7| Release confirmed: &f" + train.manualReleaseConfirmed
-                + " &7| Protection: &f" + train.protectionMode + " (ATP unavailable in alpha)"
-                + (train.automaticRun == null ? "" : " &7| " + train.automaticRun.reason
-                        + " (" + trim(train.automaticRun.remaining) + " blocks)");
+                + " &7| Protection: &f" + train.protectionMode;
     }
 
     void ensureTask(Minecart cart, Train train) {
@@ -1547,10 +1390,4 @@ final class TrainManager implements TrainMotionController.Host {
         return true;
     }
 
-    @Override
-    public boolean tickAutomaticSigns(Train train, Block rail, Location location, Vector direction, long now) {
-        synchronized (driverLock) {
-            return automaticSigns.tick(train, rail, location, direction, now);
-        }
-    }
 }

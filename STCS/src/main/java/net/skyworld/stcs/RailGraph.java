@@ -89,6 +89,13 @@ final class RailGraph {
     Map<String, Object> query(String world, int railX, int railY, int railZ,
             double directionX, double directionY, double directionZ,
             SwitchStateResolver switchStateResolver) {
+        return query(world, railX, railY, railZ, directionX, directionY, directionZ,
+                switchStateResolver, switchStateResolver);
+    }
+
+    Map<String, Object> query(String world, int railX, int railY, int railZ,
+            double directionX, double directionY, double directionZ,
+            SwitchStateResolver switchStateResolver, SwitchStateResolver displayStateResolver) {
         String key = railKey(world, railX, railY, railZ);
         List<EdgePosition> candidates = trackIndex.get(key);
         if (candidates == null || candidates.isEmpty()) {
@@ -104,6 +111,10 @@ final class RailGraph {
         double bestScore = Double.NEGATIVE_INFINITY;
         for (EdgePosition candidate : candidates) {
             Point point = candidate.edge.path().get(candidate.index);
+            // At a point the first curved tick can still carry the incoming tangent.
+            // Reject its disconnected branch before ranking tangents, using physical
+            // confirmation rather than the saved graph or commanded point position.
+            if (!connectedAtPoint(candidate, point, displayStateResolver)) continue;
             Point neighbour;
             if (candidate.index + 1 < candidate.edge.path().size()) {
                 neighbour = candidate.edge.path().get(candidate.index + 1);
@@ -170,9 +181,33 @@ final class RailGraph {
             result.put("nextSwitchMileageMeters", railwaySwitch.mileageMeters());
             result.put("nextSwitchPosition", formatPosition(railwaySwitch.rail()));
             result.put("distanceToSwitchMeters", Math.max(0.0, nextSwitch.distanceMeters()));
+            String state = displayStateResolver == null ? "UNKNOWN" : displayStateResolver.state(railwaySwitch);
+            state = state == null ? "UNKNOWN" : state.toUpperCase(java.util.Locale.ROOT);
+            if (!List.of("STRAIGHT", "DIVERGING", "PENDING").contains(state)) state = "UNKNOWN";
+            result.put("nextSwitchState", state);
+            result.put("nextSwitchDirection", switchDirection(railwaySwitch, nextSwitch.arrivalPort(), state));
         }
         result.put("graphRevision", revision);
         return result;
+    }
+
+    private boolean connectedAtPoint(EdgePosition candidate, Point point, SwitchStateResolver physicalStates) {
+        Edge edge = candidate.edge();
+        if (candidate.index() == 0 && !connectedPort(nodeIndex.get(edge.from()), edge.sourcePort(), point, physicalStates))
+            return false;
+        return candidate.index() != edge.path().size() - 1
+                || connectedPort(nodeIndex.get(edge.to()), edge.targetPort(), point, physicalStates);
+    }
+
+    private static boolean connectedPort(Node node, String port, Point point, SwitchStateResolver physicalStates) {
+        if (node == null || !"switch".equals(node.type()) || node.rail() == null) return true;
+        Position rail = node.rail();
+        if (!rail.world().equals(point.world()) || rail.x() != point.x() || rail.y() != point.y() || rail.z() != point.z()) return true;
+        if ("common".equals(port)) return true;
+        String state = physicalStates == null ? null : physicalStates.state(node);
+        if (state == null) return false;
+        state = state.toLowerCase(java.util.Locale.ROOT);
+        return ("straight".equals(state) || "diverging".equals(state)) && state.equals(port);
     }
 
     private NextTarget resolveOperationalTarget(Edge firstEdge, Node firstTarget, double initialDistance,
@@ -206,7 +241,7 @@ final class RailGraph {
         Map<String, Boolean> visited = new HashMap<>();
         while (current != null && visited.put(current.id(), true) == null) {
             if ("switch".equals(current.type())) {
-                return new NextTarget(current, distance);
+                return new NextTarget(current, distance, incoming.targetPort());
             }
             String arrivalPort = incoming.targetPort();
             String previousNode = incoming.from();
@@ -359,6 +394,34 @@ final class RailGraph {
         }
     }
 
-    private record NextTarget(Node node, double distanceMeters) {
+    /** Direction seen by the approaching driver; a disconnected trailing port has no route. */
+    static String switchDirection(Node node, String arrivalPort, String state) {
+        if (node.ports() == null || arrivalPort == null ||
+                !("STRAIGHT".equals(state) || "DIVERGING".equals(state))) return "UNKNOWN";
+        String arrival = arrivalPort.toLowerCase(java.util.Locale.ROOT);
+        String selected = state.toLowerCase(java.util.Locale.ROOT);
+        String departure = "common".equals(arrival) ? selected : selected.equals(arrival) ? "common" : null;
+        if (departure == null) return "UNKNOWN";
+        int[] entry = horizontalFace(node.ports().get(arrival));
+        int[] exit = horizontalFace(node.ports().get(departure));
+        if (entry == null || exit == null) return "UNKNOWN";
+        int cross = -entry[0] * exit[1] + entry[1] * exit[0];
+        if (cross < 0) return "LEFT";
+        if (cross > 0) return "RIGHT";
+        return -entry[0] * exit[0] - entry[1] * exit[1] > 0 ? "STRAIGHT" : "UNKNOWN";
+    }
+
+    private static int[] horizontalFace(String face) {
+        return switch (face == null ? "" : face.toLowerCase(java.util.Locale.ROOT)) {
+            case "north" -> new int[] {0, -1};
+            case "south" -> new int[] {0, 1};
+            case "east" -> new int[] {1, 0};
+            case "west" -> new int[] {-1, 0};
+            default -> null;
+        };
+    }
+
+    private record NextTarget(Node node, double distanceMeters, String arrivalPort) {
+        NextTarget(Node node, double distanceMeters) { this(node, distanceMeters, null); }
     }
 }

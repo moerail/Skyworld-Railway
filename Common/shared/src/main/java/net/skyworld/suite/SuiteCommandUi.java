@@ -114,23 +114,23 @@ public final class SuiteCommandUi {
             } catch (NumberFormatException ex) { valid = false; }
         }
         if (!valid || page < 1 || page > pageCount(root)) {
-            send(sender, text(lang,"参数无效","Invalid arguments","Arguments invalides","引数が無効", "Неверные аргументы")
+            send(sender, root, text(lang,"参数无效","Invalid arguments","Arguments invalides","引数が無効", "Неверные аргументы")
                 + ": /" + root + " help [page] [zh|en|fr|ja|ru] | /" + root + " version [zh|en|fr|ja|ru]");
             return true;
         }
         if (action.equals("version")) {
-            send(sender, text(lang,"已安装的套件版本","Installed suite versions","Versions installées","インストール済みバージョン", "Установленные версии комплекта"));
-            for (String name : List.of("SkyTrainFolia", "STCS", "SkyworldTrainAPI", "SkyPCC")) {
+            send(sender, root, text(lang,"已安装的套件版本","Installed suite versions","Versions installées","インストール済みバージョン", "Установленные версии комплекта"));
+            for (String name : List.of("SkyTrainFolia", "STCS", "SkyworldTrainAPI", "SkyPCC", "SkyATO-Lite")) {
                 Plugin installed = plugin.getServer().getPluginManager().getPlugin(name);
-                send(sender, name + ": " + (installed == null
+                send(sender, root, name + ": " + (installed == null
                     ? text(lang,"未安装","Not installed","Non installé","未導入", "Не установлен")
                     : installed.getDescription().getVersion() + " [" + (installed.isEnabled()
                         ? text(lang,"已启用","Enabled","Activé","有効", "Включён")
                         : text(lang,"未启用","Disabled","Désactivé","無効", "Отключён")) + "]"));
             }
-            send(sender, "STA: v1/v2/v3/v4; " + text(lang,"影子 MA，ATP 不动作","Shadow MA; no ATP intervention","MA d'observation ; ATP inactif","シャドー MA、ATP 非介入", "Теневая MA; ATP не вмешивается"));
+            send(sender, root, protectionSummary(lang));
         } else {
-            for (String line : helpLines(root, lang, page)) send(sender, line);
+            for (String line : helpLines(root, lang, page)) send(sender, root, line);
         }
         return true;
     }
@@ -165,7 +165,17 @@ public final class SuiteCommandUi {
         return options.stream().filter(s->s.startsWith(prefix)).toList();
     }
 
-    private static void send(CommandSender sender, String line) {
-        sender.sendMessage(line);
+    private static void send(CommandSender sender, String root, String line) {
+        String prefix = switch (root) { case "st" -> "§7[SkyTrain] §f"; case "stcs" -> "§e[STCS] §f"; default -> ""; };
+        sender.sendMessage(prefix + line);
+    }
+
+    static String protectionSummary(String lang) {
+        return "STA: v1–v10; " + text(lang,
+            "默认请求 FS，启用可执行 ATP；行车仍需有效 MA。影子模式仅用于显式测试。",
+            "FS requested by default; executable ATP enabled. A valid MA is required to move. Shadow mode is explicit testing only.",
+            "FS demandé par défaut, ATP exécutoire actif ; une MA valide reste nécessaire. Le mode fantôme est réservé aux essais explicites.",
+            "既定でFSを要求、実行型ATPを有効化。走行には有効なMAが必要です。影方式は明示的な試験用です。",
+            "По умолчанию запрашивается FS, действует ATP; для движения нужна действующая MA. Теневой режим — только для явных испытаний.");
     }
 }

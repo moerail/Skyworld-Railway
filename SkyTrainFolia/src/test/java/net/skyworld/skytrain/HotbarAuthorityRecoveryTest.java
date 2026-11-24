@@ -34,10 +34,11 @@ public final class HotbarAuthorityRecoveryTest {
 
         // Releasing MA retains the same driver and input device. No reboarding or replay of P4.
         train.operatingMode = train.operatingMode.release(true);
-        train.activeAtp.clear();
+        UUID release = train.activeAtp.beginRelease();
         controls.setBrakeNotch(train, 7);
         rejects(power);
         assert enabled.get() && train.powerNotch == 0 && train.brakeNotch == 7;
+        assert train.activeAtp.completeRelease(release, true);
         grant(train, lease, session, "FS");
         assert train.powerNotch == 0 : "New MA must not replay a previously rejected handle input";
         refreshIntegrity(train, member);

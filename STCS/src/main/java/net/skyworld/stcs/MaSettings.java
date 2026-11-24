@@ -4,7 +4,10 @@ import org.bukkit.configuration.ConfigurationSection;
 
 /** Distances along the directed route, in metres. These are shadow-model limits, not ATP settings. */
 record MaSettings(double lookAheadMeters, double lockDistanceMeters, double maxAuthorityDistanceMeters,
-        double marginMeters) {
+        double marginMeters, boolean checkExitCapacity) {
+    MaSettings(double lookAheadMeters, double lockDistanceMeters, double maxAuthorityDistanceMeters, double marginMeters) {
+        this(lookAheadMeters, lockDistanceMeters, maxAuthorityDistanceMeters, marginMeters, true);
+    }
     MaSettings {
         validate("ma.look-ahead-meters", lookAheadMeters, 10, 10000);
         validate("ma.lock-distance-meters", lockDistanceMeters, 0, 10000);
@@ -19,11 +22,23 @@ record MaSettings(double lookAheadMeters, double lockDistanceMeters, double maxA
                 read(config, "ma.look-ahead-meters", oldHorizon),
                 read(config, "ma.lock-distance-meters", legacy ? oldHorizon : 150),
                 read(config, "ma.max-authority-distance-meters", legacy ? oldHorizon : 300),
-                read(config, "ma.margin-meters", 2));
+                read(config, "ma.margin-meters", 2),
+                readBoolean(config, "ma.check-exit-capacity", true));
     }
 
     static MaSettings legacy(double horizon, double margin) {
-        return new MaSettings(horizon, horizon, horizon, margin);
+        return legacy(horizon, margin, true);
+    }
+
+    static MaSettings legacy(double horizon, double margin, boolean checkExitCapacity) {
+        return new MaSettings(horizon, horizon, horizon, margin, checkExitCapacity);
+    }
+
+    private static boolean readBoolean(ConfigurationSection config, String path, boolean fallback) {
+        if (!config.contains(path, true)) return fallback;
+        Object value = config.get(path);
+        if (!(value instanceof Boolean flag)) throw new IllegalArgumentException(path + " must be a boolean");
+        return flag;
     }
 
     private static double read(ConfigurationSection config, String path, double fallback) {

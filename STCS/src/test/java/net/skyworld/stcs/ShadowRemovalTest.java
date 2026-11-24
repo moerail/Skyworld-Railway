@@ -33,8 +33,12 @@ public final class ShadowRemovalTest {
                 assert ShadowOccupancyStore.load(file).containsKey(id) : "Absence retains occupancy";
                 input.set(with(initial,receipt,UUID.randomUUID())); r.tick();
                 assert ShadowOccupancyStore.load(file).containsKey(id) : "Wrong provider cannot clear";
+                var phantom=with(initial,receipt,live.session());
+                input.set(new ShadowRuntime.Inputs(phantom.graph(),phantom.switchStates(),true,phantom.driverSession(),phantom.rosterSession(),initial.desks(),phantom.roster(),List.of()));r.tick();
+                assert ShadowOccupancyStore.load(file).containsKey(id):"An orphan driver desk explains previously blocked deletion clearance";
                 input.set(with(initial,receipt,live.session())); r.tick();
                 assert !ShadowOccupancyStore.load(file).containsKey(id);
+                assert r.operationalSnapshot().grants().stream().noneMatch(g2->g2.trainId().equals(id));
                 r.tick(); assert !ShadowOccupancyStore.load(file).containsKey(id) : "Receipt replay is idempotent";
             }
             try(var r=new ShadowRuntime(null,null,file,100,2,input::get,q->CompletableFuture.completedFuture("COMPLETED"))) {

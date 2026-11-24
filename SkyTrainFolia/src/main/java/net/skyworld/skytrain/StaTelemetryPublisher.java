@@ -289,10 +289,15 @@ final class StaTelemetryPublisher implements TelemetrySink, TelemetryService, Co
                     p.motionX, p.motionY, p.motionZ));
             if (n == null || n.position() == null) return StcsTrackSnapshot.unavailable();
             var t = n.position();
+            String switchState = "UNKNOWN", switchDirection = "UNKNOWN";
+            try {
+                switchState = n.nextSwitchState();
+                switchDirection = n.nextSwitchDirection();
+            } catch (NoSuchMethodError oldSta) { /* Older STA still supplies navigation and distance. */ }
             return new StcsTrackSnapshot(t.edgeId(), t.edgeFromNodeId(), t.edgeToNodeId(), t.edgeOffsetMeters(),
                     t.edgeLengthMeters(), t.graphRevision(), t.line(), t.mileageMeters(), n.nextType(), n.nextName(),
                     n.nextMileageMeters(), n.distanceMeters(), n.nextSwitchName(), n.nextSwitchMileageMeters(),
-                    n.nextSwitchPosition(), n.nextSwitchDistanceMeters());
+                    n.nextSwitchPosition(), n.nextSwitchDistanceMeters(), switchState, switchDirection);
         } catch (RuntimeException ex) { warn("STA navigation unavailable: " + ex); return StcsTrackSnapshot.unavailable(); }
     }
     public void close() {

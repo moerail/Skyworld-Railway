@@ -63,7 +63,7 @@ final class RailSignAccess {
         return null;
     }
     static Vector direction(String name, Vector face, Vector incoming) {
-        return switch(AutomaticSignSpec.normalizeDirection(name)) {
+        return switch(normalizeDirection(name)) {
             case "north"->new Vector(0,0,-1);case "south"->new Vector(0,0,1);
             case "east"->new Vector(1,0,0);case "west"->new Vector(-1,0,0);
             case "left"->new Vector(-face.getZ(),0,face.getX());
@@ -75,8 +75,8 @@ final class RailSignAccess {
     static boolean entered(TrainSignHeader header, Vector facing, Vector motion) {
         String s=header.directions();
         if(s.isBlank() || s.equals("all") || s.equals("*")) return true;
-        if(AutomaticSignSpec.isDirection(s)) return direction(s,facing,facing.clone().multiply(-1)).dot(motion)<-0.1;
-        for(char c:s.toCharArray()) if(AutomaticSignSpec.isDirection(String.valueOf(c))
+        if(isDirection(s)) return direction(s,facing,facing.clone().multiply(-1)).dot(motion)<-0.1;
+        for(char c:s.toCharArray()) if(isDirection(String.valueOf(c))
                 && direction(String.valueOf(c),facing,facing.clone().multiply(-1)).dot(motion)<-0.1) return true;
         return false;
     }
@@ -104,5 +104,20 @@ final class RailSignAccess {
         return b.getType()==org.bukkit.Material.REDSTONE_BLOCK
                 || ((b.getType()==org.bukkit.Material.REDSTONE_WALL_TORCH || b.getType()==org.bukkit.Material.REDSTONE_TORCH)
                     && data instanceof org.bukkit.block.data.Lightable l && l.isLit());
+    }
+    static boolean isDirection(String value) {
+        return switch(value) {
+            case "left","l","right","r","continue","c","forward","forwards","front","f","reverse","backward","backwards","back","b",
+                    "north","n","east","e","south","s","west","w","up","upwards","above","u","down","downwards","below","d" -> true;
+            default -> false;
+        };
+    }
+    static String normalizeDirection(String value) {
+        return switch(value) {
+            case "l" -> "left"; case "r" -> "right"; case "c" -> "continue";
+            case "f","front","forwards" -> "forward"; case "b","back","backward","backwards" -> "reverse";
+            case "n" -> "north"; case "e" -> "east"; case "s" -> "south"; case "w" -> "west";
+            case "u","upwards","above" -> "up"; case "d","downwards","below" -> "down"; default -> value;
+        };
     }
 }

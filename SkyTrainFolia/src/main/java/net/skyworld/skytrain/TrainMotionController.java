@@ -18,8 +18,6 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 final class TrainMotionController {
     interface Host {
         boolean validateMemberTick(Train train, Minecart cart, ScheduledTask task);
-        boolean automaticEligible(Train train);
-        boolean tickAutomaticSigns(Train train, Block rail, Location location, Vector direction, long now);
         void refreshMemberIndexes(Train train);
         boolean isSameTrain(Minecart minecart, Entity other);
         String driverName(Train train);
@@ -32,13 +30,12 @@ final class TrainMotionController {
     private final LineInfrastructureManager infrastructureManager;
     private final TrainChunkLoader chunkLoader;
     private final StcsBridge stcsTelemetry;
-    private final TrainSignActions signActions;
     private final TrainMemberActuator actuator;
     private final TrainAudio audio;
 
     TrainMotionController(SkyTrainPlugin plugin, TrainSettings settings, Host host,
             SwitchManager switchManager, LineInfrastructureManager infrastructureManager,
-            TrainChunkLoader chunkLoader, StcsBridge stcsTelemetry, TrainSignActions signActions,
+            TrainChunkLoader chunkLoader, StcsBridge stcsTelemetry,
             TrainMemberActuator actuator, TrainAudio audio) {
         this.plugin = plugin;
         this.settings = settings;
@@ -47,7 +44,6 @@ final class TrainMotionController {
         this.infrastructureManager = infrastructureManager;
         this.chunkLoader = chunkLoader;
         this.stcsTelemetry = stcsTelemetry;
-        this.signActions = signActions;
         this.actuator = actuator;
         this.audio = audio;
     }
@@ -61,9 +57,12 @@ final class TrainMotionController {
         if (plugin.displaySync() != null) plugin.displaySync().observe(train.id(), cart);
         long now = System.currentTimeMillis();
         long currentTick = Bukkit.getCurrentTick();
+        if (plugin.automation()!=null) {
+            plugin.automation().passenger(train,cart);
+            if (train.indexOf(entityId)==activeLeaderIndex(train)) plugin.automation().tick(train,now);
+        }
         if (train.driverEmergencyHold) DriverSafety.maintainBrake(train);
         if (train.protectionMode == ProtectionMode.RECOVERING) {
-            train.automaticRun = null;
             train.powerNotch = 0;
             train.brakeNotch = 7;
             train.emergencyBrake = true;
@@ -87,6 +86,7 @@ final class TrainMotionController {
             train.powerNotch=0;
             if(train.tims.latched() || train.tims.view(now).state()==TrainIntegrityMonitor.State.LOST) {
                 train.moving=false;
+                if(train.operatingMode!=OperatingMode.TR&&train.operatingMode!=OperatingMode.PT)train.integrityTrip=true;
                 train.operatingMode=OperatingMode.TR;
             }
         }
@@ -97,19 +97,21 @@ final class TrainMotionController {
                         return sample!=null && now>=sample.timeMillis && now-sample.timeMillis<=1000
                                 && sample.velocity.lengthSquared()<=.000001;
                     });
-            train.dispatcherBrake.apply(!train.properties().conductionMode.automatic(), stopped,
+            train.dispatcherBrake.apply(true, stopped,
                     train.operatingMode==OperatingMode.TR || train.operatingMode==OperatingMode.PT, now, trip -> {
                 train.activeAtp.clear();
                 train.operatingMode=trip ? OperatingMode.TR : OperatingMode.SB;
+                if(trip)train.integrityTrip=false;
                 train.powerNotch=0; train.brakeNotch=7; train.moving=false;
                 train.activeAtpReason=trip ? "DISPATCHER_REVOKED" : "DISPATCHER_REROUTE";
                 if (trip && plugin.telemetrySink()!=null)
                     plugin.telemetrySink().driverEvent(train,null,"","EMERGENCY_BRAKE_APPLIED","DISPATCHER_REVOKED");
             });
         }
+        boolean chunksReady=true;
         if (index == activeLeaderIndex(train)) {
-            if (settings.chunkLoadingEnabled()) {
-                chunkLoader.update(train, cart.getLocation(), settings.chunkLoadingRadius());
+            if (settings.chunkLoadingEnabled() || (plugin.automation()!=null && plugin.automation().owns(train))) {
+                chunksReady=chunkLoader.update(train, cart.getLocation(), settings.chunkLoadingRadius());
             } else {
                 chunkLoader.release(train.id());
             }
@@ -189,31 +191,38 @@ final class TrainMotionController {
 
         ActiveAtpState.Decision atp = null;
         if (index == activeLeaderIndex(train) && !train.dispatcherBrake.held() && !integrityHold && train.protectionMode == ProtectionMode.ACTIVE
-                && !train.properties().conductionMode.automatic()) {
+                ) {
             var desk = plugin.driverDesks().stream().filter(d -> d.trainId().equals(train.id()))
                     .findFirst().orElse(null);
             double scale = plugin.getConfig().getDouble("infrastructure.blocks-per-meter", 1);
-            OperationalPermission permission = plugin.telemetrySink() == null
-                    ? OperationalPermission.unavailable("NO_STA")
-                    : plugin.telemetrySink().operationalPermission(train.id(),
-                            desk == null ? null : desk.leaseId(), now, train.reversed, train.reverser.name());
-            permission = permission.cappedAt(plugin.trainSpeedLimit(train) * 20 / scale);
-            OperatingMode before = train.operatingMode;
-            atp = train.activeAtp.evaluate(permission, desk == null ? null : desk.leaseId(), before,
-                    train.currentSpeed() <= .001 && train.maxMemberSpeed() <= .001,
-                    train.reversed, train.reverser.name(),
-                    Math.max(train.currentSpeed(), train.maxMemberSpeed()) * 20 / scale,
-                    train.brakeNotch, now, plugin.activeAtpSettings());
-            train.operatingMode = atp.mode();
-            train.activeAtpLimitMps = permission.available() || atp.reason().equals("LAST_CONFIRMED_EOA")
-                    ? atp.limitMps() : null;
-            train.activeAtpReason = atp.reason();
-            train.activeAtpBrakeLevel = atp.emergency() ? 8 : atp.minimumBrakeNotch();
+            OperationalPermission permission;
+            OperatingMode before;
+            // Read the source snapshot and install its decision atomically with both release phases.
+            synchronized (train) {
+                permission = plugin.telemetrySink() == null
+                        ? OperationalPermission.unavailable("NO_STA")
+                        : plugin.telemetrySink().operationalPermission(train.id(),
+                                desk == null ? null : desk.leaseId(), now, train.reversed, train.reverser.name());
+                permission = permission.cappedAt(plugin.trainSpeedLimit(train) * 20 / scale);
+                before = train.operatingMode;
+                atp = train.activeAtp.evaluate(permission, desk == null ? null : desk.leaseId(), before,
+                        train.currentSpeed() <= .001 && train.maxMemberSpeed() <= .001,
+                        train.reversed, train.reverser.name(),
+                        Math.max(train.currentSpeed(), train.maxMemberSpeed()) * 20 / scale,
+                        train.brakeNotch, now, plugin.activeAtpSettings());
+                train.operatingMode = atp.mode();
+                train.activeAtpLimitMps = permission.available() || atp.reason().equals("LAST_CONFIRMED_EOA")
+                        ? atp.limitMps() : null;
+                train.activeAtpReason = atp.reason();
+                train.activeAtpBrakeLevel = atp.emergency() ? 8 : atp.minimumBrakeNotch();
+            }
             if (permission.available() && atp.mode().permitsTraction()
                     && atp.mode().name().equals(permission.mode()) && plugin.telemetrySink() != null)
                 plugin.telemetrySink().acknowledgeOperationalGrant(train.id(), desk.leaseId(),
                         permission.id(), permission.graphRevision());
             if (before != OperatingMode.TR && atp.mode() == OperatingMode.TR) {
+                train.integrityTrip=false;
+                plugin.getLogger().warning("ATP_TR train="+train.name()+" reason="+atp.reason());
                 if (desk != null) plugin.announceAtpTrip(desk.driverId(), desk.leaseId());
                 if (plugin.telemetrySink() != null)
                     plugin.telemetrySink().driverEvent(train, desk == null ? null : desk.driverId(),
@@ -221,9 +230,17 @@ final class TrainMotionController {
             }
         }
 
+        if (train.activeAtp.releasePending()) {
+            atp = ActiveAtpState.Decision.hold(train.operatingMode, "RELEASE_PENDING");
+            train.powerNotch = 0;
+        }
         if(integrityHold) {
             atp=ActiveAtpState.Decision.hold(train.operatingMode,"TIMS_"+train.tims.view(now).reason());
             train.activeAtpBrakeLevel=8;train.activeAtpLimitMps=0.0;train.activeAtpReason=atp.reason();
+        }
+        if(!chunksReady) {
+            atp=ActiveAtpState.Decision.hold(train.operatingMode,"CHUNKS_LOADING");
+            train.powerNotch=0;train.activeAtpReason="CHUNKS_LOADING";
         }
         if (train.dispatcherBrake.held()) {
             atp = ActiveAtpState.Decision.hold(train.operatingMode,
@@ -231,19 +248,8 @@ final class TrainMotionController {
             train.activeAtpBrakeLevel=8; train.activeAtpLimitMps=0.0;
             train.activeAtpReason=atp.reason(); train.powerNotch=0;
         }
-        if (index == activeLeaderIndex(train)) {
-            signActions.refreshStationLatches(train);
-            if (atp == null || (atp.minimumBrakeNotch() == 0 && atp.tractionAllowed())) {
-                if (host.tickAutomaticSigns(train, rail.block, location, direction, now)) return;
-                if (signActions.handleSignActions(train, rail.block, location, direction, now)) return;
-                signActions.prepareStationDeparture(train, now);
-            }
-        }
 
-        StationMotion stationMotion = train.stationMotion();
-        boolean stationMoving = stationMotion != null && stationMotion.isMoving();
-        boolean stationWaiting = stationMotion != null && stationMotion.isWaiting();
-        boolean waiting = stationWaiting || train.pauseUntilMillis > now;
+        boolean waiting = train.pauseUntilMillis > now;
         if (!waiting && train.pauseUntilMillis > 0L) {
             train.pauseUntilMillis = 0L;
         }
@@ -251,21 +257,17 @@ final class TrainMotionController {
         boolean controlledStop = (!train.driveControlEnabled && !train.moving) || waiting || settlingReverse
                 || train.emergencyBrake || (atp != null && atp.emergency());
         boolean playerPushCoasting = controlledStop && train.playerPushActive && !train.dispatcherBrake.held() && !integrityHold;
-        boolean automaticHandle = train.automaticRun != null && host.automaticEligible(train);
         double desiredTrainSpeed = controlledStop ? 0.0
-                : stationMoving ? stationMotion.commandedSpeed(signActions.stationMotionMinimumSpeed(stationMotion))
-                : (train.driveControlEnabled || automaticHandle ? train.maxSpeed : train.targetSpeed);
+                : (train.driveControlEnabled ? train.maxSpeed : train.targetSpeed);
 
-        if (!controlledStop && !stationMoving && index == activeLeaderIndex(train) && rail.poweredRail && rail.powered) {
+        if (!controlledStop && index == activeLeaderIndex(train) && rail.poweredRail && rail.powered) {
             desiredTrainSpeed = Math.max(desiredTrainSpeed, settings.poweredRailBoostSpeed());
         }
-        if (!controlledStop && !stationMoving && index == activeLeaderIndex(train)
+        if (!controlledStop && index == activeLeaderIndex(train)
                 && rail.poweredRail && !rail.powered && settings.brakeOnUnpoweredRail()) {
             desiredTrainSpeed *= 0.25;
         }
         desiredTrainSpeed *= RailMath.clamp(train.properties().friction, 0.0, 4.0);
-        if (automaticHandle && train.properties().automaticTargetSpeed != null)
-            desiredTrainSpeed = Math.min(desiredTrainSpeed, train.properties().automaticTargetSpeed);
         desiredTrainSpeed = RailMath.clamp(desiredTrainSpeed, 0.0, trainSpeedLimit);
         SpeedLimit obstacleLimit = index == activeLeaderIndex(train)
                 ? frontMinecartSpeedLimit(train, cart, location, direction, desiredTrainSpeed)
@@ -286,12 +288,7 @@ final class TrainMotionController {
         }
         boolean speedController = index == activeLeaderIndex(train) && !train.speedControlledRecently(now);
         double speed;
-        if (speedController && stationMoving && !controlledStop
-                && (atp == null || atp.minimumBrakeNotch() == 0)) {
-            speed = Math.min(obstacleLimit.speed,
-                    stationMotion.commandedSpeed(signActions.stationMotionMinimumSpeed(stationMotion)));
-            train.seedCurrentSpeed(speed);
-        } else if (speedController && (train.driveControlEnabled || automaticHandle)) {
+        if (speedController && train.driveControlEnabled) {
             boolean tractionAllowed = !controlledStop
                     && train.moving
                     && train.reverser != Reverser.NEUTRAL
@@ -412,15 +409,8 @@ final class TrainMotionController {
 
         double elapsedTicks = train.beginMotionFrame(now);
         double plannedDistance = speed * elapsedTicks;
-        AutomaticRun automaticRun = train.automaticRun;
-        if (automaticRun != null && automaticRun.phase == AutomaticRun.Phase.APPROACH) {
-            plannedDistance = Math.min(plannedDistance, automaticRun.remaining);
-        }
+        if (plugin.automation()!=null) plannedDistance=plugin.automation().movementLimit(train,plannedDistance);
         double movedThisFrame = 0.0;
-        StationMotion stationMotion = train.stationMotion();
-        if (stationMotion != null && stationMotion.isMoving()) {
-            plannedDistance = Math.min(plannedDistance, stationMotion.remainingDistance());
-        }
         if (speed > 0.001 && !switchManager.prepareTrain(
                 train, trackPath, leaderLocation, plannedDistance)) {
             train.seedCurrentSpeed(0.0);
@@ -432,33 +422,14 @@ final class TrainMotionController {
                 speed = 0.0;
             }
             movedThisFrame = trackPath.lastMoveDistance();
-            if (automaticRun != null && train.automaticRun == automaticRun) {
-                automaticRun.moved(movedThisFrame);
-                if (automaticRun.phase == AutomaticRun.Phase.APPROACH && automaticRun.remaining <= 0.02) {
-                    automaticRun.arrived(now);
-                    train.seedCurrentSpeed(0);
-                    speed = 0;
-                }
-            }
+            if (plugin.automation()!=null) plugin.automation().moved(train,movedThisFrame);
             infrastructureManager.observeTrainMovement(
                     train, trackPath.lastMoveProbes(), trackPath.lastMoveDistance());
-            if (stationMotion != null && train.stationMotion() == stationMotion) {
-                StationMotion.AdvanceResult result = stationMotion.advance(trackPath.lastMoveDistance(), now);
-                if (result == StationMotion.AdvanceResult.DOCKED) {
-                    train.seedCurrentSpeed(0.0);
-                    train.pauseUntilMillis = stationMotion.dwellUntilMillis();
-                    speed = 0.0;
-                } else if (result == StationMotion.AdvanceResult.COMPLETE) {
-                    train.clearStationMotion(stationMotion);
-                    train.pauseUntilMillis = 0L;
-                }
-            }
         } else {
             infrastructureManager.observeTrainMovement(
                     train, trackPath.probeAhead(0.0, train.reversed), 0.0);
         }
-        if (train.protectionMode == ProtectionMode.ACTIVE
-                && !train.properties().conductionMode.automatic()) {
+        if (train.protectionMode == ProtectionMode.ACTIVE) {
             double scale = plugin.getConfig().getDouble("infrastructure.blocks-per-meter", 1);
             if (Double.isFinite(scale) && scale > 0) train.activeAtp.advance(movedThisFrame / scale);
         }

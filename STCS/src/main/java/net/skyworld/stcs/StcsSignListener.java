@@ -7,6 +7,8 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.SignChangeEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.block.data.Rail;
 
 final class StcsSignListener implements Listener {
     private final StcsPlugin plugin;
@@ -61,6 +63,7 @@ final class StcsSignListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     void onBlockBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
+        if(block.getBlockData() instanceof Rail)manager.updateAround(BlockPosition.of(block));
         if (block.getState() instanceof org.bukkit.block.Sign sign) {
             String header = plain(sign.getLine(0));
             String action = plain(sign.getLine(1));
@@ -72,6 +75,11 @@ final class StcsSignListener implements Listener {
         if (manager.removeAt(block)) {
             plugin.send(event.getPlayer(), "&eSTCS marker removed; RailGraph rebuild started.");
         }
+    }
+
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
+    void onRailPlace(BlockPlaceEvent event) {
+        if(event.getBlockPlaced().getBlockData() instanceof Rail)manager.updateAround(BlockPosition.of(event.getBlockPlaced()));
     }
 
     private void scheduleRebuild() {

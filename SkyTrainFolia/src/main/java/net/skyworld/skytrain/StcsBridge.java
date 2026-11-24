@@ -63,7 +63,8 @@ final class StcsBridge {
                     string(result.get("nextSwitchName")),
                     number(result.get("nextSwitchMileageMeters")),
                     string(result.get("nextSwitchPosition")),
-                    number(result.get("distanceToSwitchMeters")));
+                    number(result.get("distanceToSwitchMeters")),
+                    string(result.get("nextSwitchState")), string(result.get("nextSwitchDirection")));
         } catch (IllegalAccessException | InvocationTargetException | RuntimeException ex) {
             if (!failureLogged) {
                 failureLogged = true;
@@ -273,11 +274,11 @@ record StcsTrackSnapshot(String edgeId, String edgeFromNodeId, String edgeToNode
         String line, Double currentMileageMeters, String nextType,
         String nextName, Double nextMileageMeters, Double distanceMeters,
         String nextSwitchName, Double nextSwitchMileageMeters,
-        String nextSwitchPosition, Double nextSwitchDistanceMeters) {
+        String nextSwitchPosition, Double nextSwitchDistanceMeters, String nextSwitchState, String nextSwitchDirection) {
     static StcsTrackSnapshot unavailable() {
         return new StcsTrackSnapshot(null, null, null, null, null, -1L,
                 null, null, null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, "UNKNOWN", "UNKNOWN");
     }
 
     boolean available() {
@@ -298,6 +299,7 @@ record StcsTrackSnapshot(String edgeId, String edgeFromNodeId, String edgeToNode
         return new StcsTrackSnapshot(edgeId, edgeFromNodeId, edgeToNodeId,
                 offset, edgeLengthMeters, graphRevision, line, currentMileageMeters,
                 nextType, nextName, nextMileageMeters, distanceMeters,
-                nextSwitchName, nextSwitchMileageMeters, nextSwitchPosition, nextSwitchDistanceMeters);
+                nextSwitchName, nextSwitchMileageMeters, nextSwitchPosition, nextSwitchDistanceMeters,
+                nextSwitchState, nextSwitchDirection);
     }
 }

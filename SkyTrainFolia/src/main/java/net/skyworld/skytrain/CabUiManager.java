@@ -570,36 +570,6 @@ final class CabUiManager implements Listener {
                 new AtpDriverFeedback(), new DriverGuide());
     }
 
-    void announceStationBraking(Train train, AutomaticRun run) {
-        boolean forecast = run.graphApproach;
-        long distance = Math.round(run.remaining);
-        for (CabSession session : List.copyOf(sessions.values())) {
-            if (!session.trainId.equals(train.id())) continue;
-            Player player = Bukkit.getPlayer(session.playerId);
-            if (player == null) continue;
-            // Inspect riding state and send chat only on this player's entity scheduler.
-            player.getScheduler().run(plugin, task -> {
-                if (!player.isOnline() || sessions.get(session.playerId) != session
-                        || train.automaticRun != run || !manager.automaticEligible(train)
-                        || run.phase != AutomaticRun.Phase.APPROACH || run.coasting
-                        || !(player.getVehicle() instanceof Minecart cart)
-                        || manager.trainForCart(cart) != train) return;
-                UiLanguage language = ui.language(player);
-                String message = forecast ? localized(language,
-                        "已识别前方车站信息，开始减速。距停车点约 " + distance + " 格。",
-                        "Station ahead identified. Braking for the stop, about " + distance + " blocks away.",
-                        "Station en amont identifiée. Début du freinage, arrêt dans environ " + distance + " blocs.",
-                        "前方の駅を認識しました。減速を開始します。停止位置まで約 " + distance + " ブロック。",
-                        "Станция впереди. Начинается торможение; до остановки около " + distance + " блоков.")
-                        : localized(language,
-                        "已在站牌处识别车站，开始减速（未使用提前预告）。",
-                        "Station identified at the sign. Braking without advance notice.",
-                        "Station identifiée au panneau. Début du freinage sans annonce anticipée.",
-                        "駅看板で駅を認識しました。事前予告なしで減速を開始します。", "Станция обнаружена у таблички. Торможение без предварительного обнаружения.");
-                plugin.send(player, "&f" + message);
-            }, () -> {});
-        }
-    }
 
     void announceAutomaticTargetSpeed(Train train, double targetSpeed) {
         for (CabSession session : List.copyOf(sessions.values())) {
@@ -608,7 +578,7 @@ final class CabUiManager implements Listener {
             if (player == null) continue;
             player.getScheduler().run(plugin, task -> {
                 if (!player.isOnline() || sessions.get(session.playerId) != session
-                        || !manager.automaticEligible(train)
+                        || plugin.automation()==null || !plugin.automation().owns(train)
                         || !(player.getVehicle() instanceof Minecart cart)
                         || manager.trainForCart(cart) != train) return;
                 SpeedUnit unit = ui.speedUnit(player);
@@ -808,28 +778,22 @@ final class CabUiManager implements Listener {
                 nextBalise.available() ? nextBalise.name() + " / " + nextBalise.position() : "--");
         lines[4] = line(localized(language, "距离应答器", "Balise distance", "Distance à la balise", "バリスまで", "До бализы"),
                 nextBalise.available() ? formatDistance(nextBalise.distanceMeters()) : "--");
-        String switchPosition = stcs.nextSwitchMileageMeters() != null
-                ? LineInfrastructureManager.formatMileageCompact(stcs.nextSwitchMileageMeters())
-                : stcs.nextSwitchPosition();
         lines[5] = line(localized(language, "下一道岔", "Next switch", "Prochaine aiguille", "次の分岐器", "Следующая стрелка"),
-                stcs.nextSwitchAvailable()
-                        ? stcs.nextSwitchName() + " / " + (switchPosition == null ? "--" : switchPosition)
-                        : "--");
+                nextSwitchDisplay(language, stcs));
         lines[6] = line(localized(language, "距离道岔", "Switch distance", "Distance à l'aiguille", "分岐器まで", "До стрелки"),
                 stcs.nextSwitchAvailable() ? formatDistance(stcs.nextSwitchDistanceMeters()) : "--");
         lines[7] = line(localized(language, "换向器", "Reverser", "Inverseur de marche", "逆転ハンドル", "Реверсор"),
                 reverser(language, train.reverser));
         lines[8] = line(localized(language, "主控手柄", "Master controller", "Manipulateur traction-frein", "主ハンドル", "Контроллер"),
                 masterHandle(language, train));
-        String driver = manager.automaticEligible(train)
-                ? localized(language, "自动驾驶", "Automatic", "Automatique", "自動", "Автоматика")
+        String driver = plugin.automation()!=null&&plugin.automation().owns(train)
+                ? localized(language, "琪露诺", "Cirno", "Cirno", "チルノ", "Чирно")
                 : manager.driverName(train);
         lines[9] = line(localized(language, "驾驶员", "Driver", "Conducteur", "運転士", "Машинист"),
                 driver == null ? "--" : driver);
         var stcsPlugin = Bukkit.getPluginManager().getPlugin("STCS");
         boolean stcsEnabled = stcsPlugin != null && stcsPlugin.isEnabled();
-        String operating = train.properties().conductionMode.automatic()
-                ? ui.text(language, "protection.operation.AUTO") : train.operatingMode.name();
+        String operating = train.operatingMode.name() + (train.properties().conductionMode.automatic() ? " / ATO" : "");
         lines[10] = line(ui.text(language, "protection.atp"),
                 ui.text(language, "protection.mode." + train.protectionMode) + " | " + operating);
         String unavailable = ui.text(language, train.protectionMode == ProtectionMode.ISOLATED ? "protection.isolated" : "ma.wait");
@@ -886,8 +850,7 @@ final class CabUiManager implements Listener {
                 }
             }
         }
-        if (train.protectionMode == ProtectionMode.ACTIVE
-                && !train.properties().conductionMode.automatic()) {
+        if (train.protectionMode == ProtectionMode.ACTIVE) {
             maRemaining = train.activeAtp.remainingMeters();
             shadowLimitMps = train.activeAtpLimitMps;
             maTitle = ui.text(language, "ma.active") + " MA | "
@@ -909,8 +872,7 @@ final class CabUiManager implements Listener {
                 if (speedCue != null) plugin.playMaNotice(player.getUniqueId(), desk.leaseId(), speedCue);
             }
         }
-        boolean activeManual = train.protectionMode == ProtectionMode.ACTIVE
-                && !train.properties().conductionMode.automatic();
+        boolean activeManual = train.protectionMode == ProtectionMode.ACTIVE;
         double speedMps = speed * 20 / plugin.getConfig().getDouble("infrastructure.blocks-per-meter", 1);
         boolean intervention = activeManual && AtpDriverFeedback.interventionVisible(
                 train.activeAtpBrakeLevel, train.operatingMode, train.activeAtpReason, speedMps);
@@ -927,6 +889,12 @@ final class CabUiManager implements Listener {
                 activeManual && manager.isDriver(player, train), train.activeAtpBrakeLevel,
                 intervention && train.operatingMode != OperatingMode.TR);
         if (interventionCue != null) plugin.playMaNotice(player.getUniqueId(), driverLease, interventionCue);
+        if (plugin.automation()!=null && plugin.automation().sidebar(train)!=null) {
+            lines[3]=line("运营",plugin.automation().sidebar(train));
+            lines[4]=line("TIMS",train.tims.view(System.currentTimeMillis()).reason());
+            lines[9]=line(localized(language,"驾驶员","Driver","Conducteur","運転士","Машинист"),
+                    localized(language,"琪露诺","Cirno","Cirno","チルノ","Чирно"));
+        }
         ShadowCurveDisplay.limitSecond(lines);
         session.maBar.update(player, manager.isDriver(player, train),
                 ShadowCurveDisplay.bossTitle(maTitle, language, shadowLimitMps), maRemaining,
@@ -1154,6 +1122,23 @@ final class CabUiManager implements Listener {
                     "力行" + train.powerNotch + "段", "Тяга P" + train.powerNotch);
         }
         return localized(language, "中立", "Neutral", "Neutre", "中立", "Нейтраль");
+    }
+
+    static String nextSwitchDisplay(UiLanguage language, StcsTrackSnapshot stcs) {
+        if (!stcs.nextSwitchAvailable()) return "--";
+        String state = stcs.nextSwitchState() == null ? "UNKNOWN" : stcs.nextSwitchState().toUpperCase(java.util.Locale.ROOT);
+        String direction = stcs.nextSwitchDirection() == null ? "UNKNOWN" : stcs.nextSwitchDirection().toUpperCase(java.util.Locale.ROOT);
+        String label;
+        if (state.equals("PENDING")) label = localized(language, "转换中", "Changing", "En mouvement", "転換中", "Перевод");
+        else if (!state.equals("STRAIGHT") && !state.equals("DIVERGING"))
+            label = localized(language, "未知", "Unknown", "Inconnu", "不明", "Неизвестно");
+        else label = switch (direction) {
+            case "STRAIGHT" -> localized(language, "直", "Straight", "Tout droit", "直進", "Прямо");
+            case "LEFT" -> localized(language, "左", "Left", "Gauche", "左", "Налево");
+            case "RIGHT" -> localized(language, "右", "Right", "Droite", "右", "Направо");
+            default -> localized(language, "未知", "Unknown", "Inconnu", "不明", "Неизвестно");
+        };
+        return stcs.nextSwitchName() + " [" + localized(language, "开向", "Route", "Direction", "開通方向", "Направление") + ": " + label + "]";
     }
 
     private static String localized(UiLanguage language, String zh, String en, String fr, String jp, String ru) {

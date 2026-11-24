@@ -26,12 +26,15 @@
     view: { x: 0, y: 0, w: 100, h: 100 },
     fitted: false,
     dragging: null,
-    lastGraphCheck: 0,
+    graphRevision: null,
+    switchStates: null,
+    requireHttpsForControl: true,
     updateMode: 'auto',
     pollIntervalMillis: 1000,
-    labelScale: loadLabelScale()
+    labelScale: loadLabelScale(), highlightScale: loadHighlight('scale'), highlightColor: loadHighlight('color'), focusedInfrastructure:null
   };
   let eventSource = null;
+  let graphRequest = null;
   let pollTimer = null;
   let pollGeneration = 0;
   let sseRetryTimer = null;
@@ -49,13 +52,25 @@
   let revokeRequest = null;
 
   function canSendControlRequest() {
-    return window.isSecureContext === true && typeof window.crypto?.randomUUID === 'function';
+    return (!state.requireHttpsForControl || window.isSecureContext === true)
+      && (typeof window.crypto?.randomUUID === 'function' || typeof window.crypto?.getRandomValues === 'function');
+  }
+
+  function controlRequestId() {
+    if (!canSendControlRequest()) throw new Error('Control requests are not available in this context');
+    if (typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    // getRandomValues is also available on HTTP; randomUUID is restricted to secure contexts.
+    const bytes = window.crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   }
 
   const ui = Object.fromEntries([
     'railMap', 'edgeLayer', 'switchLayer', 'nodeLayer', 'labelLayer', 'trainLayer', 'lineFilter',
     'areaLayer', 'areaFilter', 'areaStatus',
-    'fitButton', 'zoomIn', 'zoomOut', 'fontDecrease', 'fontSizeValue', 'fontIncrease',
+    'infrastructureSelectionLayer', 'highlightDecrease', 'highlightSizeValue', 'highlightIncrease', 'highlightColor', 'fitButton', 'zoomIn', 'zoomOut', 'fontDecrease', 'fontSizeValue', 'fontIncrease',
     'connectionDot', 'connectionText', 'themeToggle', 'brandLogo',
     'graphRevision', 'trainCount', 'activeCount', 'trainList', 'emptyState',
     'inspectorBack', 'inspectorEmpty', 'inspector', 'detailName', 'detailStatus', 'detailMode',
@@ -104,6 +119,50 @@
       // The control still works when browser storage is unavailable.
     }
     updateScaleStyles();
+    window.PccOperatingMap?.scale(state.labelScale);
+  }
+
+  function loadHighlight(kind) {
+    try {
+      const value = localStorage.getItem('skypcc.highlight' + (kind === 'scale' ? 'Scale' : 'Color'));
+      if (kind === 'color') return /^#[0-9a-f]{6}$/i.test(value || '') ? value : '#56c7d9';
+      const number = Number(value ?? 1);
+      return Number.isFinite(number) ? Math.max(.5, Math.min(2.5, number)) : 1;
+    } catch (_) { return kind === 'color' ? '#56c7d9' : 1; }
+  }
+  function setHighlight(scale, color = state.highlightColor) {
+    state.highlightScale = Math.max(.5, Math.min(2.5, Math.round(scale * 4) / 4));
+    if (/^#[0-9a-f]{6}$/i.test(color)) state.highlightColor = color;
+    ui.highlightSizeValue.textContent = `${Math.round(state.highlightScale * 100)}%`;
+    ui.highlightDecrease.disabled = state.highlightScale <= .5;
+    ui.highlightIncrease.disabled = state.highlightScale >= 2.5;
+    ui.highlightColor.value = state.highlightColor;
+    try {
+      localStorage.setItem('skypcc.highlightScale', String(state.highlightScale));
+      localStorage.setItem('skypcc.highlightColor', state.highlightColor);
+    } catch (_) { /* Optional storage. */ }
+    renderInfrastructureSelection();
+  }
+  function renderInfrastructureSelection() {
+    ui.infrastructureSelectionLayer.replaceChildren();
+    const selected = state.focusedInfrastructure || state.selectedInfrastructure;
+    if (!selected) return;
+    const attrs = {fill:'none', stroke:state.highlightColor, 'stroke-width':2 * state.highlightScale,
+      'vector-effect':'non-scaling-stroke', 'stroke-linejoin':'round', 'stroke-linecap':'round'};
+    if (selected.kind === 'edge') {
+      const edge = state.edges.get(selected.id);
+      if (edge?.path?.length) ui.infrastructureSelectionLayer.append(svg('polyline', {...attrs,
+        points:edge.path.map(p => `${p.x},${p.z}`).join(' '), 'stroke-width':6 * state.highlightScale, opacity:.65}));
+    } else {
+      const node = state.nodes.get(selected.id);
+      if (node?.rail && (window.PccOperatingMap?.infrastructureVisible(node.type) ?? true))
+        ui.infrastructureSelectionLayer.append(svg('circle', {...attrs,cx:node.rail.x,cy:node.rail.z,
+          r:((node.type === 'switch' ? 4.2 : 3.2) + 3 * state.highlightScale) * unitPerPixel()}));
+    }
+  }
+  function focusInfrastructure(element, kind, id) {
+    element.addEventListener('focus', () => { state.focusedInfrastructure = {kind,id}; renderInfrastructureSelection(); });
+    element.addEventListener('blur', () => { state.focusedInfrastructure = null; renderInfrastructureSelection(); });
   }
 
   function svg(tag, attrs = {}) {
@@ -118,28 +177,42 @@
     return response.json();
   }
 
-  async function loadGraph(force = false) {
-    if (!force && Date.now() - state.lastGraphCheck < 2000) return;
-    state.lastGraphCheck = Date.now();
+  function loadGraph() {
+    if (graphRequest) return graphRequest;
+    if (state.graph && (state.graphRevision == null || state.graph.revision === state.graphRevision)) return Promise.resolve();
+    graphRequest = downloadGraph().finally(() => { graphRequest = null; });
+    return graphRequest;
+  }
+
+  async function downloadGraph() {
     const graph = await fetchJson('/api/v5/graph');
     if (!graph || !Array.isArray(graph.edges)) return;
-    const sameTopology = !force && state.graph && state.graph.revision === graph.revision;
     state.graph = graph;
     state.edges = new Map(graph.edges.map(edge => [edge.id, edge]));
     graph.nodes = (graph.nodes || []).map(node => ({ ...node, type: String(node.type || '').toLowerCase() }));
     state.nodes = new Map(graph.nodes.map(node => [node.id, node]));
+    applySwitchStates();
     renderPendingSr();
-    if (sameTopology) {
-      renderSwitchDirections();
-      renderStationAreas();
-      return;
-    }
     state.bounds = calculateBounds(graph);
     ui.graphRevision.textContent = graph.revision ?? '--';
     populateLines();
     populateStationAreas();
     renderGraph();
     fitGraph();
+  }
+
+  function applySwitchStates() {
+    if (!state.switchStates || state.graph?.revision !== state.graphRevision) return;
+    let changed = false;
+    state.nodes.forEach(node => {
+      if (node.type !== 'switch') return;
+      const next = state.switchStates[node.id] || 'UNKNOWN';
+      if (node.state !== next) { node.state = next; changed = true; }
+    });
+    if (changed) {
+      renderSwitchDirections();
+      updateInspector();
+    }
   }
 
   function lineOfEdge(edge) {
@@ -177,7 +250,7 @@
     ui.nodeLayer.replaceChildren();
     ui.labelLayer.replaceChildren();
     const hasGraph = state.graph && state.graph.edges.length > 0;
-    ui.emptyState.hidden = hasGraph;
+    if(!window.PccOperatingMap?.active())ui.emptyState.hidden = hasGraph;
     if (!hasGraph) return;
 
     state.graph.edges.forEach(edge => {
@@ -203,7 +276,7 @@
         cy: node.rail.z,
         r: 3.2,
         class: `rail-node ${node.type || ''}${dimmed ? ' dimmed' : ''}`,
-        'data-radius': node.type === 'switch' ? '4.2' : '3.2'
+        'data-infrastructure-type': node.type, 'data-radius': node.type === 'switch' ? '4.2' : '3.2'
       });
       const title = svg('title');
       title.textContent = `${node.name || node.id}\n${code(node.type || 'marker')}\n${node.line || t('Unassigned')}`;
@@ -218,11 +291,11 @@
         class: `node-label${node.type === 'switch' ? ' switch-label' : ''}${dimmed ? ' dimmed' : ''}`,
         'data-node-x': node.rail.x,
         'data-node-z': node.rail.z,
-        'data-priority': node.type === 'switch' ? '0' : node.type === 'station' ? '1' : '2'
+        'data-infrastructure-type': node.type, 'data-priority': node.type === 'switch' ? '0' : node.type === 'station' ? '1' : '2'
       });
       label.textContent = node.name || node.id;
       if (node.type === 'switch') {
-        const group = svg('g');
+        const group = svg('g', {'data-infrastructure-type':node.type});
         switchClick(group, node.id);
         group.append(svg('rect', { class: `switch-label-bg${dimmed ? ' dimmed' : ''}` }), label);
         ui.labelLayer.append(group);
@@ -378,7 +451,7 @@
       const face = node.ports[switchState];
       const vector = faceVector(face);
       const direction = svg('text', {
-        class: `switch-direction ${switchState}`,
+        class: `switch-direction ${switchState}`, 'data-infrastructure-type':'switch',
         'data-node-x': node.rail.x,
         'data-node-z': node.rail.z,
         'data-vector-x': vector[0],
@@ -429,6 +502,7 @@
     const { x, y, w, h } = state.view;
     ui.railMap.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
     updateScaleStyles();
+    window.dispatchEvent(new Event('pcc-view'));
   }
 
   function unitPerPixel() {
@@ -447,6 +521,9 @@
   }
 
   function updateScaleStyles() {
+    renderInfrastructureSelection();
+    window.PccOperatingMap?.refreshLayers();
+    if(window.PccOperatingMap?.active())return;
     const bounds = graphBounds();
     if (!bounds) return;
     const unit = unitPerPixel();
@@ -495,7 +572,7 @@
     const unit = unitPerPixel();
     const viewport = ui.railMap.getBoundingClientRect();
     const occupied = [...ui.switchLayer.querySelectorAll('.switch-direction')]
-      .map(element => paddedRect(element.getBoundingClientRect(), 4));
+      .filter(element => element.style.display !== 'none').map(element => paddedRect(element.getBoundingClientRect(), 4));
     ui.trainLayer.querySelectorAll('.train-label').forEach(label => {
       occupied.push(paddedRect(label.getBoundingClientRect(), 4));
     });
@@ -503,7 +580,7 @@
       [8, -8, 'start'], [8, 16, 'start'], [-8, -8, 'end'], [-8, 16, 'end'],
       [0, -14, 'middle'], [0, 22, 'middle'], [8, -26, 'start'], [-8, 34, 'end']
     ];
-    const labels = [...ui.labelLayer.querySelectorAll('.node-label')]
+    const labels = [...ui.labelLayer.querySelectorAll('.node-label')].filter(label => window.PccOperatingMap?.infrastructureVisible(label.dataset.infrastructureType) ?? true)
       .sort((a, b) => Number(a.dataset.priority) - Number(b.dataset.priority));
     labels.forEach(label => {
       let best = null;
@@ -548,6 +625,7 @@
   }
 
   function updateTrainSamples(snapshot) {
+    window.PccOperatingMap?.update(snapshot.operatingNetwork,snapshot.serverTimeMillis);
     if (snapshot.schemaVersion !== 5) {
       snapshot = { schemaVersion: 5, serviceStatus: 'UNAVAILABLE', trains: [], shadowMa: null, operationalMa: null };
     }
@@ -557,6 +635,9 @@
     state.serviceStatus = snapshot.serviceStatus || 'AVAILABLE';
     state.lastSnapshotAt = Date.now();
     state.clockOffset = Number(snapshot.serverTimeMillis || Date.now()) - Date.now();
+    state.graphRevision = snapshot.graphRevision ?? null;
+    state.switchStates = snapshot.switchStates || null;
+    applySwitchStates();
     updateStationAreas(snapshot.stationAreas);
     renderAuthority();
     const next = new Map();
@@ -573,7 +654,7 @@
     renderTrainList();
     renderPendingSr();
     updateInspector();
-    if (snapshot.graphRevision !== state.graph?.revision) loadGraph(true).catch(showDisconnected);
+    loadGraph().catch(showDisconnected);
   }
 
   function liveOperational() {
@@ -585,7 +666,7 @@
 
   function renderPendingSr() {
     const pending = liveOperational()?.pendingSr || [];
-    ui.srControls.hidden = pending.length === 0;
+    ui.srControls.hidden = pending.length === 0 || !!window.PccOperatingMap?.active();
     if (!pending.some(item => item.trainId === state.selectedSrTrainId)) state.selectedSrTrainId = null;
     ui.srTrainSelect.replaceChildren();
     const prompt = document.createElement('option');
@@ -658,10 +739,11 @@
       else if (event.type === 'DRIVER_ACQUIRED') message.textContent = t('{driver} acquired control via /st drive. EB retained until handle input.', { driver });
       else if (event.type === 'DRIVER_RELEASED') message.textContent = t('{driver} released control ({reason}). EB commanded.', { driver, reason });
       else if (event.type === 'MA_REQUESTED') message.textContent = t('{driver} requested {mode} MA. Result: {state} ({reason}); executable: {executable}.', {
-        driver, mode: code(event.details?.mode || '--'), state: code(event.details?.state || 'UNKNOWN'),
+        driver, mode: code(event.details?.mode || '--'), state: code(event.details?.executable === 'true' && event.details?.state === 'ALLOCATED_SHADOW' ? 'ALLOCATED' : event.details?.state || 'UNKNOWN'),
         reason, executable: code(event.details?.executable || 'false') });
       else if (event.type === 'MA_RELEASED') message.textContent = t('{driver} released forward MA reservation. Train occupancy retained.', { driver });
       else if (event.type === 'INTEGRITY_CHANGED') message.textContent = `${t('Train integrity')}: ${reason}`;
+      else if (event.type === 'MA_UNAVAILABLE' && event.reason === 'ROUTE_DEVIATION') message.textContent = t('Automatic train left its service route. Brakes held; approve SR segments to guide it home.');
       else if (event.type === 'MA_UNAVAILABLE' && event.reason === 'DISPATCHER_REVOKED') message.textContent = code('DISPATCHER_REVOKED');
       else if (event.type === 'MA_UNAVAILABLE') message.textContent = t('Executable MA unavailable for {train} ({reason}). Stop at the last confirmed EoA.', {
         train: event.trainName || event.trainId, reason });
@@ -720,6 +802,7 @@
       showConnected();
       renderTrainList();
     }
+    if(window.PccOperatingMap?.active()){updateInspector();requestAnimationFrame(renderTrains);return;}
     ui.trainLayer.replaceChildren();
     state.trains.forEach(train => {
       const edge = state.edges.get(train.edgeId);
@@ -804,25 +887,26 @@
   }
 
   function selectTrain(id) {
-    state.selectedInfrastructure = null;
+    state.selectedInfrastructure = null; renderInfrastructureSelection();
     if (id !== state.selectedTrainId) state.followTrainId = null;
     state.selectedTrainId = id;
-    state.selectedTrainSnapshot = id ? (state.trains.get(id) || state.selectedTrainSnapshot) : null;
+    state.selectedTrainSnapshot = id ? (state.trains.get(id) || (state.selectedTrainSnapshot?.trainId===id?state.selectedTrainSnapshot:null)) : null;
     renderTrainList();
     updateInspector();
   }
 
   function selectInfrastructure(kind, id) {
     state.selectedTrainId = null; state.selectedTrainSnapshot = null; state.followTrainId = null;
-    state.selectedInfrastructure = { kind, id };
+    state.selectedInfrastructure = { kind, id }; renderInfrastructureSelection();
     renderTrainList(); updateInspector();
   }
   function inspectClick(element, kind, id) {
+    focusInfrastructure(element, kind, id);
     element.classList.add('infrastructure-hit');
     element.setAttribute('tabindex', '0'); element.setAttribute('role', 'button');
     element.setAttribute('aria-label', `${kind === 'edge' ? t('Edge') : t('Infrastructure')} ${state.nodes.get(id)?.name || id}`);
     element.dataset.inspectId = id;
-    const open = event => { event.stopPropagation(); selectInfrastructure(kind, id); };
+    const open = event => { event.stopPropagation(); if(window.PccOperatingMap?.pick(kind,id))return; selectInfrastructure(kind, id); };
     element.addEventListener('click', open);
     element.addEventListener('keydown', event => {
       if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(event); }
@@ -840,7 +924,7 @@
       ui.srApprove.onclick = () => {
         if (srPending || !liveOperational()) return;
         const secure = canSendControlRequest();
-        srRequest = secure ? { requestId: crypto.randomUUID(), trainId: pending.trainId,
+        srRequest = secure ? { requestId: controlRequestId(), trainId: pending.trainId,
           targetNodeId: id, graphRevision: state.graph.revision } : null;
         ui.srTarget.textContent = `${pending.trainName || pending.trainId} → ${item.name || id}`;
         ui.srToken.value = '';
@@ -890,7 +974,7 @@
       const states = [...new Set(sections.map(s => code(s.state)))];
       rows.push(['Status', live && sections.length ? states.join(' · ') : code('UNKNOWN')]);
       const names = key => [...new Set(sections.flatMap(s => s[key] || []))].map(uuid => state.trains.get(uuid)?.name || uuid).join(', ') || '--';
-      rows.push(['Occupants', live ? names('occupants') : '--'], ['Shadow reservations', live ? names('reservations') : '--']);
+      rows.push(['Occupants', live ? names('occupants') : '--'], ['MA reservations', live ? names('reservations') : '--']);
       if (kind === 'edge') for (const s of sections.filter(s => s.state !== 'UNALLOCATED'))
         rows.push(['Intervals', `${s.fromMeters == null ? '0' : s.fromMeters.toFixed(1)}–${s.toMeters == null ? item.distanceMeters.toFixed(1) : s.toMeters.toFixed(1)} m · ${code(s.state)}`]);
     }
@@ -921,9 +1005,10 @@
     const train = state.trains.get(state.selectedTrainId) || state.selectedTrainSnapshot;
     const available = Boolean(state.trains.get(state.selectedTrainId));
     ui.inspector.hidden = !train;
-    ui.inspectorEmpty.hidden = Boolean(train);
+    window.PccOperatingMap?.inspect(Boolean(train));
+    ui.inspectorEmpty.hidden = Boolean(train)||!!window.PccOperatingMap?.hasPanel();
     ui.inspectorBack.hidden = !train;
-    ui.cameraControls.hidden = !train;
+    ui.cameraControls.hidden = !train || !!window.PccOperatingMap?.active();
     document.querySelector('.workspace').classList.toggle('has-selection', Boolean(train));
     if (!train) return;
     const following = state.followTrainId === train.trainId;
@@ -944,10 +1029,12 @@
       ISOLATED: t('Isolated'), BYPASS: t('Bypass'), RECOVERING: t('Recovering') };
     ui.detailAtp.textContent = cab ? (modes[cab.atpMode] || cab.atpMode || '--') : '--';
     const authority = liveAuthority()?.authorities?.find(a => a.trainId === train.trainId);
-    ui.detailMa.textContent = authority?.state === 'ALLOCATED_SHADOW'
+    const grant = liveOperational()?.grants?.find(g => g.trainId === train.trainId && g.executable && g.NID_MESSAGE === 1003 && g.NID_PACKET === 1015);
+    ui.detailMa.textContent = grant ? t('{mode} MA: {n} m', { mode: grant.mode, n: Math.max(0,grant.remainingMeters).toFixed(1) }) : authority?.state === 'ALLOCATED_SHADOW'
       ? t('{n} m (shadow)', { n: Math.max(0, authority.signedRemainingMeters || 0).toFixed(1) }) : t('Not allocated');
-    ui.detailEoa.textContent = authority?.eoaEdgeId
-      ? `${t('{n} m remaining', { n: Number(authority.signedRemainingMeters).toFixed(1) })} · ${authority.eoaEdgeId} + ${Number(authority.eoaOffsetMeters).toFixed(1)} m` : '--';
+    const eoa = grant || authority;
+    ui.detailEoa.textContent = eoa?.eoaEdgeId
+      ? `${t('{n} m remaining', { n: Number(grant ? grant.remainingMeters : authority.signedRemainingMeters).toFixed(1) })} · ${eoa.eoaEdgeId} + ${Number(eoa.eoaOffsetMeters).toFixed(1)} m` : '--';
     ui.detailMaReason.textContent = code(authority?.reason || 'UNAVAILABLE');
     ui.detailMaReason.title = authority?.reason || 'UNAVAILABLE';
     ui.detailDirection.textContent = ({ forward: t('Forward'), reverse: t('Reverse') })[train.direction] || '--';
@@ -959,7 +1046,7 @@
     document.getElementById('detailIntegrity').textContent=tiFresh
       ? `${t(ti.state === 'COMPLETE' ? 'Integrity complete' : ti.state === 'LOST' ? 'Integrity lost' : 'Integrity unknown')} · ${ti.reason} · ${new Date(ti.observedAtMillis).toLocaleTimeString()} · hold=${ti.brakeHeld} · ${(ti.affectedMembers || []).join(', ')}`
       : t('Integrity unknown');
-    ui.detailDriver.textContent = train.mode === 'automatic' ? t('Automatic') : (train.driver || '--');
+    ui.detailDriver.textContent = train.mode === 'automatic' ? t('Cirno') : (train.driver || '--');
     ui.detailLine.textContent = train.line || '--';
     ui.detailMileage.textContent = train.currentMileageMeters != null && Number.isFinite(Number(train.currentMileageMeters))
       ? `K${(Number(train.currentMileageMeters) / 1000).toFixed(3)}` : '--';
@@ -1002,7 +1089,7 @@
       try {
         const snapshot = await fetchJson('/api/v5/trains');
         updateTrainSamples(snapshot);
-        await loadGraph(false);
+        await loadGraph();
         showConnected(state.updateMode === 'poll' ? 'Live / Poll' : 'Live / Poll fallback');
       } catch (error) {
         showDisconnected(error);
@@ -1041,7 +1128,6 @@
       if (eventSource !== source) return;
       try {
         updateTrainSamples(JSON.parse(event.data));
-        loadGraph(false).catch(showDisconnected);
         showConnected('Live / SSE');
       } catch (error) {
         showDisconnected(error);
@@ -1065,6 +1151,7 @@
       state.updateMode = ['auto', 'sse', 'poll'].includes(config.updateMode)
         ? config.updateMode : 'auto';
       state.controlEnabled = config.controlEnabled === true;
+      state.requireHttpsForControl = config.requireHttpsForControl !== false;
       state.pollIntervalMillis = Math.max(250,
         Math.min(10000, Number(config.pollIntervalMillis || 1000)));
     } catch (error) {
@@ -1082,7 +1169,14 @@
     state.areaFilter = ui.areaFilter.value;
     renderStationAreas();
   });
-  ui.fitButton.addEventListener('click', () => { state.followTrainId = null; fitGraph(); });
+  ui.fitButton.addEventListener('click', () => { state.followTrainId = null; if(window.PccOperatingMap?.active())window.PccOperatingMap.fit();else fitGraph(); });
+  window.addEventListener('pcc-fit-points',event=>{
+    const points=event.detail.points||[];if(!points.length)return;
+    let x=Infinity,z=Infinity,right=-Infinity,bottom=-Infinity;for(const p of points){if(!Number.isFinite(p.x)||!Number.isFinite(p.z))continue;x=Math.min(x,p.x);z=Math.min(z,p.z);right=Math.max(right,p.x);bottom=Math.max(bottom,p.z);}if(!Number.isFinite(x))return;const w=Math.max(20,right-x),h=Math.max(20,bottom-z),m=Math.max(12,Math.max(w,h)*.06);
+    state.followTrainId=null;state.view={x:x-m,y:z-m,w:w+2*m,h:h+2*m};applyView();
+  });
+  window.addEventListener('pcc-select-train',event=>selectTrain(event.detail.id));
+  window.addEventListener('pcc-map-mode',()=>{state.followTrainId=null;state.selectedInfrastructure=null;updateInspector();renderPendingSr();if(!window.PccOperatingMap?.active()){updateScaleStyles();renderStationAreas();renderAuthority();}});
   ui.themeToggle.addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
   ui.followTrain.addEventListener('click', () => {
     state.followTrainId = state.selectedTrainId;
@@ -1092,6 +1186,7 @@
   });
   ui.cancelFollow.addEventListener('click', () => { state.followTrainId = null; });
   function zoomAtMapCenter(factor) {
+    if(window.PccOperatingMap?.active()){window.PccOperatingMap.zoom(factor);return;}
     const rect = ui.railMap.getBoundingClientRect();
     zoom(factor, rect.left + rect.width / 2, rect.top + rect.height / 2);
   }
@@ -1110,6 +1205,11 @@
     event.currentTarget.setAttribute('aria-label', event.currentTarget.title);
     requestAnimationFrame(updateScaleStyles);
   });
+  window.addEventListener('pcc-infrastructure-filter', () => { renderInfrastructureSelection(); scheduleLabelLayout(); });
+  ui.highlightDecrease.onclick = () => setHighlight(state.highlightScale - .25);
+  ui.highlightIncrease.onclick = () => setHighlight(state.highlightScale + .25);
+  ui.highlightSizeValue.onclick = () => setHighlight(1);
+  ui.highlightColor.oninput = () => setHighlight(state.highlightScale, ui.highlightColor.value);
   ui.fontDecrease.addEventListener('click', () => setLabelScale(state.labelScale - 0.25));
   ui.fontIncrease.addEventListener('click', () => setLabelScale(state.labelScale + 0.25));
   ui.fontSizeValue.addEventListener('click', () => setLabelScale(1.5));
@@ -1148,7 +1248,8 @@
 
   function renderAuthority() {
     const live = liveAuthority();
-    ui.maStatus.textContent = live ? t('SHADOW · no ATP') : t('MA unavailable / stale');
+    ui.maStatus.textContent = liveOperational()?.grants?.some(g => g.executable)
+      ? t('ATP · executable MA') : live ? t('Observation · no executable MA') : t('MA unavailable / stale');
     ui.edgeLayer.querySelectorAll('.interval-overlay').forEach(e => e.remove());
     const sections = new Map((live?.sections || []).filter(s => s.fromMeters == null).map(s => [s.edgeId, s]));
     for (const line of ui.edgeLayer.querySelectorAll('.rail-edge')) {
@@ -1157,7 +1258,7 @@
       line.dataset.occupancy = value;
       let title = line.querySelector('title');
       if (!title) { title = svg('title'); line.append(title); }
-      title.textContent = `${code(value)}\n${t('Occupants')}: ${(section?.occupants || []).join(', ') || '--'}\n${t('Shadow reservations')}: ${(section?.reservations || []).join(', ') || '--'}`;
+      title.textContent = `${code(value)}\n${t('Occupants')}: ${(section?.occupants || []).join(', ') || '--'}\n${t('MA reservations')}: ${(section?.reservations || []).join(', ') || '--'}`;
     }
     for (const s of live?.sections || []) {
       if (!Number.isFinite(s.fromMeters) || !Number.isFinite(s.toMeters) || s.state === 'UNALLOCATED') continue;
@@ -1179,7 +1280,7 @@
         class: `rail-edge interval-overlay${state.lineFilter && line !== state.lineFilter ? ' dimmed' : ''}`,
         'data-edge-id': s.edgeId, 'data-occupancy': s.state });
       const title = svg('title');
-      title.textContent = `${code(s.state)} · ${s.fromMeters.toFixed(1)}–${s.toMeters.toFixed(1)} m\n${t('Occupants')}: ${(s.occupants || []).join(', ') || '--'}\n${t('Shadow reservations')}: ${(s.reservations || []).join(', ') || '--'}`;
+      title.textContent = `${code(s.state)} · ${s.fromMeters.toFixed(1)}–${s.toMeters.toFixed(1)} m\n${t('Occupants')}: ${(s.occupants || []).join(', ') || '--'}\n${t('MA reservations')}: ${(s.reservations || []).join(', ') || '--'}`;
       overlay.append(title); ui.edgeLayer.append(overlay);
       inspectClick(overlay, 'edge', s.edgeId);
     }
@@ -1202,22 +1303,24 @@
     }
     const unit = unitPerPixel();
     const marker = svg('circle', { cx: p.x, cy: p.z, r: 7 * unit, class: 'eoa-marker' });
-    const title = svg('title'); title.textContent = t('Shadow EoA: {n} m remaining', { n: a.signedRemainingMeters.toFixed(1) }); marker.append(title);
+    const title = svg('title'); title.textContent = t('MA EoA: {n} m remaining', { n: a.signedRemainingMeters.toFixed(1) }); marker.append(title);
     ui.authorityLayer.append(marker);
   }
 
   function switchClick(element, id, control = false) {
+    focusInfrastructure(element, 'node', id);
     element.classList.add('switch-hit');
     element.dataset.switchId = id;
     element.setAttribute('role', 'button'); element.setAttribute('tabindex', '0');
     element.setAttribute('aria-label', t('Inspect switch {name}', { name: state.nodes.get(id)?.name || id }));
     const open = event => {
       event.stopPropagation();
+      if (window.PccOperatingMap?.pick('node',id))return;
       if (!control) { selectInfrastructure('node', id); return; }
       const node = state.nodes.get(id); if (!node || switchPending) return;
       const expected = String(node.state).toLowerCase();
       const secure = canSendControlRequest();
-      switchRequest = secure ? { requestId: crypto.randomUUID(), switchId: id, graphRevision: state.graph.revision,
+      switchRequest = secure ? { requestId: controlRequestId(), switchId: id, graphRevision: state.graph.revision,
         expectedState: expected, targetState: expected === 'straight' ? 'diverging' : 'straight',
         position: node.rail ? { world: node.rail.world, x: node.rail.x, y: node.rail.y, z: node.rail.z } : null } : null;
       ui.switchTitle.textContent = t('Switch {name}', { name: node.name || id });
@@ -1249,7 +1352,7 @@
         if (response.status !== 202) {
           setSwitchResult(result.status === 'COMPLETED' ? { key: 'Conversion confirmed' }
             : { status: result.status || response.status, reason: result.reason || 'UNCONFIRMED' });
-          await loadGraph(false); return;
+          return;
         }
         setSwitchResult({ status: 'PENDING', reason: result.reason || 'UNCONFIRMED' });
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -1260,7 +1363,7 @@
   });
   ui.revokeMa.addEventListener('click', () => {
     if (revokePending || !state.selectedTrainId || !canSendControlRequest()) return;
-    revokeRequest = { requestId: crypto.randomUUID(), trainId: state.selectedTrainId };
+    revokeRequest = { requestId: controlRequestId(), trainId: state.selectedTrainId };
     ui.revokeTarget.textContent = state.trains.get(state.selectedTrainId)?.name || state.selectedTrainId;
     ui.revokeToken.value = ''; ui.revokeResult.textContent = ''; ui.revokeConfirm.disabled = false;
     ui.revokeDialog.showModal();
@@ -1332,6 +1435,7 @@
 
   function refreshLanguage() {
     PccI18n.apply();
+    window.PccOperatingMap?.refreshLanguage();
     document.getElementById('languageSelect').value = PccI18n.language;
     setTheme(document.documentElement.dataset.theme || loadTheme());
     if (state.graph) { populateLines(); populateStationAreas(); renderGraph(); }
@@ -1362,8 +1466,9 @@
   });
   refreshLanguage();
   setTheme(loadTheme());
+  setHighlight(state.highlightScale);
   setLabelScale(state.labelScale);
-  loadGraph(true).catch(showDisconnected);
+  loadGraph().catch(showDisconnected);
   startDataTransport();
   requestAnimationFrame(renderTrains);
 })();

@@ -1,196 +1,117 @@
-# SkyRail Suite
+# SkyRail Suite — Uitgebreide Nederlandse handleiding
 
-## Machinistenwissel en MA — 2026-10-24
+## **[2026-11-24] Toegevoegd / hersteld: PCC 2.4.1 kaartweergave**
 
-Huidige bronnen: STCS **4.1.1** / STF **4.0.9** / STA **2.2.0** / SkyPCC **2.1.0**. Uitstappen, de verbinding verbreken of de bediening vrijgeven trekt de oude MA in en zet de boordmodus terug op `SB` met vastgehouden remmen. Vooruitliggende reserveringen vervallen na bevestiging van stilstand, positie en treinintegriteit; de fysieke bezetting blijft beschermd. De volgende machinist gebruikt `/st drive` en vraagt opnieuw `/stcs ma fs` aan, zonder de vorige MA handmatig vrij te geven. `/stcs ma demand` blijft een compatibele alias. Werk STCS en STF samen bij. **87 Java-tests geslaagd op zowel 26.2 als 26.3; praktijktests op de server zijn nog nodig.** [Wijzigingen](CHANGELOG.md)
+~~De standaard focusrand van de browser rond geselecteerde sporen en objecten.~~ De markering volgt nu de echte spoorlijn of een kleine ring rond het object, met een vaste lijndikte op het scherm. Inzoomen vergroot de rand niet; muisselectie en toetsenbordfocus blijven zichtbaar.
 
-## Historische update: STCS 4.1.0 / STF 4.0.8 / STA 2.1.4 / SkyPCC 2.0.3
+Naast A− / A+ staan **H− / H+** voor de markeringsgrootte (50%–250%). Klik op het percentage om100% te herstellen; kies een kleur via het kleurvak. Grootte en kleur worden in deze browser bewaard; bediening blijft mogelijk zonder opslag.
 
-2026-10-09: de beheerder bevestigt dat STCS 4.1.0 de tests heeft doorstaan. Acceptatie van andere onderdelen blijft afzonderlijk; oudere versies hieronder zijn historisch.
+Onder infrastructuur staan **Balise, END, ORIGIN en Wissel**. Het hoofdvak schakelt alles in of uit; de onderliggende vakken zijn afzonderlijk instelbaar. Een gedeeltelijke selectie geeft een gemengde hoofdstatus. Symbolen, labels en wisselrichtingspijlen worden samen gefilterd. Spoorbasis en SAL-laag blijven onafhankelijk.
 
-- STCS [4.1.0](doc/releases/stcs-v4.1.0-railgraph-storage.md): snelheidsafhankelijk wisselbereik in FS en compact opgeslagen rechte paden in RailGraph v4. Oude grafen worden geback-upt; bochten en hellingen en de volledige servicepaden blijven behouden.
-- STF: [bestuurdershulp in vier talen](doc/releases/skytrainfolia-v4.0.5-driver-guide-lexicon.md), bewerkbare willekeurige teksten in `driver-guide.yml`, verbeteringen aan effectieve helling, wegrijden, herladen van geometrie en voertuigweergave. Alleen stilstaand herladen.
-- STA [2.1.1](doc/releases/sta-v2.1.1-dispatcher-map.md): TLS-desktopbediening met bezetting/reserveringen, wisselrichtingen en treindetails; standaard uitgeschakeld. [Installatie](../STA/tools/README.md).
-- SkyPCC [2.0.1](doc/releases/skypcc-v2.0.1.md): wisselbediening op afstand en SR-goedkeuring met een geldig Bearer-token; standaard alleen lokaal bereikbaar.
+Dit verandert alleen de weergave, niet RailGraph, objecten, routes, MA of bezetting. Vernieuw een oude pagina met Ctrl+F5.
 
-FS-wisselbereik: `max(ma.lock-distance-meters, v²/(2a) + v × lead-seconds + buffer-meters)`, met v in m/s. Standaard a=1 m/s², 5 s vooruitlooptijd en 25 m marge. `ma.dynamic-lock.enabled: false` herstelt het vaste bereik; SH/SR blijven gelijk. `ma.look-ahead-meters` (600 m) en `ma.max-authority-distance-meters` (300 m) blijven onafhankelijke harde grenzen. Dynamisch bereik is maximaal 10000 m. Bij 420 km/h leveren deze parameters ongeveer 7414 m op; de benodigde MA hangt nog af van de ATP-curve. Onbekende wissels, conflicten en volledige uitrijruimte worden nog steeds gecontroleerd.
 
-Lokale ontwikkelversie **STF 4.0.8 / STCS 4.0.6 / STA 2.1.4 / SkyPCC 2.0.3**: TIMS controleert de vaste samenstelling, actuele metingen en afstand tussen rijtuigen langs het spoor. Bij onbekende of verloren integriteit blijven rem, bezetting en MA bescherming actief. `/st info <trein>` toont de actuele positie of de laatst gemelde coördinaten en tijd. Alleen reizigers in het buitenste rijtuig aan elk uiteinde mogen `/st drive` gebruiken; forward/backward volgen die bestuurderspositie. Na herstel en volledige stilstand: `/st tims ack`, daarna in TR `/stcs ma ack`, `/stcs ma release` en een nieuwe MA. Bestaande opgeslagen treinen vergen een eerste controle van de samenstelling. Deze versie is nog niet gepubliceerd of in bedrijf getest. [Ontwikkelnotities 4.0.8](doc/releases/suite-v4.0.8.md)
+## **[NIEUW / GEWIJZIGD · 2026-11-24] Eén PCC-kaart en lijnbewerking**
 
-Deze patch gebruikt **STF 4.0.7 / STCS 4.0.5 / STA 2.1.3 / SkyPCC 2.0.2**. Bij een stilstaande handmatige trein bevestigt de trein eerst de remvasthouding; daarna worden de voorwaartse reservering ingetrokken, de wissel omgelegd en de MA opnieuw berekend, zonder voorafgaande release door de machinist. Web PCC krijgt “Revoke MA → TR”: zowel rijdend als stilstaand gaat de trein na bevestiging in TR en remt. Reserveringen blijven behouden tot de hele trein aantoonbaar stilstaat; treinbezetting blijft altijd behouden. Deze expliciete opdracht werkt ook in het schaduwkanaal. Herstel: stoppen, `/stcs ma ack`, `/stcs ma release`, opnieuw MA aanvragen. Een time-out bevestigt niets. Werk de geïnstalleerde plugins samen bij en vernieuw de clients; behoud certificaten en tokens. Praktijktests op de server zijn nog nodig. [4.0.7 release notes](doc/releases/suite-v4.0.7.md)
+Eén RailGraph met afzonderlijk aanklikbare infrastructuur-, SAL-, exploitatie- en livelagen. Open de editor met het bestaande wisseltoken, kies een lijn of maak een concept met minstens één geregistreerd depot.
 
-**Voor spelers:** de bestuurdershandleiding is beschikbaar in [Engels](doc/driver/README.en.md), [Chinees](doc/driver/README.zh.md), [Frans](doc/driver/README.fr.md) en [Japans](doc/driver/README.ja.md).
+Eerst depot registreren. Klik bakens, wissels, gerichte graafranden en stations van deze lijn; wijzig volgorde, wachttijd en keren zonder borden te herschrijven. Opslaan, controleren en publiceren zijn aparte stappen. Lopende taken behouden hun eigen gepubliceerde versie.
 
-## Gepubliceerde versie: Shiroha 26.2 / 26.3
+Gelijktijdige spel/PCC-bewerking bevriest beide kanten, ook na herstart. Opslaan/controleren/publiceren/verwijderen wordt geweigerd tot handmatige oplossing. Een voorstel kiezen publiceert niets. Sluit spelbewerking met `/sal route close <lijn>`; succesvolle publicatie sluit de spelsessie.
 
-SkyTrainFolia **4.0.7** bevat beide displaypakketadapters in één JAR en kiest bij het starten de adapter voor de serverversie. De gepubliceerde suite bestaat uit STCS **4.0.5**, STA **2.1.3** en SkyPCC **2.0.2**. Geïsoleerde compilatie en Java-tests slagen op beide versies; acceptatie op een draaiende server staat nog open. [Aanpassingsrapport](doc/releases/skytrainfolia-v4.0.6-shiroha-26.2-26.3.md).
+`/sal route create Line1 maintown` · `/sal route depot Line1 maintown,otherdepot` · `/sal route resolve Line1 DISCARD`
 
-## Eerdere update 4.0.2: waarschuwingen en serviceherstel
+[Eén PCC-kaart en lijnbewerking](doc/PCC-ROUTE-EDITING.en.md)
 
-De actuele ATP-limiet bepaalt de waarschuwingsband, niet de werkelijke snelheid. Bij een limiet **≤40 km/h**, inclusief de standaard SH-limiet, begint de waarschuwing **5 km/h eronder** en stopt deze bij **8 km/h eronder** of lager. Boven 40 zijn de standaardwaarden voor nieuwe installaties **15 / 18 km/h**; bestaande instellingen voor de normale band blijven behouden. Oversnelheidsprioriteit, stilte bij zeer lage snelheid en ATP-remingrepen veranderen niet.
 
-Na een MA-servicestop door een I/O-fout kan een beheerder `/stcs admin ma restart` gebruiken (`stcs.admin`, ook via de console). Het herstel controleert de bronnen, vereist recente stilstandmeldingen voor resterende uitvoerbare toestemmingen, maakt back-ups van het register en tijdelijke bestand en controleert een echte schrijfactie. Bezetting blijft behouden; bestuurders moeten opnieuw MA aanvragen. Remmen worden niet gelost. Blijvende I/O-fouten houden de service gestopt; andere runtimefouten vereisen onderzoek en een serverherstart.
+[中文详细手册](README.zh.md) · [Detailed English manual](README.en.md) · [Manuel détaillé français](README.fr.md) · [Uitgebreide Nederlandse handleiding](README.nl.md) · [日本語詳細マニュアル](README.ja.md) · [Подробное руководство на русском](README.ru.md) · [文語體鐵道運轉詳細規程](README.ja.classical.md)
 
-```yaml
-shadow-atp:
-  warning:
-    enter-gap-kmh: 15.0
-    clear-gap-kmh: 18.0
-    low-speed-limit-kmh: 40.0
-    low-speed-enter-gap-kmh: 5.0
-    low-speed-clear-gap-kmh: 8.0
-```
+Distributie van2026-11-24, gebaseerd op de vorige uitgebreide Manuel en de definitieve implementatie. Ongewijzigde uitleg blijft staan. Vetgedrukte labels markeren toevoegingen, wijzigingen, verwijderingen en opvraagfuncties; doorgehaalde tekst bewaart vervallen instructies.
 
-## Experimentele M3: bescherming van handbestuurde treinen
+## Lees eerst de incompatibele wijzigingen
 
-De eerdere voorlopige uitgave `suite-v4.0.2` staat in de [uitgavenotities](doc/releases/suite-v4.0.2.md).
+- De oude STF-uitvoeringsketen voor station/cruise/start/stop/spawn/destroy/property en bordcontrole is verwijderd, zonder herinschakeloptie. Oude borden en bestanden blijven bestaan maar sturen geen automatische ritten meer.
+- ~~`/st property demo mode auto` / `mode automatic`~~ is verwijderd. SAL beheert automatisch rijden; STF behoudt handbediening, fysieke uitvoering en infrastructuur.
+- ~~Alleen `/st release` geeft toestemming voor automatische overname~~: eerst SAL-overdracht bevestigen op een depotplaats, daarna dezelfde bestuurderslease expliciet vrijgeven.
+- ~~Standaard schaduw-MA, geen ATP-ingreep~~: nieuwe sessies vragen standaard FS aan met uitvoerbare beveiliging. SAL gebruikt dezelfde bescherming. Zonder geldige MA blijven remmen vast; schaduwmodus blijft alleen expliciet testen.
+- ~~`scan.only-loaded-chunks: false` laadt chunks bij het opbouwen~~: onderhoud scant alleen geladen gebieden en migreert deze waarde naar true. Ontladen bewijst geen breuk of vrijgave.
+- Werk de vijf plugins samen bij. Bewaar werelden, samenstellingen, RailGraph, SAL-status, vernietigingsbewijzen en alle bezettingsregisters. Herstel bij terugdraaien één gezamenlijke back-up.
 
-Gebruik STF **4.0.7**, STCS **4.0.5**, STA **2.1.3** en SkyPCC **2.0.2** samen. Stop de server en maak een back-up van RailGraph en bezettingsregisters voordat u componenten vervangt; meng geen versies. STF blijft zelfstandig bruikbaar, maar `Enforced` vereist STA en STCS. De bestaande v5-schaduwservice blijft adviserend; de uitvoerbare STA v6-autoriteit is een apart kanaal.
+**[NIEUW · 2026-11-21]** Opgeleverd: SAL-ritten en depotbewegingen, handmatig/automatisch overdragen, incrementele RailGraph, uitvoerbare MA/ATP-weergave en afzonderlijke PCC-exploitatiekaart. SAL heeft blauw `[SkyATO-Lite]`, STF grijs en STCS geel. Oude standaardprefixen migreren; eigen prefixen blijven. De versiepagina toont SAL en de juiste ATP-status.
 
-Alleen **handbestuurde treinen** volgen de toestanden `SB/FS/SH/SR/TR/PT`. Na het claimen van de bediening begint de trein in `SB`. `/stcs ma fs` vraagt `FS`, `/stcs ma sh` een begrensde rangeertoestemming en `/stcs ma sr` wacht op goedkeuring door PCC of een beheerder tot een gekozen spoorobject. Een geaccepteerd verzoek is nog geen uitvoerbare MA. Na het overschrijden van EoA (`TR`): stoppen, `/stcs ma ack` voor `PT`, daarna `/stcs ma release` voor een nieuw verzoek. Een beheerder wisselt het kanaal alleen bij stilstand met `/stcs admin enforce true|false`; `false` keert terug naar `RECOVERING` met remvasthouding. De zijbalk toont het vertaalde kanaal en de onvertaalde moduscode, bijvoorbeeld **`Enforced | SR`**.
-
-STF's ingebouwde pseudo-ATO **automatische treinen volgen deze toestandsmachine niet**; een passagier kan ze met modus- of MA-commando's niet naar `FS/SH/SR` omschakelen. `shadow-atp` blijft alleen-lezen; `active-atp` heeft instelbare soepele en strenge profielen. Dit is experimenteel en moet nog op een server worden gevalideerd: **geen gecertificeerde ATP, interlocking of ETCS-implementatie**. Onbekende infrastructuur betekent nooit vrij spoor. SR-goedkeuring is een SkyRail-serviceaanroep en gebeurtenis, geen nieuw ETCS-telegram; v6 MA hergebruikt de eigen Message 1003 / Packet 1015.
-
-### Huidig M3-gedrag
-
-In `Enforced` gebruiken SH/SR de ingestelde maximumsnelheid van de modus: standaard 40 km/h via STCS `ma.sh.speed-kmh` / `ma.sr.speed-kmh`. Overschrijding buiten een kleine detectietolerantie activeert B7 zonder de soepele FS-vertraging; de remcurve naar de EoA kan een lagere snelheid vereisen. Waarschuwingen bij het naderen en overschrijden van de snelheidslimiet werken ook in dit kanaal. Een ATP-ingreep verschijnt als `ATP B7` of `ATP EB` in de zijbalk en de BossBar van de bestuurder. EoA-overschrijding leidt tot TR, een vertaald bericht en een noodremgeluid. De STF-geluiden zijn instelbaar onder `ma-sounds.atp-service` en `ma-sounds.atp-emergency`.
-
-SR-goedkeuring beoordeelt de bereikbaarheid van het doel op de opgeslagen RailGraph los van de huidige MA-afstand. STCS `ma.sr.max-target-distance-meters` begrenst de doelzoekafstand standaard op 5000 m; `ma.sr.max-distance-meters` begrenst elke voortschrijdende autoriteit standaard op 120 m. Goedkeuring reserveert of autoriseert dus niet de hele route naar het doel. Opgeslagen geometrie van gewoon spoor kan over ongeladen chunks worden gecontroleerd; ontbrekende verbindingen, onbekende wisselstanden, onzekere bezetting en conflicten blijven toewijzing of verlenging beperken. SR/Trip-antwoorden en PCC-afwijzingen zijn beschikbaar in het Chinees, Engels, Frans en Japans.
-
-## Vorige incompatibele update: STA v5
-
-De vorige v5-set gebruikte STF **3.0.0**, STCS **3.0.0**, STA **1.0.0** en SkyPCC **1.0.0** samen. Dit zijn historische versies, niet de huidige installatiedoelen. STF blijft zelfstandig bruikbaar; behoud RailGraph en bezettingsregisters bij updates.
-
-Message en Packet hebben aparte nummerreeksen: toegewezen schaduw-MA gebruikt **Message 1003 / Packet 1015**, telemetrie **Message 1136**. Eigen berichten voor verwijdering, graafpositie en wachtende/inactieve autoriteit gebruiken **2001 / 2002 / 2003**. Verwijdering bewijst geen vrij spoor. De verwijzing naar SUBSET-026 is uitsluitend conceptueel, geen ETCS-codering of conformiteitsclaim. Deze alinea beschrijft de vorige v5-basis, niet het nieuwe v6-kanaal. [Migratie](doc/STA-V5-MIGRATION.md).
-
-## Diagnose van knooppuntpassages
-
-`/stcs integrity [treinnaam|uuid]` vereist `stcs.admin`. Het toont de verdeling van voertuigen over kanten en afgeleide passages, met onzekerheid bij ontbrekende waarnemingen. Stilstaan laat bezetting niet verlopen. Deze alleen-lezen diagnose staat in het geheugen en begint opnieuw na een herstart; ze bewijst geen volledige vrijmaking en geeft geen bezetting of MA vrij. Dit is geen voltooide virtuele assenteller. Lokale tests zijn geslaagd; servertests blijven nodig.
-
-## Eerdere update: STF 2.1.5 (2026-09-23)
-
-Schaduwcurves wijzigen geen rijstanden of remmen. Standaard: stilstand 1 m voor EoA en maximaal 5 km/h in de laatste 5 m, aflopend tot nul. Het model voor vlak spoor gebruikt B7-parameters en gemeten snelheid; vertraging wordt niet meer met de theoretische maximumsnelheid gecompenseerd.
-
-De curve staat onder `shadow-atp`; `enforcement-enabled: true` wordt geweigerd. `shadow-atp.warning`: continue waarschuwing volgens de twee bovenstaande banden; stil onder 0.5 km/h. Boven de limiet krijgt het oversnelheidsalarm voorrang; bij 1 km/h eronder keert de gewone waarschuwing terug. Alle drempels zijn instelbaar; het oude `cooldown-millis` wordt genegeerd. `ma-sounds.near-limit` gebruikt standaard `minecraft:block.note_block.flute`; `ma-sounds.overspeed` snellere pulsen van `minecraft:block.note_block.bit`. Beide herhalen zonder pauzes tussen reeksen. Stop treinen voor `/st reload`.
-
-De waarschuwing herhaalt zes C5-G5-paren per reeks totdat de snelheid onder de hysteresegrens komt; een krimpende MA geeft drie korte pieptonen. `pitch-sequence` vervangt `pitch`; `count` herhaalt de reeks (maximaal 64 tonen). Bestaande geluidsinstellingen blijven behouden; zie de [audioconfiguratie](doc/SHADOW-ATP.md#existing-configurations--旧配置更新) voor de nieuwe standaardwaarden.
-
-De testbank leest bij elkaar horende railgraph- en shadow-occupancy.json-bestanden zonder ze te wijzigen. Alleen na controle dat de volledige oorspronkelijke trein verdwenen is: consolecommando `stcs ma clear <volledige-UUID> confirm`. Dit verwijdert alle schaduwbewijzen voor die identiteit, met back-up en audit; historische M1-gegevens blijven behouden. Een niet-geladen trein is niet automatisch verdwenen.
-
-[Home](README.md) | [中文](README.zh.md) | [English](README.en.md) | **Nederlands** | [Русский](README.ru.md)
-
-**Nederlandse uitgave. Zelfstandig leesbaar: aanvullende documentatie is niet nodig om deze handleiding te gebruiken.**
-
-Een suite voor treinbesturing, spoorweginfrastructuur, treinbeveiliging in schaduwbedrijf en verkeersleidingsweergave in Minecraft / Folia. SkyRail Suite is de nieuwe repositorynaam voor de SkyTrain Suite-ontwikkellijn; bestaande pluginnamen, commando's en gegevensmappen blijven gelijk.
-
-Deze handleiding beschrijft de lokale broncodebasis die op **29 september 2026** is gedocumenteerd. De Nederlandse versie is opgesteld op **14 september 2026**, voor serverbeheerders, machinisten, spoorbouwers en pluginontwikkelaars. Besproken toekomstplannen zijn niet automatisch gerealiseerde functies.
-
-> **Beperking van deze ontwikkelversie:** MA/EoA in schaduwbedrijf grijpt niet in op de remmen. Het aparte kanaal `Enforced` kan bij handbestuurde treinen alleen ingrijpen na expliciete activering en een gevalideerde uitvoerbare autoriteit; servertests zijn nog nodig. Een geaccepteerd verzoek, een ogenschijnlijk vrij PCC-spoor of een online RBC bewijst geen veiligheid.
-
-**Voor TrainCarts-ontwikkelaars:** TrainCarts dient als referentie voor delen van de bordinterface en de bediening. Dit document claimt geen volledige TrainCarts-compatibiliteit, gelijkwaardige fysica of ondersteuning van iedere TC-uitbreiding. STF `switch` is niet TC `switcher`. TC en BKCommonLib zijn geen vereiste; laat niet twee plugins dezelfde mijnkar tegelijk besturen.
-
-De code en documentatie van SkyRail Suite vallen onder de MIT-licentie: Copyright (c) 2026 Skyworld Minecraft Server contributors. De beheerder is bereikbaar via GitHub-account moerail. De volledige licentie wordt meegeleverd met het bronpakket en alle vier plugin-JAR's. Logo's en personageafbeeldingen, waaronder day_logo.png en night_logo.png, vallen niet onder deze codelicentie; er wordt geen nieuwe toestemming verleend voor hergebruik of verspreiding van deze afbeeldingen. Controleer de beeldrechten voordat pakketten met deze afbeeldingen worden gepubliceerd.
-
-De bestaande STF-resources bevatten META-INF/NOTICE-TrainCarts.txt met de behouden MIT-verklaring en referentiecommit 9813810aa7e751d3a00d3d087186d44f6e90df10 voor het compatibiliteitswerk aan borden. Deze verklaring blijft ongewijzigd behouden in de broncode en STF-JAR; de copyrightvermelding van de suite vervangt deze niet.
+| Bestand / component | Versie | Taak |
+| --- | --- | --- |
+| SkyworldTrainAPI / STA | **2.7.0** | Getypeerde contracten, telemetrie en bedieningsdiensten |
+| SkyTrainFolia / STF | **5.0.2** | Samenstellingen, fysica, chunktickets, handbediening, TIMS, ATP en uitvoering |
+| STCS | **4.3.5** | Infrastructuur, grafiek, lokalisatie, bezetting, reservering, MA en rijwegarbitrage |
+| SkyATO-Lite / SAL | **0.5.0** | Exploitatieplannen, oproepen, haltes, passagierstitels, depot en overdracht; geen directe entiteitsbediening |
+| SkyPCC / PCC | **2.4.1** | Webkaarten, depotlijsten en gecontroleerde verkeersleiding |
 
 ## Inhoud
 
-1. [Doel en componenten](#1-doel-en-componenten)
-2. [Installatie en updates](#2-installatie-en-updates)
-3. [Rechten en talen](#3-rechten-en-talen)
-4. [De eerste handmatig bestuurde trein](#4-de-eerste-handmatig-bestuurde-trein)
-5. [Commando-overzicht](#5-commando-overzicht)
-6. [Voertuigprofielen en eigenschappen](#6-voertuigprofielen-en-eigenschappen)
-7. [Lijnen en wissels bouwen](#7-lijnen-en-wissels-bouwen)
-8. [Automatische borden en stationshaltes](#8-automatische-borden-en-stationshaltes)
-9. [Schaduw-MA en beveiligingsmodi](#9-schaduw-ma-en-beveiligingsmodi)
-10. [SkyPCC-webinterface](#10-skypcc-webinterface)
-11. [Geluiden en HMI](#11-geluiden-en-hmi)
-12. [STA-contracten en berichten](#12-sta-contracten-en-berichten)
-13. [Gegevensopslag en probleemoplossing](#13-gegevensopslag-en-probleemoplossing)
-14. [Acceptatietests en vervolgstappen](#14-acceptatietests-en-vervolgstappen)
-15. [Technische toelichting voor ontwikkelaars](#15-technische-toelichting-voor-ontwikkelaars)
+1. [Doel, componenten en eindresultaat](#section-1)
+2. [Installatie, migratie en terugdraaien](#section-2)
+3. [Rechten en talen](#section-3)
+4. [De eerste handmatige trein](#section-4)
+5. [Commando-overzicht](#section-5)
+6. [Voertuigprofielen en eigenschappen](#section-6)
+7. [Lijnen en wissels bouwen](#section-7)
+8. [SAL-lijnen, borden en bestuursoverdracht](#section-8)
+9. [Uitvoerbare MA, standaard FS en ATP](#section-9)
+10. [SkyPCC-infrastructuur- en exploitatiekaart](#section-10)
+11. [Geluiden en HMI](#section-11)
+12. [STA-contracten en HTTP](#section-12)
+13. [Opslag en probleemoplossing](#section-13)
+14. [Acceptatie en beperkingen](#section-14)
+15. [Ontwikkeling, broncode en distributie](#section-15)
 
-## 1. Doel en componenten
+<a id="section-1"></a>
 
-SkyTrain Suite gebruikt Minecraft als interactieve spoorwegomgeving. Spelers bouwen fysieke sporen en besturen treinsamenstellingen van mijnkarren. De plugins regelen de beweging, herkennen het spoornet en tonen positie, bezetting en rijtoestemming in de cabine en op een verkeersleidingsscherm.
+## 1. Doel, componenten en eindresultaat
 
-Het project introduceert expliciete besturingsrechten, spoorbezetting, strijdige rijwegen, Movement Authority (MA), End of Authority (EoA) en het bewaren van onzekere waarnemingen. De scheiding van verantwoordelijkheden is geïnspireerd op ETCS. Het is echter **geen SUBSET-026-implementatie, gecertificeerde interlocking of beveiligingssysteem voor echte spoorwegen**.
+**[GEWIJZIGD · 2026-11-21]** Een SAL-exploitatielijn is een geordend rit-/halteplan. Een STCS-infrastructuurlijn bevat toewijzing en kilometrering. SAL gebruikt RailGraph; STCS bepaalt rijweg/MA en laat STA/STF fysiek uitvoeren. Dit is spel-ATP, geen gecertificeerd ETCS-product.
 
-| Component | Versie | Verantwoordelijkheid |
+| Bestand / component | Versie | Taak |
 | --- | --- | --- |
-| SkyTrainFolia / STF | `4.0.6` | Treinsamenstelling, beweging, besturing, fysieke wissels, HMI en experimentele ATP-uitvoering voor handbestuurde treinen |
-| STCS | `4.0.4` | RailGraph, plaatsbepaling, bewaarde bezetting, schaduw- en experimentele operationele MA/EoA |
-| SkyworldTrainAPI / STA | `2.1.1` | Versiegebonden plugincontracten, telemetrie, operationele autorisaties en gebeurtenissen |
-| SkyPCC | `2.0.1` | Verkeersleidingsweergave, inspecties, gebeurtenissen, wisselbediening en SR-goedkeuring |
+| SkyworldTrainAPI / STA | **2.7.0** | Getypeerde contracten, telemetrie en bedieningsdiensten |
+| SkyTrainFolia / STF | **5.0.2** | Samenstellingen, fysica, chunktickets, handbediening, TIMS, ATP en uitvoering |
+| STCS | **4.3.5** | Infrastructuur, grafiek, lokalisatie, bezetting, reservering, MA en rijwegarbitrage |
+| SkyATO-Lite / SAL | **0.5.0** | Exploitatieplannen, oproepen, haltes, passagierstitels, depot en overdracht; geen directe entiteitsbediening |
+| SkyPCC / PCC | **2.4.1** | Webkaarten, depotlijsten en gecontroleerde verkeersleiding |
+
+**[NIEUW · 2026-11-21]** Opgeleverd: SAL-ritten en depotbewegingen, handmatig/automatisch overdragen, incrementele RailGraph, uitvoerbare MA/ATP-weergave en afzonderlijke PCC-exploitatiekaart. SAL heeft blauw `[SkyATO-Lite]`, STF grijs en STCS geel. Oude standaardprefixen migreren; eigen prefixen blijven. De versiepagina toont SAL en de juiste ATP-status.
+
+**[GEWIJZIGD · 2026-11-21]** `<lijn>:up|down`-voorkeursrichting, volledige enkelsporige sectiereservering, algemeen zoeken met meerdere tussentijdse keerbewegingen en de Python-daemon zijn uitsluitend ontwerp. De huidige depotplanner vergelijkt beide startrichtingen bij stilstand, geen willekeurige meermaals kerende route.
+
+[TRAFFIC-PLANNING-DAEMON-DESIGN](doc/TRAFFIC-PLANNING-DAEMON-DESIGN.md)
+
+<a id="section-2"></a>
+
+## 2. Installatie, migratie en terugdraaien
+
+**[GEWIJZIGD · 2026-11-21]** Java25 en ondersteunde Shiroha/Folia26.2 of26.3; gewone browser voor PCC. Geen clientmod of TrainCarts/BKCommonLib vereist; niet elke Folia-versie is compatibel.
+
+1. Pak alles uit, maak back-ups van wereld/plugins en stop de server. Kopieer vijf JARs uit plugins/ naar serverplugins en verwijder oude versies. Documenten zijn geen plugins.
+2. Start voor standaardbestanden, controleer vijf modules, stop en voeg configuratie samen, daarna volledig herstarten. Geen hete verwijdering.
+3. Controleer `/st version en`, `/stcs status`, `/sal help`; open lokaal http://127.0.0.1:8765/ en ververs grondig. Externe toegang vereist eigen proxy/authenticatie.
+4. `/st reload` herlaadt ook treingegevens: eerst alle treinen stoppen. STCS/PCC via herstart. SAL-taken starten als RECOVERY_REQUIRED; na controle brengt resume eerst terug naar depot.
+5. Wis nooit registers voor een update. SHA256 controleert bestanden. Broncode onder Source en alle gelinkte documenten/afbeeldingen zijn bijgevoegd.
 
 ```text
-Minecraft spelers / mijnkarren / rails / redstone
-                       |
-                      STF   Beweging, besturing en uitvoering
-                       |
-                      STA   Contracten, telemetrie en gebeurtenissen
-                       |
-                     STCS   Graaf, plaatsbepaling, bezetting, schaduw-MA
-                       |
-                     SkyPCC Waarneming en bediening via het web
+SkyworldTrainAPI-2.7.0.jar
+SkyTrainFolia-5.0.2.jar
+STCS-4.3.5.jar
+SkyATO-Lite-0.5.0.jar
+SkyPCC-2.4.1.jar
 ```
 
-Dit schema toont verantwoordelijkheden, geen verplichte opeenvolging van alle aanroepen. Interpolatie in de browser is geen bron voor veilige plaatsbepaling. De browser beslist niet welke spoorresources mogen worden toegewezen.
+[SHA256](../Latest/SHA256.json) · [LICENSE](LICENSE) · [ASSET-LICENSE](ASSET-LICENSE.md)
 
-### Gerealiseerd en gepland
-
-| Onderdeel | Huidige status |
-| --- | --- |
-| Handmatige besturing, expliciete overname, EB bij verlies van machinist | Gerealiseerd; na iedere instap opnieuw besturing aanvragen |
-| Samenstelling, beweging in spoorcoördinaten, weergave bij hoge snelheid | Gerealiseerd; hoge snelheid, regiowissels en combinaties met andere plugins vereisen servertests |
-| Pseudo-automatische stationsbediening | MVP met tractie-/remstanden van het profiel, geen complete ATO |
-| Graaf, lijntoewijzing, kilometrering en bewaarde bezetting | Gerealiseerd; timeout of chunk-unload bewijst geen vrijgave |
-| Online MA/EoA en ruimtelijke reserveringen | Schaduwservice blijft adviserend; experimentele operationele autorisaties voor handbestuurde treinen |
-| Wisselbediening via het web | Authenticatie, lokale controles en asynchrone PENDING gerealiseerd |
-| Snelheidscurves aan boord en ATP-ingreep bij te hoge snelheid/EoA | Schaduwcurves alleen-lezen; experimentele `Enforced`-ingreep voor handbestuurde treinen nog niet live veiligheidstechnisch gevalideerd |
-| Volledige bestemmingsroutering en dienstregeling-ATO | Niet als compleet systeem gerealiseerd; routegegevens zijn geen ingestelde rijweg |
-| SkyRail-modi SB/FS/SH/SR/TR/PT voor handbestuurde treinen | Experimentele toestandsmachine, geen ETCS-conformiteit; ingebouwde pseudo-ATO uitgesloten |
-| Aparte SIR-, SkyCBI- of Python-RBC-service | Architectuurideeën, geen huidige installeerbare onderdelen |
-
-## 2. Installatie en updates
-
-### Vereisten
-
-- De huidige aanpassing richt zich op **Shiroha / Folia 26.2 en 26.3 met Java 25**. Geïsoleerde Java-tests slagen op beide versies; controleer de werking op een server vóór productiegebruik.
-- STF bevat versieafhankelijke bewegings-/weergavekoppelingen. `folia-supported: true` garandeert niet alle Folia-versies; `api-version: 1.13` betekent niet dat deze binary op Minecraft 1.13 draait.
-- PCC werkt in een gewone browser, zonder verplichte clientmod.
-- TC/BKCommonLib zijn niet vereist. Voorkom dat meerdere plugins dezelfde mijnkar besturen.
-
-### Eerste installatie
-
-1. Maak een back-up van de wereld en de volledige map `plugins`. Begin op een testserver.
-2. Stop de server, plaats de vier onderstaande JAR-bestanden in `plugins` en verwijder oudere JAR-versies van dezelfde plugins.
-3. Start eenmaal om de standaardconfiguratie te genereren en controleer of alle vier plugins actief worden.
-4. Stop, pas de configuratie aan en start volledig opnieuw. Vervang deze plugins niet via hot-unload.
-5. Voer `/st version` en `/stcs status` uit. Open op de servercomputer `http://127.0.0.1:8765/`.
-
-Huidige installatiebestanden:
-
-```text
-SkyTrainFolia-4.0.7.jar
-STCS-4.0.5.jar
-SkyworldTrainAPI-2.1.3.jar
-SkyPCC-2.0.2.jar
-```
-
-STF/STCS declareren STA als zachte afhankelijkheid, maar installeer alle vier voor de volledige suite. PCC vereist STCS en STA. STF alleen levert niet de volledige graaf-, MA- en verkeersleidingsfunctionaliteit.
-
-### Updateregels
-
-- Gebruik een passende combinatie, vooral als STA-contracten wijzigen. Installeer niet alle historische JAR-bestanden uit `artifacts`.
-- Bewaar bestaande gegevens en voeg nieuwe configuratiesleutels toe vanuit de huidige standaardconfiguratie. Ontbrekende sleutels worden niet noodzakelijk automatisch in een bestaand bestand geschreven.
-- `/st reload` herlaadt ook treingegevens: **zet eerst alle treinen stil**. Het is geen afzonderlijke geluidsreload.
-- Pas STCS/PCC-configuratie toe via een volledige herstart. Deze handleiding introduceert geen niet-bestaande `/stcs reload` of `/skypcc reload`.
-- Na wijzigingen in topologie of graafherkenning: laad het betrokken spoor en voer `/stcs rebuild` uit. Een update van alleen geluid of webinterface vereist normaal geen rebuild.
-- Vernieuw de browsercache na webupdates. Zet bij terugdraaien binaries, wereld en gegevens uit dezelfde back-up terug, geen willekeurige combinatie van registerversies.
+<a id="section-3"></a>
 
 ## 3. Rechten en talen
+
+**[NIEUW · 2026-11-21]** Alleen release, uitstappen, verbreken, bewegen, andere bestuurder/plaats of verlopen bevestiging draagt niet over. Handmatige toestand blijft bewaard. Rechten: skyatolite.driver+skytrain.use; beheer skyatolite.admin.
 
 | Recht | Standaard | Doel |
 | --- | --- | --- |
@@ -219,7 +140,11 @@ Zowel `ja` als `jp` kiest Japans. Alle vier hoofdcommando's bieden `help` en `ve
 
 PCC bewaart zijn taalkeuze afzonderlijk in de browser.
 
-## 4. De eerste handmatig bestuurde trein
+<a id="section-4"></a>
+
+## 4. De eerste handmatige trein
+
+**[GEWIJZIGD · 2026-11-21]** Standaard FS aanvragen is geen verleende FS. Handmatige bestuurder neemt expliciet lease; SAL vereist ook uitvoerbare MA. SB/herstel/ontbrekende MA houden remmen.
 
 Plaats enkele mijnkarren op een recht, geladen testspoor zonder andere treinen in de buurt. Houd de scanstraal klein om geen kar op het naastgelegen spoor mee te nemen.
 
@@ -262,6 +187,8 @@ Selecteer **vak 5** voordat `/st hotbar` wordt ingeschakeld. Inschakelen geeft o
 
 Uitschakelen met `/st hotbar` mag vanuit ieder vak. `/st cab` opent de grafische cabine. Beide vereisen eerst besturingsrechten.
 
+<a id="section-5"></a>
+
 ## 5. Commando-overzicht
 
 `<...>` is verplicht, `[...]` optioneel. Hieronder staan de aanbevolen vormen, niet iedere oude alias. Commando's en configuratiesleutels worden niet vertaald.
@@ -278,7 +205,7 @@ Uitschakelen met `/st hotbar` mag vanuit ieder vak. `/st cab` opent de grafische
 | `/st forward`, `/st neutral`, `/st backward` | Rijrichtingkeuze |
 | `/st p1` t/m `/st p4`, `/st n`, `/st b1` t/m `/st b7`, `/st eb` | Rij-/remhendel; verkorte hoofdcommando's zoals `/p1`, `/n`, `/b7` bestaan ook |
 | `/st horn`, `/st bell` | Hoorn/bel |
-| `/st lang zh\|en\|fr\|jp` | Spelertaal |
+| `/st lang zh\|en\|fr\|jp\|ru` | Spelertaal |
 | `/st speedunit kph\|mph\|block/tick` | Weergave-eenheden, alias `/st unit`; wijzigt geen numerieke beheereenheden |
 | `/st balise [info]`, `/st origin [info]`, `/st end [info]` | Nabije infrastructuur |
 | `/st mileage [train]` | Kilometrering; een specifieke trein opgeven vereist beheerrechten |
@@ -321,7 +248,7 @@ Eigenschappen accepteren ook `property <train> get <key>` en `property <train> s
 | `/stcs help [page] [language]`, `/stcs version [language]` | Hulp/versie |
 | `/stcs inspect` | `stcs.use`; markering binnen 3 blokken |
 | `/stcs status` | `stcs.use`; knopen/verbindingen/graafrevisie, niet de ATP-modus |
-| `/stcs ma fs` | `stcs.ma` en huidige machinist; schaduw-MA aanvragen |
+| `/stcs ma fs` | **[GEWIJZIGD]** Standaard FS aanvragen is geen verleende FS. Handmatige bestuurder neemt expliciet lease; SAL vereist ook uitvoerbare MA. SB/herstel/ontbrekende MA houden remmen. |
 | `/stcs ma release` | `stcs.ma` en huidige machinist; reserveringen vóór de trein vrijgeven, niet de bezetting onder de trein |
 | `/stcs ma status` | `stcs.admin`; MA-/blokkeerdiagnose |
 | `/stcs admin status` | `stcs.admin`; beveiligingsstatus van de trein waarin men zit |
@@ -329,12 +256,20 @@ Eigenschappen accepteren ook `property <train> get <key>` en `property <train> s
 | `/stcs admin bypass true\|false` | Bewaking overbruggen |
 | `/stcs admin shadow true\|false` | Schaduwtestmodus |
 | `/stcs occupancy [train-name\|uuid]` | `stcs.admin`; bewaarde bezetting/voertuigwaarnemingen |
-| `/stcs rebuild` | `stcs.admin`; graaf uit geregistreerde infrastructuur herbouwen |
+| `/stcs rebuild` | **[GEWIJZIGD]** STCS bezit fysieke grafiek; spoor/apparaatwijzigingen lokaal. Wisselstand is niet topologie. rebuild begint rond beheerder, alleen geladen bronnen. |
 | `/stcs export` | `stcs.admin`; huidige graaf exporteren, niet opnieuw scannen |
 | `/stcs switch info` | `stcs.use`; dichtstbijzijnde wissel binnen 8 blokken |
 | `/stcs switch change` | `stcs.admin`; nabije wissel omzetten |
 
-Het spelerscommando is **`demand`, niet `request`**. Interne gebeurtenissen kunnen nog `MA_REQUESTED` heten. `/sta` en `/skypcc` bieden vooral hulp/versie, geen tweede verzameling rijcommando's.
+~~Het spelerscommando is **`demand`, niet `request`**. Interne gebeurtenissen kunnen nog `MA_REQUESTED` heten. `/sta` en `/skypcc` bieden vooral hulp/versie, geen tweede verzameling rijcommando's.~~
+
+**[GEWIJZIGD · 2026-11-21]** `/stcs ma fs` · `/stcs ma demand` (alias)
+
+**[OPVRAGEN · 2026-11-21]** `/sal help` · `/sal status` · `/sal route list Line1` · `/sal train home`
+
+Alleen release, uitstappen, verbreken, bewegen, andere bestuurder/plaats of verlopen bevestiging draagt niet over. Handmatige toestand blijft bewaard. Rechten: skyatolite.driver+skytrain.use; beheer skyatolite.admin.
+
+<a id="section-6"></a>
 
 ## 6. Voertuigprofielen en eigenschappen
 
@@ -375,7 +310,8 @@ Een profiel beschrijft een complete referentietrein. Het aantal Minecraft-karren
 | `resistance.air-mps2-at-100-kmh` | Luchtweerstand bij 100 km/h, schaalt met het kwadraat van de snelheid |
 | `resistance.grade-mps2` | Factor voor hellingsversnelling |
 | `control.direction-change-speed-kmh` | Lage-snelheidsgrens voor richtingwisselen |
-| `automatic.*` | Parameters van de bestaande doelsnelheidsregeling, niet de complete stationstrategie |
+| `automatic.*` | **[GEWIJZIGD]** Samenstellingen, fysica, chunktickets, handbediening, TIMS, ATP en uitvoering / V_target |
+
 
 Oude losse sleutels zoals `drive-power-acceleration-p1` zijn niet de huidige profielinterface. Maak een back-up en zet alle treinen stil vóór herladen, of wijzig terwijl de server uitstaat en herstart.
 
@@ -411,7 +347,11 @@ Bij de nominale schaal van 1 blok = 1 meter en 20 TPS geldt `km/h = blocks/tick 
 - `pushable=true` alleen is onvoldoende: machinistbesturing, niet-vrijgegeven handmatige overname of rijstatus kunnen duwen blokkeren. Controleer `/st info`.
 - Owner/tag/route-metadata impliceert geen complete routering, verkeersleiding of toegangsisolatie per eigenaar.
 
+<a id="section-7"></a>
+
 ## 7. Lijnen en wissels bouwen
+
+**[GEWIJZIGD · 2026-11-21]** STCS bezit fysieke grafiek; spoor/apparaatwijzigingen lokaal. Wisselstand is niet topologie. rebuild begint rond beheerder, alleen geladen bronnen.
 
 ### Fysieke topologie en lijntoewijzing
 
@@ -508,203 +448,238 @@ graph:
 
 De scanafstand is niet de MA-vooruitkijkafstand. Lange secties vereisen passende ankers of een grotere scanlimiet. Houd de STF/STCS-schalen gelijk, normaal 1 blok per meter.
 
-## 8. Automatische borden en stationshaltes
+<a id="section-8"></a>
 
-Station/spawn/destroy volgen op TC geïnspireerde conventies. De railkoppeling gebruikt de bordkolom onder de rail en bevestigingsrelaties, niet een willekeurige bol rondom de rail. **Ondersteuning van deze vormen betekent geen volledige compatibiliteit met TC-expressies, afstandsborden of uitbreidingen.**
+## 8. SAL-lijnen, borden en bestuursoverdracht
 
-Een handmatig bestuurde trein wordt niet door station/destroy overgenomen. Stop, laat de machinist `/st release` uitvoeren en stel expliciet `/st property <train> mode auto` in. ISOLATED, RECOVERING en niet-vrijgegeven handmatige overname kunnen automatisch gebruik eveneens blokkeren.
+**[NIEUW · 2026-11-21]** Eén oproep geeft één rit, geen eindeloze lus of dienstregeling. Eerste/laatste bezoek zijn stations; herhaling mag. Bind tussenliggende bakens/wissels om vertakkingen eenduidig te maken. SAL maakt geen trein aan: eerst STF-samenstelling en depot.
 
-Gebruikelijke koppen: `[stf]` gebruikt redstone, `[+stf]` is continu actief, `[!stf]` geïnverteerd, `[-stf]` uitgeschakeld. De parser kent ook vormen voor stijgende/dalende flanken; de daadwerkelijke activering hangt af van de actie.
+### Commando en selectie
 
-### Station
+1. Maak Line1 in de vertrekrichting, of stel de windrichting in.
+2. Plaats eerste station en bind apparatuur in volgorde. Meerdere kandidaten binnen8blokken: choose binnen60seconden; expliciete UUID/station ID mag.
+3. Nieuwe stations worden op plaatsingsvolgorde toegevoegd. Controleer list; remove verwijdert bezoek vanaf index1. Bind het eerste station opnieuw als eindpunt.
+4. reverse na een stationbinding keert na dat bezoek; geen automatische omkering op elke willekeurige plek.
+5. preview duurt twee minuten, groen bij gesloten route, anders rood. Groen is geen vrije baan of MA. validate bewaart validatie; publish maakt oproepen mogelijk.
+~~6. Een lijn met taak is niet bewerkbaar. Alleen gewijzigde afhankelijkheden vereisen hercontrole; ongerelateerde grafiekwijzigingen houden publicatie.~~
+
+**[NIEUW / GEWIJZIGD]** Eerst depot registreren. Klik bakens, wissels, gerichte graafranden en stations van deze lijn; wijzig volgorde, wachttijd en keren zonder borden te herschrijven. Opslaan, controleren en publiceren zijn aparte stappen. Lopende taken behouden hun eigen gepubliceerde versie.
+7. Plaats depot/snelheid/message, maak en bind trein en roep via knop/awake.
 
 ```text
-[+stf]
-station
-5
-continue 40kmh
+/sal route create Line1
+/sal route direction Line1 east
+/sal route bind Line1
+/sal route choose 1
+/sal route bind Line1 <deviceUUID>
+/sal route bind Line1 <stationID> reverse
+/sal route list Line1
+/sal route remove Line1 <index>
+/sal route preview Line1
+/sal route preview Line1 off
+/sal route validate Line1
+/sal route publish Line1
 ```
 
-| Regel | Betekenis |
-| --- | --- |
-| 1 | Kop/activering |
-| 2 | station, eventueel ondersteunde vertrekafstand/-tijd/-versnelling en stopoffset |
-| 3 | Halteertijd; kaal getal in seconden, ook `5s`, `100t`, `00:05` |
-| 4 | Richting/snelheid, bijvoorbeeld `continue 40kmh` of `reverse 0.4`; zonder eenheid blokken/tick |
+### Borden per regel
 
-Automatische treinen kunnen Station-borden vooruit ontdekken door de werkelijke rails te volgen, zonder lijnnaam, balises of STCS-kalibratie. De zoekactie volgt de ingestelde wisseltak, laadt geen chunks en detecteert geen voorliggende treinen. Dit is geen ATP of botsbeveiliging.
+`[SAL]` = `[SkyATOL]`
 
-Het stoppunt is het midden van de voorste mijnkar in de rijrichting, plus de stationoffset; er wordt geen halve treinlengte meer toegevoegd. Vanaf 2.1.3 kiest de virtuele machinist de remstand op basis van de resterende afstand. Onder de remcurve wordt uitgerold; alleen bij werkelijk te vroeg stoppen volgt langzaam bijrijden met hysterese. Bij stilstand en HOLD blijft B7 actief; handmatige bediening verandert niet.
-
-Voeg onder de bestaande STF-sectie `settings` de instelling `station-local-look-ahead-blocks: 256.0` toe. Bereik: 0–1024 blokken; 0 schakelt lokaal zoeken uit. Er wordt hoogstens iedere 200 ms gezocht, uitsluitend op geladen rails binnen de huidige Folia-thread. Dit is een maximale zoekafstand, geen gegarandeerde remweg. Optioneel STA/STCS-graafadvies gebruikt afzonderlijk `station-look-ahead-blocks` (standaard 8192). Test eerst langzaam met voldoende geladen spoor.
-
-### V_target-eigenschapsbord (Vanaf 2.1.2)
-
-Dit bord wijzigt de doelsnelheid van automatische treinen, niet hun maximumsnelheid of besturingsmodus. Handmatige treinen negeren het. Alleen `V_target` is toegestaan op eigenschapsborden; andere eigenschappen worden via beheerderscommando's ingesteld.
+#### depot
 
 ```text
-[+stf]
+[SAL]
+depot
+maintown
+L1
+```
+
+depot: regel3 maintown, regel4 plaats L1. L2/L3 elk eigen bord, eventueel verspreid. Depot is geen vertrekstation. Behalve awake koppelen aan een geregistreerde RailGraph-spoorkolom.
+
+#### station
+
+```text
+[SAL]
+station
+15
+Line1
+```
+
+station: regel3 wachttijd in seconden, regel4 SAL-lijn. Eerst lijn maken. Geen apart naamveld; PCC toont lijn en volgorde.
+
+#### awake
+
+```text
+[SAL]
+awake
+maintown
+Line1
+```
+
+awake: regel3 depot, regel4 lijn. Stijgende redstoneflank op bord/steun roept; spoor eronder niet nodig. Permanente voeding/start roept niet, dubbele oproepen worden samengevoegd.
+
+#### property / v_target
+
+```text
+[SAL]
 property
 V_target
-60km/h
+36km/h
 ```
 
-Zonder eenheid geldt blokken/tick: `0.4`, `8m/s` en `28.8km/h` zijn gelijk bij 20 ticks/s en één blok per meter. De eigenschap wordt opgeslagen, respecteert trein- en profielmaxima en start een stilstaande trein niet zelfstandig. Een expliciete stationvertreksnelheid heeft voorrang; anders geldt V_target, met `settings.station-launch-speed` (standaard 0.4) als terugval. `[+stf]` is altijd actief; `[stf]` gebruikt redstone. Beheerders gebruiken `/st property demo V_target 60km/h` om in te stellen en `/st property demo get V_target` om uit te lezen.
-
-### Spawn en Destroy
+property alleen V_target met snelheid regel4. v_target kort: snelheid regel3, regel4 leeg. km/h, kmh, m/s, m/t, b/t, mph; geen eenheid=blokken/tick. Voertuig-/treinlimiet en ATP blijven gelden.
 
 ```text
-[stf]
-spawn 0.0
-mmm
+[SkyATOL]
+v_target
+36km/h
 
 ```
 
-Genereer met gecontroleerde redstone drie gewone mijnkarren. Regel 2 accepteert `spawn [velocity] [interval]`, met bijvoorbeeld `00:30` als interval; regels 3 en 4 vormen samen het patroon. Basissymbolen: `m` gewoon, `s` kist, `p` oven, `h` trechter, `t` TNT, naast ondersteunde sjabloonpatronen. Gebruik aanvankelijk geen TNT.
-
-Sjablonen voor automatisch genereren moeten expliciet in auto zijn opgeslagen. Laat niet continu treinen op een onbeveiligde lijn verschijnen.
+#### message
 
 ```text
-[+stf]
-destroy
-
-
+[SAL]
+message
+Skyworld
+5
 ```
 
-Destroy verwijdert daadwerkelijk entiteiten. Test op een apart spoor met back-up; een handmatig bestuurde trein hoort niet te worden verwijderd. Test eerst station, daarna spawn/destroy afzonderlijk.
+message: letterlijke tekst regel3, seconden regel4. Centrale Title voor eigen passagiers; nieuwe tekst overschrijft direct, geen wachtrij of commando-uitvoering.
 
-## 9. Schaduw-MA en beveiligingsmodi
+### Treinen en uitvoering
 
-| Term | Betekenis in deze suite |
-| --- | --- |
-| MA / Movement Authority | Schaduwrijtoestemming langs een toegestaan gericht pad |
-| EoA / End of Authority | Einde van de huidige rijtoestemming, niet noodzakelijk lijneinde |
-| Credit | Resterende padafstand tot EoA, niet de rechte afstand |
-| Occupancy | Spoorbezetting volgens voertuigwaarnemingen/bewaard bewijs |
-| Reservation | Reservering vóór de trein, geen gecertificeerde rijwegvergrendeling |
-| RBC link | Status van het schaduwinformatiekanaal, geen bewijs van een radio-RBC of werkzame ATP |
+**[GEWIJZIGD]** Cirno — SAL
 
-### Werkwijze voor de machinist
-
-1. Controleer topologie, wissels, plaatsbepaling en het echte testtraject.
-2. Stap in, `/st drive`, stop en kies richting in een modus die aanvragen toestaat.
-3. `/stcs ma fs`; controleer resultaat/reden, niet alleen acceptatie van de aanvraag.
-4. De BossBar toont de resterende MA, de HMI EoA-lijn/kilometrering en PCC de gereserveerde intervallen.
-5. Regel snelheid en stoppen handmatig. `/stcs ma release` geeft de reserveringen vóór de trein vrij.
-
-Treinen zonder machinist verkrijgen niet actief nieuwe MA. Een stilstaande trein met machinist is iets anders. MA vrijgeven wist geen bezetting onder de trein en is geen stopcommando.
-
-### Toestandsmachine
-
-| Status | MA/kanaal | Actief gedrag |
-| --- | --- | --- |
-| SHADOW | Schaduwaanvragen/herkenning toegestaan | Geen ATP-ingreep op MA/snelheid |
-| BYPASS | Kanaal blijft; schaduw-MA kan behouden/aangevraagd worden | Bewaking overbrugd, communicatie niet geïsoleerd |
-| ISOLATED | Nieuwe aanvragen geweigerd, kanaal aan boord geïsoleerd | Alleen-lezen kilometrering en STA-telemetrie blijven, automatische borden uit |
-| RECOVERING | Geen nieuwe geldige MA aan boord | Rem vasthouden, tractie geweigerd, expliciete volgende modus vereist |
-
-Modi worden met treingegevens opgeslagen. Een toepasselijke schakelaar op `false` zet RECOVERING. Een doelmodus op `true` vereist RECOVERING, recente waarnemingen van de complete trein en stilstand. Niet zomaar tijdens het rijden naar een andere modus schakelen.
-
-Beheerder in de betreffende trein, bijvoorbeeld:
+Beheerder in samengestelde stilstaande trein stelt home in: depot, geen vaste L1. Nieuwe bestuurderloze trein kan op zijn depotmarkering worden geduwd voor langzame STF-parkeerovername. Oproep vereist verse complete waarneming, geen TIMS-houding, menselijke bestuurder of andere taak.
 
 ```text
-/stcs admin shadow false
-/stcs admin status
+/st create demo 6
+/sal train home maintown
+/sal train home
+/sal awake maintown Line1
+/sal status
 ```
 
-Na stilstand van de complete trein:
+Oproep→uit depot→eerste station→rit/haltes→laatste station→passende plaats reserveren→terug en stoppen. Ook zonder instappers één rit. Passagiers mogen mee terug; volgende ronde vraagt nieuwe oproep. Geschikte trein van dezelfde lijn nog op eerste station wordt hergebruikt: terugkeer annuleren, zo nodig veilig keren, volledige wachttijd opnieuw. Niet na vertrek of storing.
+
+Route via RailGraph, onafhankelijk van huidige fysieke wisselstand. STCS legt om via STA/STF. Keren: oude MA vrijgeven, stilstand/omkering bevestigen, opnieuw plannen vanaf echte voorste wagen. Geen ruimte/plaats/pad: wachten.
+
+### Handmatige/automatische overdracht
+
+Automatisch→handmatig: alleen complete stilstaande PARKED-depottrein zonder taak/storingshoud met `/sal release`, daarna wachten en `/st drive` in eindwagen. Niet onderweg naar depot.
+
+Handmatig→automatisch: bestuurderslease,3seconden volledig stil op geldige plaats, SAL bevestigen, binnen30seconden expliciet `/st release` of tweede knop. Werkelijk depot wordt home; geen direct vertrek.
+
+Alleen release, uitstappen, verbreken, bewegen, andere bestuurder/plaats of verlopen bevestiging draagt niet over. Handmatige toestand blijft bewaard. Rechten: skyatolite.driver+skytrain.use; beheer skyatolite.admin.
 
 ```text
-/stcs admin bypass true
+/sal release
+/st drive
 ```
 
-Teruggaan: `bypass false`, stoppen, `shadow true`. Een moduswijziging schakelt tractie uit/remt, maar veroorzaakt geen automatisch vertrek. Na isolatie bewaarde grondreserveringen zijn geen bruikbare MA aan boord en geen grond voor verlenging.
+### Lege treinen en storingen
 
-### Drie afstandsinstellingen
+```text
+/sal stop <trainUUID>
+/sal resume <trainUUID>
+/sal finish <trainUUID>
+```
 
-In STCS:
+stop houdt; resume na controle herstelt eerst terugkeer; finish vraagt betrouwbare positie en complete stilstand voor MA-vrijgave/einde. Parameter=trein-UUID.
+
+STF-tickets zonder passagier; asynchroon laden en tickets op eigenaarregio. Onklaar chunk blokkeert tractie. Lege-serverpauze apart uitschakelen met pause-when-empty-seconds=-1.
+
+TIMS-herstel pas na echte integriteit, maximaal3pogingen; geen leden wijzigen, opnieuw spawnen of lichaamsbezetting wissen. Echte schade handmatig inspecteren.
+
+Padfout geeft PCC-alarm. Eerst stil, compleet en betrouwbaar gelokaliseerd, dan SR-aanvraag. Elke sectie opnieuw goedkeuren; geen eindeloze automatische SR.
+
+[SAL-MANUAL-HANDOVER](doc/SAL-MANUAL-HANDOVER.md) · [SAL-DEPOT-AND-RETIREMENT](doc/SAL-DEPOT-AND-RETIREMENT.md)
+
+<a id="section-9"></a>
+
+## 9. Uitvoerbare MA, standaard FS en ATP
+
+**[GEWIJZIGD · 2026-11-21]** Standaard FS aanvragen is geen verleende FS. Handmatige bestuurder neemt expliciet lease; SAL vereist ook uitvoerbare MA. SB/herstel/ontbrekende MA houden remmen.
+
+FS bewaakt snelheid/EoA; SH/SR standaard maximaal40km/h of lagere curve. TR stil: ack→PT, release→SB, controleren en opnieuw aanvragen. TIMS eerst werkelijk herstellen/bevestigen.
+
+Eerste padaanvraag, daarna stille verlenging terwijl STCS MA uitbreidt. Gewijzigd pad/versie, verlopen lease of verloren controle vraagt nieuw geldig verzoek; laat bericht herstelt niets.
+
+Schaduwtest simulationOnly=true/executable=false is geen uitvoerbare MA. BYPASS/ISOLATED/RECOVERING behouden voorwaarden.
+
+MA-vrijgave bewaart lichaamsbezetting. Ontladen/tijd/verbreking bewijzen geen uitrijden. Expliciete verwijdering vereist volledig STF-bewijs en opgeruimde virtuele bestuurder; vrijgave alleen betreffende trein.
+
+```text
+/stcs ma fs
+/stcs ma status
+/stcs ma ack
+/stcs ma release
+```
+
+### Configuratie en lokale grafiek
+
+STCS bezit fysieke grafiek; spoor/apparaatwijzigingen lokaal. Wisselstand is niet topologie. rebuild begint rond beheerder, alleen geladen bronnen.
+
+Ontladen bewaart bewezen verbindingen. Nooit waargenomen richting blijft onbekend; bekende breuk blijft fout na ontladen. Bezetting, fysieke bevestiging en MA apart.
+
+Standaard elke60seconden, bereik1–86400, batch1–64bronnen. Gezonde controle verhoogt revision niet. SAL controleert geraakte afhankelijkheden; MA houdt globale versiecontrole.
 
 ```yaml
+graph:
+  review-interval-seconds: 60
+  sources-per-tick: 4
 ma:
   enabled: true
   look-ahead-meters: 600.0
   lock-distance-meters: 150.0
   max-authority-distance-meters: 300.0
-  margin-meters: 2.0
+  check-exit-capacity: true
 ```
 
-| Sleutel | Betekenis |
-| --- | --- |
-| `look-ahead-meters` | Zoeklimiet; niet alles wat gevonden wordt, wordt gereserveerd |
-| `lock-distance-meters` | Naderingsafstand waarbinnen schaduw-MA een wissel mag passeren; verder weg stopt die ervoor, geen bewijs van fysieke vergrendeling |
-| `max-authority-distance-meters` | Werkelijke Credit-limiet, ook beperkt door vooruitkijken |
-| `margin-meters` | Marge vóór een obstakel/conflict, geen complete remweg |
+`look-ahead` ≠ `lock-distance` ≠ `max-authority-distance`
 
-De oude `ma.horizon-meters` levert compatibiliteitswaarden voor ontbrekende nieuwe sleutels. Stel de drie expliciet in bij nieuwe configuraties. STF `switch-approach-distance`, stationvooruitkijken en BossBar-schaal blijven afzonderlijk.
+`FS lock = max(lock-distance, v²/(2a) + v×lead + buffer)`
 
-### Opvolgen, parallelle rijwegen en wisselgebieden
+`a = 1 m/s²; lead = 5 s; buffer = 25 m; v = m/s`
 
-Ruimtelijke MA gebruikt fysieke railcellen en intervallen binnen verbindingen, niet een complete balise-tot-balise-verbinding als exclusief bezit. Tegengestelde gerichte verbindingen delen dezelfde fysieke resource.
+[RAILGRAPH-INCREMENTAL](doc/RAILGRAPH-INCREMENTAL.md) · [STCS-DYNAMIC-SWITCH-LOCK](doc/STCS-DYNAMIC-SWITCH-LOCK.zh.md) · [CONFIGURATION-SWITCHES](doc/CONFIGURATION-SWITCHES.md)
 
-- Opvolgende treinen horen begrensd te worden door de voorafgaande bezettings-/reserveringsgrens, niet steeds door de vorige balise.
-- Parallelle rijwegen zonder gedeelde resources/conflicten horen samen te kunnen bestaan; niet het hele wisselgebied vergrendelen wegens nabijheid.
-- De niet-bereden wisseltak hoort niet automatisch onder de treinbezetting te vallen.
-- Vóór binnengaan moet voorbij het wisselgebied ruimte zijn voor de hele trein; anders wachten vóór de ingang.
-- Onbekende graaf-/wisselstatus, ontbrekende voertuigen en bewaard bewijs kunnen toewijzing blijven blokkeren. Een visueel vrij spoor rechtvaardigt niet het overslaan van controles.
+<a id="section-10"></a>
 
-Voertuigprojectie en asynchrone consistentie blijven conservatief, geen bewezen oplossing voor treinintegriteit of de volledige door de trein bestreken ruimte. Obstakels worden langs het pad per kwart blok bemonsterd, maar de resources zijn fysieke railcellen. Dit is schaduwtoewijzing op blokschaal, geen gecertificeerde continue moving-block-ATP. Reserveringen eindigen bij het toegekende interval. Een gedeelde wisselcel kan een kort uiteinde van een niet-gebruikte tak kleuren zonder die hele tak te reserveren.
+## 10. SkyPCC-infrastructuur- en exploitatiekaart
 
-Resource-ID's gebruiken `cell@world:x:y:z`. Oude bezettingsrecords voor hele verbindingen blijven conservatief blokkeren totdat een complete, recente waarneming ze vervangt. Unload, herstart, ontbrekende voertuigen en een afwijkende graaf wissen het bewijs niet vanzelf. Een offline trein met oude records kan dus nog een groter gebied blokkeren. Gebruik bij teruggaan naar een oudere versie niet zomaar een nieuwer register zonder bijpassende back-up.
+~~**[NIEUW · 2026-11-21]** Infrastructuurkaart houdt apparatuur, kilometrering, bezetting, MA en bediening. Exploitatiekaart heeft apart canvas/zicht zonder bakens/wissels/origins; alle of één SAL-lijn.~~
 
-## 10. SkyPCC-webinterface
+**[NIEUW / GEWIJZIGD]** Eén RailGraph met afzonderlijk aanklikbare infrastructuur-, SAL-, exploitatie- en livelagen. Open de editor met het bestaande wisseltoken, kies een lijn of maak een concept met minstens één geregistreerd depot.
+
+DRAFT gestippeld; VALIDATED lange streep na geldige controle; PUBLISHED doorgetrokken na geldige publicatie. Geschatte conceptverbinding is expliciet onbevestigd.
+
+Depot kiezen markeert alle plaatsen. Totaal bevat gemarkeerde ongeldige plaatsen. Geparkeerd=vers/compleet, geen TIMS, op precies één geldige plaats. Rijdend=SAL-taak, inclusief wachttijd, pauze en herstel.
+
+Overig/onbekend: handmatig, elders wachtend, ontbrekende waarneming. Lege omtrek is geen vrijeplaatsgarantie. Verouderde data wordt onbekend, geen nul of actuele oude positie.
+
+Klik plaats voor locatie, trein voor details; aparte zoom, labels, thema en wereldkeuze. PCC zh/en/fr/ja; STF ook ru. Nederlandse handleiding voegt geen speltaal toe.
+
+Schrijven vereist web.control-enabled en Bearer; web.require-https-for-control standaardtrue. false versoepelt alleen HTTPS. Geen geheimen inbegrepen.
 
 ```yaml
 web:
   enabled: true
   bind-address: 127.0.0.1
   port: 8765
-  control-enabled: false
-  control-token: ''
-  update-mode: auto
-  poll-interval-millis: 1000
-  sse-keepalive-seconds: 15
+  require-https-for-control: true
 ```
 
-Open `http://127.0.0.1:8765/` op de servercomputer. Op een andere computer verwijst dat adres naar die computer zelf. Gebruik voor afstandsbediening een lokale SSH-tunnel; publiek luisteren is geen beveiligingsoplossing.
+[PCC-OPERATING-MAP](doc/PCC-OPERATING-MAP.md)
 
-### Weergave
-
-- Chinees/Engels/Frans/Japans, lichte/donkere thema's en meegeleverde dag-/nachtlogo's.
-- Lijnfilter, zoom, passend beeld en tekstschaal.
-- Treinen die op plaatsbepaling wachten blijven in de lijst; bewaarde regels zijn geen recente posities.
-- Kaartlabels: `<ritnummer> | <treinnaam> | <snelheid> km/h`, met een aanduiding als het ritnummer ontbreekt.
-- Treininspectie en camera volgen/annuleren: ATP-modus, MA/EoA, reden, richting, rijrichtingkeuze, hendel, machinist, kilometrering, verbinding en gegevensleeftijd.
-- Wisselnamen hebben vet zwart op geel; aparte pijlen: paars rechtdoor, oranjegeel afbuigend.
-- Klik op balises, wissels of verbindingen voor infrastructuurinspectie. Bevestigde hoofdlijnkilometrering wordt getoond; anders afstanden naar aangrenzende graafknopen/poorten zonder kilometrering te verzinnen.
-- Wisselstatus is een ontvangen momentopname, geen nieuwe fysieke controle door de browser.
-- Bezet, bevroren/onzeker, schaduwgereserveerd en niet-toegewezen hebben eigen kleuren. Grijs betekent niet bewezen vrij.
-- Operations log ondersteunt ernstfiltering, inklappen en naar boven vergroten.
-
-### Wissels bedienen
-
-Zet `control-enabled` aan, stel een privé willekeurig token van **minstens 32 tekens** in en herstart. Voer het via de bedieningsinterface in, nooit via URL, screenshot of openbaar log.
-
-Selecteer en inspecteer een wissel, bevestig daarna omzetten. De aanvraag bevat graafrevisie, identiteit, verwachte/doelstand en positie. STCS controleert lokaal; STF voert uit.
-
-- Onverwante verre treinen blokkeren niet automatisch, maar lokale bezetting, reserveringsconflicten, onzekerheid en afwijkende stand/positie kunnen dat wel.
-- Een ongeladen locatie kan PENDING worden, waarna asynchroon laden en opnieuw valideren in de verantwoordelijke regio volgt. PENDING is geen succes en geen toestemming om door te rijden.
-- Alleen een correct token is onvoldoende: loopback en same-origin worden eveneens gecontroleerd.
-- Publieke alleen-lezen toegang vraagt eigen toegangscontrole; waarnemingstoegang en bedieningsgeheimen zijn verschillende zaken.
-
-### Gebeurtenissen
-
-Het log bevat overname/vrijgave/verlies van besturing, wisselomzettingen, vermoedelijk openrijden van wissels, EB-activering, MA-aanvragen/vrijgaven en moduswijzigingen. Modusgebeurtenissen noemen uitvoerder en oude/nieuwe status; de beheerder is niet noodzakelijk de machinist.
-
-STA bewaart standaard de laatste 500 gebeurtenissen van de huidige sessie, geen permanent auditarchief. Niet iedere vloeiende MA-update wordt een gebeurtenis. Vermoedelijk openrijden is geen volledig bewezen foutdiagnose.
+<a id="section-11"></a>
 
 ## 11. Geluiden en HMI
 
-De BossBar voor de machinist toont MA-informatie en de schaduwsnelheidslimiet, die ook op de tweede zijbalkregel staat. Ongeldige curves tonen `--`. De interface ondersteunt Chinees, Engels, Frans en Japans. `settings.cab-ma-bar-range-meters` is standaard 300 m en bepaalt alleen de schaal.
+~~De BossBar voor de machinist toont MA-informatie en de schaduwsnelheidslimiet, die ook op de tweede zijbalkregel staat. Ongeldige curves tonen `--`. De interface ondersteunt Chinees, Engels, Frans en Japans. `settings.cab-ma-bar-range-meters` is standaard 300 m en bepaalt alleen de schaal.~~
+
+**[GEWIJZIGD]** Standaard FS aanvragen is geen verleende FS. Handmatige bestuurder neemt expliciet lease; SAL vereist ook uitvoerbare MA. SB/herstel/ontbrekende MA houden remmen. FS bewaakt snelheid/EoA; SH/SR standaard maximaal40km/h of lagere curve. TR stil: ack→PT, release→SB, controleren en opnieuw aanvragen. TIMS eerst werkelijk herstellen/bevestigen.
 
 ### MA-geluiden configureren
 
@@ -756,46 +731,39 @@ Meer remming of remmen vanuit N/tractie geeft een aanleggeluid; volledig lossen 
 
 Stop alle treinen vóór `/st reload`; dit herlaadt gegevens, niet alleen geluid.
 
-## 12. STA-contracten en berichten
+<a id="section-12"></a>
 
-STA biedt voornamelijk Java-services binnen de server-JVM, niet automatisch een Python TCP/WebSocket-RBC. PCC levert de bestaande HTTP/SSE-waarneming en beperkte wisselbedieningsgateway.
+## 12. STA-contracten en HTTP
 
-| Contract/gegevens | Hoofdproducent | Hoofdafnemer | Betekenis |
-| --- | --- | --- | --- |
-| v5 TELEMETRY_REPORT / 1136 | STF | STCS/abonnees | Fysieke telemetrie |
-| v5 TRACK_REPORT / 2002 | STCS | PCC/abonnees | Graafpositie gekoppeld aan de oorspronkelijke waarneming |
-| v5 TRAIN_REMOVED / 2001 | Opruiming bij de bron | Registers/abonnees | Geen toestemming om bezettingsbewijs te wissen |
-| v5 RailNetworkService | STCS | STF/anderen | Graaf, navigatie, positie, stationvooruitkijken |
-| v3 ConsistObservation | STF | STCS | Voertuigwaarnemingen/levenscyclus |
-| v3 RailwayEvent | STF/STCS | PCC/abonnees | Bedrijfsgebeurtenissen |
-| v5 DriverDeskService | STF | STCS | Machinist, besturingsrecht, ATP-modus |
-| v5 ShadowAuthorityService | STCS | STF/PCC | Niet-uitvoerbare MA/EoA en secties |
-| v5 SwitchControl | Aanvrager zoals PCC; STCS controleert, STF voert uit | Aanvrager | Versie-/stand-/positiecontrole en PENDING |
+**[GEWIJZIGD · 2026-11-21]** STA is een Java-contract binnen hetzelfde proces, geen actieve Python/TCP RBC. Message, Packet en interfacefamilie onderscheiden; sessie, volgnummer, versie en tijd controleren.
 
-Er zijn drie generieke v5-berichttypen, maar de API bevat daarnaast afzonderlijke momentopnamen, gebeurtenissen en services. Die vallen niet allemaal onder die drie typen.
+ATO privé-Message6508; SUBSET_139 Packet1031/1032 als31/32+1000. Privé5115–5118 voor verlengen/parkeren/overdracht. MA Message1003/Packet1015; telemetrie1136.
 
-v5-headers bevatten version, kind, source, sessionId, sequence, emittedAt en trainId. Kwaliteitswaarden zijn onder andere VALID, UNLOCATED, STALE, EXPIRED, GRAPH_CHANGED, SOURCE_UNAVAILABLE en SCALE_MISMATCH. Gebruik geen coördinaten zonder identiteit, volgorde en kwaliteit mee te nemen.
+v8 OperatingNetworkService alleen weergave, schemaVersion1, geen MA. v9 TopologyDependency voor randen. SAL publiceert, PCC cachet op achtergrond; HTTP leest geen entiteiten. JAR/DTO/URL-versies verschillen.
 
-v5-schaduwmomentopnamen hebben `simulationOnly=true` en `executable=false`. Een MA bevat pad, EoA-verbinding/offset, resterende afstand en waarnemingsherkomst. Secties kunnen `fromMeters/toMeters` bevatten; één verbinding kan meerdere intervallen hebben. Een interval is geen bezetting van de hele verbinding.
+```text
+GET /api/v5/graph
+GET /api/v5/trains
+GET /api/v5/messages
+GET /api/v5/railway-events
+GET /api/v5/shadow-ma
+GET /api/v5/config
+GET /api/v5/events
+GET /api/v6/operational-ma
+GET /api/v7/station-areas
+GET /api/v8/operating-network
+POST /api/v5/switch
+POST /api/v6/sr
+POST /api/v6/ma/revoke
+```
 
-Het midden van de leidende kar is geen bewezen treinfront; nominale treinlengte is geen integriteitsbewijs; snelheid bij nominale 20 TPS is geen werkelijke snelheid in kloktijd bij lag. De contracten zijn geïnspireerd op ETCS, **geen SUBSET-026-berichtcodering of interoperabiliteit**.
+[STA-V8-ATO-PROTOCOL](doc/STA-V8-ATO-PROTOCOL.md) · [STA-V5-MIGRATION](doc/STA-V5-MIGRATION.md)
 
-### PCC HTTP-eindpunten
+<a id="section-13"></a>
 
-| Eindpunt | Inhoud |
-| --- | --- |
-| `GET /api/v5/graph` | RailGraph |
-| `GET /api/v5/trains` | Treinweergave |
-| `GET /api/v5/messages` | Telemetriemomentopname |
-| `GET /api/v5/railway-events` | Gebeurtenissen |
-| `GET /api/v5/shadow-ma` | Schaduw-MA/secties |
-| `GET /api/v5/config` | Openbare webinstellingen, niet het controletoken |
-| `GET /api/v5/events` | SSE |
-| `POST /api/v5/switch` | Geauthenticeerde wisselbediening |
+## 13. Opslag en probleemoplossing
 
-Eindpunt- en JAR-versies verschillen. Speel weergavemomentopnamen niet opnieuw af als uitvoerbare rijtoestemming. Dit is een interface-overzicht, geen volledig gegenereerde SDK-/schemareferentie. Een externe client moet het exacte berichtformaat en de contracten van de gebruikte build valideren vóór het verzenden van commando's. Lege sectie-eindpunten behouden met name de oude betekenis van een hele verbinding; expliciete eindpunten begrenzen een interval.
-
-## 13. Gegevensopslag en probleemoplossing
+**[GEWIJZIGD · 2026-11-21]** SAL state.json bevat borden, routes, home, handmatige wachtstatus en taken, plus .bak. Niet-afgeronde toestemming overleeft herstart niet. Opslagfout blokkeert oproep. occupancy-ledger.json en shadow-occupancy.json apart; confirmed-destructions.json bewaren.
 
 Paden ten opzichte van de servermap:
 
@@ -816,7 +784,7 @@ De graaf is nog één logische graaf/JSON-export, geen productieopslag met een b
 
 | Verschijnsel | Eerst controleren |
 | --- | --- |
-| auto maar station doet niets | Machinist, expliciete release, modus, redstone, bordkolom en blokkeerreden |
+| ~~auto maar station doet niets~~ | ~~Machinist, expliciete release, modus, redstone, bordkolom en blokkeerreden~~ |
 | Aanvraag geaccepteerd, HMI zonder MA | `/stcs ma status` en PCC-reden; acceptatie is geen toewijzing |
 | SWITCH_UNKNOWN | Fysieke validatie, geladen/verantwoordelijke regio, registratie en positie |
 | FLEET_UNCERTAIN / onvindbare bewaarde trein | Register/UUID; geen getekende trein betekent niet geen bewijs |
@@ -832,53 +800,107 @@ Unload is geen vrijmelding van de treinachterzijde; hersteld bewijs is geen rece
 
 Meldingen horen plugin-/serverversies, tijd, treinnaam/UUID, infrastructuur-ID's, stappen, logs, graafexport en bezettingsdiagnose te bevatten. Verwijder tokens voordat configuratie gedeeld wordt.
 
-## 14. Acceptatietests en vervolgstappen
+- Geen oproep: publicatie, awake-flank, namen, handmatige status, TIMS, observatie en taken. Tegengestelde richting op zichzelf vraagt geen handmatig draaien.
+- Geen verbinding: RailGraph/routingIssues, lokale scan van geladen spoor. chunk_not_loaded alleen bewijst geen breuk.
+- Terugkeer houdt: plaats, hele trein, pad, wisselbevestiging en MA-reden; geen registers wissen.
+- Bezetting na verwijderen: UUID, volledig bewijs en virtuele bestuurder nakijken; onbekend is niet veilig verwijderd.
+- Exploitatiegegevens weg: diensten/versies SAL/STA, revision en leeftijd, browser verversen.
 
-### Minimale regressiechecklist
+<a id="section-14"></a>
 
-1. Vier plugins laden, versies/hulp en configuratie kloppen.
-2. Iedere instap vereist drive; passagiers erven geen besturing; machinistverlies geeft EB; herverbinden herstelt geen oude tractie.
-3. Modus false geeft herstel; herstel blokkeert tractie; doel true vereist stilstand; herstart bewaart status.
-4. Test recht spoor, zijspoor, overloopwissels, rug-aan-rug origins, spoor voorbij End en hangborden; lijntoewijzing blijft lokaal.
-5. Test rijdend/stilstaand/ongeladen/herstart; bewaard bewijs verdwijnt niet zonder grond.
-6. Test zonder machinist, demand/release, opvolgen, tegenrijconflicten, parallelle rijwegen, wisselgebiedcapaciteit en achterzijdevrijgave.
-7. Test lokale/PCC-omzetting, conflictweigering, ongeladen PENDING, echte railvorm en hendel/redstone.
-8. Controleer machinist-BossBar, EoA-kilometrering, intervalkleuren, infrastructuurinspectie, logvergroting, vier talen/thema's.
-9. Controleer toekenning/sprong/afname/lage afstand/vrijgave, geen herhaalde vloeiende verlengingsmelding, geen vertraagd geluid naar een vorige machinist.
-10. Handmatig rijden wordt niet automatisch overgenomen; release + auto activeert station, spawn/destroy apart testen.
+## 14. Acceptatie en beperkingen
 
-De offline Python-testbank test topologie, richting, bezetting, reserveringen en EoA, maar niet Bukkit-levenscycli, Folia-planning, netwerk of echt remgedrag. Dit zijn spelregressies, geen spoorwegcertificering.
+**[GEWIJZIGD · 2026-11-21]** Onafhankelijke Java-regressie26.2/26.3, inclusief nieuwe versie-/ATP-tekst en SAL-presentatie. Resultaten in distributie.
 
-M0-contracten/modi en M1-waarneming/behoud zijn geïmplementeerd en met spelers getest. M2 bevat nu online schaduw-MA en ruimtelijke verfijningen. Eerdere acceptatie vervangt geen regressietest en bewijst geen ATP-gereedheid.
+Eerder gecontroleerd: één lege rit26.3, echte PCC26.2 met line1 en twee maintown-plaatsen; browserstijlen/filter/lijsten/veroudering en363viertalige sleutels. Geen acceptatie van alle layouts.
 
-Volgende stap: de nieuwe `Enforced`-keten voor handbestuurde treinen, actuele plaatsbepaling, graaf-/sessiewissels, remrespons en SR-procedure op een gecontroleerde server testen. FS vereist een expliciete kanaalwissel bij stilstand en een uitvoerbare STCS-autorisatie, geen configuratiesnelkoppeling.
+Ter plaatse: omgekeerde oproep, depotwissels, hergebruik eerste station, L1/L2-concurrentie, hele trein vrij van wissel/keren, lege server, Title, TIMS/uitval/herstart, tweestapsoverdracht en gerichte verwijdering.
 
-Voor echte ATP blijven nodig: volledige treinbegrenzing/consistentie, MA-identiteit/bevestiging/intrekking, beleid bij contactverlies/bevriezen/bypass, snelheidsbeperkingen/remmodellen, onderbouwde resourcevrijgave en foutinjectietests.
+[VALIDATION](../VALIDATION.md)
 
-## 15. Technische toelichting voor ontwikkelaars
+<a id="section-15"></a>
 
-De repository bevat vier modulemappen: `SkyTrainFolia`, `STCS`, `STA` en `SkyPCC`. Gedeelde gecompileerde code staat in `shared`, ontwikkelnotities in `doc`. Raadpleeg per module `plugin.yml` of het version-commando; de repositorynaam wijzigt de pluginnamen niet.
+## 15. Ontwikkeling, broncode en distributie
 
-### Beweging en Folia-grenzen
+**[GEWIJZIGD · 2026-11-21]** Bronarchief bevat vijf modules, gedeelde code, standaardresources en tests. Na uitpakken Common/build.ps1 uitvoeren met JavaHome en twee voorbereide testservers. Latest pas na beide controles. Geen Minecraft-kern, wereld, privéconfiguratie, token of certificaat.
 
-STF gebruikt spoorcoördinaten en voertuigafstanden in plaats van uitsluitend de snelheid van de leidende kar naar volgende karren te kopiëren. Positiecorrectie, vloeiende passagiersbeweging en weergavesynchronisatie zijn afzonderlijke onderdelen. Dit garandeert geen onbeperkte veilige snelheid: bochten, hellingen, regiowissels en entiteitsverwijdering blijven belangrijke tests.
+```powershell
+./Common/build.ps1 -ServerRoot <server26.2> -ServerRoot26_3 <server26.3> -JavaHome <jdk25>
+node SkyPCC/tests/edge-line.cjs
+node SkyPCC/tests/i18n.cjs
+node SkyPCC/tests/operating-map-browser.cjs
+./Common/package-source.ps1
+```
 
-Fysieke handelingen aan entiteiten/blokken moeten Folia's verantwoordelijke entiteits-/regioschedulers respecteren. Asynchrone graaf-/MA-berekeningen gebruiken momentopnamen; dat geeft geen vrijbrief om vanuit werkthreads willekeurige Bukkit-objecten te benaderen. Chunkbeschikbaarheid, graafkennis en actuele fysieke wisselvalidatie zijn verschillende statussen. Een geladen chunk bewijst niet dat een eerder onbekende wissel al gevalideerd is.
+MIT-code/documenten en afzonderlijke beeldrechten bijgevoegd. Presentatie verandert geen rijweg-, MA- of fysieke uitvoeringsgrenzen.
 
-Minecraft-updates kunnen entiteitsinternals, pakket-/weergavekoppelingen en planningsaannames wijzigen terwijl gewone commando-/configuratiecode gelijk blijft. De betreffende adapters moeten tegen de nieuwe serverbuild worden gecontroleerd en getest. Abstractie verkleint het wijzigingsgebied, maar maakt de suite niet onderhoudsvrij.
+[LICENSE](LICENSE) · [ASSET-LICENSE](ASSET-LICENSE.md) · [TrainCarts](https://github.com/bergerhealer/TrainCarts) · [BKCommonLib](https://github.com/bergerhealer/BKCommonLib)
 
-### Afbakening ten opzichte van TrainCarts
+## Vorige handleiding en verwijderde instructies
 
-- Het huidige bordwerk betreft station, spawn en destroy, met STF/SkyTrain-koppen en de hierboven beschreven interpretatie-/activeringsregels.
-- De rail-bordkoppeling volgt een bordkolom-/bevestigingsmodel, zonder aanspraak op iedere TC-bordactie of expressie.
-- STF-wisseldefinities beschrijven geometrie/poorten en een uitvoerder. Het zijn geen TC-switcher-expressies voor routekeuze.
-- Een vertrouwde stationinterface betekent geen identieke onderliggende regelaar: deze MVP stuurt voertuigstanden aan, met afzonderlijk gedrag voor het laatste deel van de stop.
-- Bestemmingsmetadata, adviserende stationvooruitblik, reserveringen en uitvoerbare rijtoestemming zijn verschillende lagen. De aanwezigheid van de ene betekent niet dat de andere af is.
+**[VERWIJDERD · 2026-11-21]** Verwijderde STF-instructies hieronder zijn doorgestreept en niet meer geldig.
 
-### Build- en validatieomvang
+~~Station/spawn/destroy volgen op TC geïnspireerde conventies. De railkoppeling gebruikt de bordkolom onder de rail en bevestigingsrelaties, niet een willekeurige bol rondom de rail. **Ondersteuning van deze vormen betekent geen volledige compatibiliteit met TC-expressies, afstandsborden of uitbreidingen.**~~
 
-De PowerShell-build en regressie-ingang `Common/build.ps1` vereist beide voorbereide servermappen en JDK 25: `./Common/build.ps1 -ServerRoot /path/to/26.2-server -ServerRoot26_3 /path/to/26.3-server -JavaHome /path/to/jdk-25` (of stel `JAVA_HOME` in). Het script leest beide serverkernen en hun `libraries/`, verpakt beide STF-pakketadapters in één JAR, en compileert en test met elke versie. Het start, installeert of wijzigt geen server. Afhankelijkheden zijn niet meegeleverd. Uitvoer gaat naar genegeerde mappen `artifacts/` en `target/`. `Common/package-source.ps1` maakt een broncode-ZIP onder `dist/`.
+~~Een handmatig bestuurde trein wordt niet door station/destroy overgenomen. Stop, laat de machinist `/st release` uitvoeren en stel expliciet `/st property <train> mode auto` in. ISOLATED, RECOVERING en niet-vrijgegeven handmatige overname kunnen automatisch gebruik eveneens blokkeren.~~
 
-Automatische controles testen contracten, modusovergangen, ruimtelijke conflicten/behoud en browserweergave. Servertests blijven noodzakelijk voor instappen/machinistlevenscyclus, Folia-regioverantwoordelijkheid, redstone, chunkladen en beweging. Een documentvertaling is geen nieuwe runtimevalidatie of release.
+~~Gebruikelijke koppen: `[stf]` gebruikt redstone, `[+stf]` is continu actief, `[!stf]` geïnverteerd, `[-stf]` uitgeschakeld. De parser kent ook vormen voor stijgende/dalende flanken; de daadwerkelijke activering hangt af van de actie.~~
 
-Dit bestand is bewust zelfstandig. Installatie, rechten, ondersteunde commando's, configuratie, bediening, API-grenzen en bekende beperkingen staan hierin zonder afhankelijkheid van een andere README of historische uitgavenotitie.
+**Station**
+
+
+~~`[+stf]`~~
+~~`station`~~
+~~`5`~~
+~~`continue 40kmh`~~
+
+
+~~| Regel | Betekenis |~~
+~~| --- | --- |~~
+~~| 1 | Kop/activering |~~
+~~| 2 | station, eventueel ondersteunde vertrekafstand/-tijd/-versnelling en stopoffset |~~
+~~| 3 | Halteertijd; kaal getal in seconden, ook `5s`, `100t`, `00:05` |~~
+~~| 4 | Richting/snelheid, bijvoorbeeld `continue 40kmh` of `reverse 0.4`; zonder eenheid blokken/tick |~~
+
+~~Automatische treinen kunnen Station-borden vooruit ontdekken door de werkelijke rails te volgen, zonder lijnnaam, balises of STCS-kalibratie. De zoekactie volgt de ingestelde wisseltak, laadt geen chunks en detecteert geen voorliggende treinen. Dit is geen ATP of botsbeveiliging.~~
+
+~~Het stoppunt is het midden van de voorste mijnkar in de rijrichting, plus de stationoffset; er wordt geen halve treinlengte meer toegevoegd. Vanaf 2.1.3 kiest de virtuele machinist de remstand op basis van de resterende afstand. Onder de remcurve wordt uitgerold; alleen bij werkelijk te vroeg stoppen volgt langzaam bijrijden met hysterese. Bij stilstand en HOLD blijft B7 actief; handmatige bediening verandert niet.~~
+
+~~Voeg onder de bestaande STF-sectie `settings` de instelling `station-local-look-ahead-blocks: 256.0` toe. Bereik: 0–1024 blokken; 0 schakelt lokaal zoeken uit. Er wordt hoogstens iedere 200 ms gezocht, uitsluitend op geladen rails binnen de huidige Folia-thread. Dit is een maximale zoekafstand, geen gegarandeerde remweg. Optioneel STA/STCS-graafadvies gebruikt afzonderlijk `station-look-ahead-blocks` (standaard 8192). Test eerst langzaam met voldoende geladen spoor.~~
+
+**V_target-eigenschapsbord (Vanaf 2.1.2)**
+
+~~Dit bord wijzigt de doelsnelheid van automatische treinen, niet hun maximumsnelheid of besturingsmodus. Handmatige treinen negeren het. Alleen `V_target` is toegestaan op eigenschapsborden; andere eigenschappen worden via beheerderscommando's ingesteld.~~
+
+
+~~`[+stf]`~~
+~~`property`~~
+~~`V_target`~~
+~~`60km/h`~~
+
+
+~~Zonder eenheid geldt blokken/tick: `0.4`, `8m/s` en `28.8km/h` zijn gelijk bij 20 ticks/s en één blok per meter. De eigenschap wordt opgeslagen, respecteert trein- en profielmaxima en start een stilstaande trein niet zelfstandig. Een expliciete stationvertreksnelheid heeft voorrang; anders geldt V_target, met `settings.station-launch-speed` (standaard 0.4) als terugval. `[+stf]` is altijd actief; `[stf]` gebruikt redstone. Beheerders gebruiken `/st property demo V_target 60km/h` om in te stellen en `/st property demo get V_target` om uit te lezen.~~
+
+**Spawn en Destroy**
+
+
+~~`[stf]`~~
+~~`spawn 0.0`~~
+~~`mmm`~~
+
+
+
+~~Genereer met gecontroleerde redstone drie gewone mijnkarren. Regel 2 accepteert `spawn [velocity] [interval]`, met bijvoorbeeld `00:30` als interval; regels 3 en 4 vormen samen het patroon. Basissymbolen: `m` gewoon, `s` kist, `p` oven, `h` trechter, `t` TNT, naast ondersteunde sjabloonpatronen. Gebruik aanvankelijk geen TNT.~~
+
+~~Sjablonen voor automatisch genereren moeten expliciet in auto zijn opgeslagen. Laat niet continu treinen op een onbeveiligde lijn verschijnen.~~
+
+
+~~`[+stf]`~~
+~~`destroy`~~
+
+
+
+
+~~Destroy verwijdert daadwerkelijk entiteiten. Test op een apart spoor met back-up; een handmatig bestuurde trein hoort niet te worden verwijderd. Test eerst station, daarna spawn/destroy afzonderlijk.~~
+
+[Volledige vorige handleiding — alleen historische referentie](doc/manual-baseline-20261120/README.nl.md)

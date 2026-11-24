@@ -13,6 +13,8 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.skyworld.sta.api.v5.*;
 import net.skyworld.sta.api.v6.OperationalAuthorityService;
 import net.skyworld.sta.api.v7.StationAreaService;
+import net.skyworld.sta.api.v8.OperatingNetworkService;
+import net.skyworld.sta.api.v10.RouteEditingService;
 import net.skyworld.sta.api.v3.RailwayEventService;
 import net.skyworld.sta.api.v3.ConsistObservationService;
 import net.skyworld.sta.api.v5.*;
@@ -36,8 +38,11 @@ public final class SkyPccPlugin extends JavaPlugin {
     private ExecutorService executor;
     private ScheduledTask refreshTask;
     private volatile byte[] graph = bytes("{}"), snapshot = bytes("{}"), messages = bytes("{}");
+    private long cachedGraphRevision = Long.MIN_VALUE;
+    private long cachedGraphCheckedAt = Long.MIN_VALUE;
     private volatile byte[] operationalEvents = bytes("{\"status\":\"UNAVAILABLE\",\"events\":[]}");
     private volatile byte[] stationAreas = bytes("{\"status\":\"UNAVAILABLE\",\"areas\":[]}");
+    private volatile byte[] operatingNetwork = bytes("{\"status\":\"UNAVAILABLE\",\"routes\":[],\"depots\":[],\"trains\":[]}");
     private RailwayEventService.History eventHistory;
     private volatile boolean running;
     private final Semaphore streamSlots = new Semaphore(8);
@@ -55,19 +60,24 @@ public final class SkyPccPlugin extends JavaPlugin {
     private volatile SwitchControlService switchControl;
     private final SwitchGateway switchGateway = new SwitchGateway();
     private boolean controlEnabled;
+    private boolean requireHttpsForControl = true;
     private String controlToken;
+    private volatile RouteEditingService editingSource;
+    private volatile byte[] routeCatalog=bytes("{\"status\":\"UNAVAILABLE\",\"lines\":[],\"devices\":[],\"depots\":[]}");
+    private final RouteGateway routeGateway=new RouteGateway();
     @Override public void onEnable() {
         saveDefaultConfig();
         if (!getConfig().getBoolean("web.enabled", true)) return;
         interval = Math.max(100, getConfig().getInt("web.poll-interval-millis", 1000));
         mode = getConfig().getString("web.update-mode", "auto");
         controlToken = getConfig().getString("web.control-token", "");
+        requireHttpsForControl = getConfig().getBoolean("web.require-https-for-control", true);
         controlEnabled = getConfig().getBoolean("web.control-enabled", false) && controlToken.length() >= 32;
         if (getConfig().getBoolean("web.control-enabled", false) && !controlEnabled)
             getLogger().warning("PCC control disabled: configure a private token of at least 32 characters.");
         if (!Set.of("auto","sse","poll").contains(mode)) mode = "auto";
         try {
-            for (String path : List.of("index.html", "app.js", "i18n.js", "styles.css", "day_logo.png", "night_logo.png")) {
+            for (String path : List.of("index.html", "app.js", "operating-map.js", "i18n.js", "styles.css", "day_logo.png", "night_logo.png")) {
                 try (InputStream in = getResource("web/" + path)) {
                     if (in == null) throw new IOException("Missing asset " + path);
                     assets.put(path, in.readAllBytes());
@@ -95,9 +105,27 @@ public final class SkyPccPlugin extends JavaPlugin {
         report.addProperty("protocol", "STA"); report.addProperty("M_VERSION", StaMessage.VERSION); report.addProperty("serverTimeMillis", now);
         JsonArray encoded = new JsonArray(); List<Map<String,Object>> trains = new ArrayList<>();
         String status = "SERVICE_UNAVAILABLE"; long revision = 0;
+        Map<String, String> switchStates = new LinkedHashMap<>();
         try {
             if (tracking != null && network != null && tracking.protocolVersion() == net.skyworld.sta.api.v5.StaMessage.VERSION && network.protocolVersion() == net.skyworld.sta.api.v5.StaMessage.VERSION) {
-                revision = network.graphRevision(); graph = bytes(network.graphJson());
+                // The provider includes live points in its graph JSON. Publish those separately;
+                // Refresh topology on structural change and diagnostics on a completed rail review.
+                String graphJson = network.graphJson();
+                JsonObject graphView = JsonParser.parseString(graphJson).getAsJsonObject();
+                revision = graphView.get("revision").getAsLong();
+                for (JsonElement element : graphView.getAsJsonArray("nodes")) {
+                    JsonObject node = element.getAsJsonObject();
+                    if ("switch".equalsIgnoreCase(node.get("type").getAsString()))
+                        switchStates.put(node.get("id").getAsString(),
+                                node.has("state") && !node.get("state").isJsonNull()
+                                        ? node.get("state").getAsString() : "UNKNOWN");
+                }
+                long checkedAt=graphView.has("lastCheckedMillis")?graphView.get("lastCheckedMillis").getAsLong():0;
+                if (cachedGraphRevision != revision || cachedGraphCheckedAt != checkedAt) {
+                    graph = bytes(graphJson);
+                    cachedGraphRevision = revision;
+                    cachedGraphCheckedAt=checkedAt;
+                }
                 status = tracking.sourceAvailable() ? "AVAILABLE" : "SOURCE_UNAVAILABLE";
                 for (StaMessage m : tracking.snapshots()) {
                     encoded.add(StaJson.tree(m));
@@ -112,8 +140,10 @@ public final class SkyPccPlugin extends JavaPlugin {
                         trains.add(train);
                     }
                 }
-            } else graph = bytes("{}");
-        } catch (RuntimeException ex) { status = "SERVICE_UNAVAILABLE"; trains.clear(); encoded = new JsonArray(); }
+            } else { graph = bytes("{}"); cachedGraphRevision = Long.MIN_VALUE; }
+        } catch (RuntimeException ex) {
+            status = "SERVICE_UNAVAILABLE"; trains.clear(); encoded = new JsonArray(); switchStates.clear();
+        }
         // The restored STF roster is available before any player loads train chunks.
         // Keep this independent of the STCS tracking/network startup order.
         try {
@@ -169,12 +199,26 @@ public final class SkyPccPlugin extends JavaPlugin {
                     && now >= view.emittedAtMillis() && now - view.emittedAtMillis() <= 3500) areaReport = view;
         } catch (RuntimeException | LinkageError ex) { /* Optional read-only SkyCBI provider. */ }
         stationAreas = bytes(JSON.toJson(areaReport));
-        snapshot = bytes(JSON.toJson(Map.of("schemaVersion", 5, "serverTimeMillis", now, "graphRevision", revision,
+        Object operatingView=Map.of("status","UNAVAILABLE","routes",List.of(),"depots",List.of(),"trains",List.of());
+        try {
+            var source=svc.load(OperatingNetworkService.class);
+            var view=source==null||source.operatingSchemaVersion()!=OperatingNetworkService.SCHEMA_VERSION?null:source.operatingNetwork();
+            long operatingNow=System.currentTimeMillis();
+            if(view!=null&&view.status().equals("AVAILABLE")&&view.graphRevision()==revision&&operatingNow>=view.emittedAtMillis()&&operatingNow-view.emittedAtMillis()<=3500)operatingView=view;
+        }catch(RuntimeException|LinkageError ex){ /* Optional read-only SAL provider. */ }
+        operatingNetwork=bytes(JSON.toJson(operatingView));
+        editingSource=svc.load(RouteEditingService.class);
+        try{var catalog=editingSource==null?null:editingSource.catalog();routeCatalog=bytes(JSON.toJson(catalog));}
+        catch(RuntimeException|LinkageError ex){routeCatalog=bytes("{\"status\":\"UNAVAILABLE\",\"lines\":[],\"devices\":[],\"depots\":[]}");}
+        var live=JSON.toJsonTree(Map.of("schemaVersion", 5, "serverTimeMillis", now, "graphRevision", revision,
                 "serviceStatus", status, "trains", trains, "operationalEvents", eventReport,
-                "shadowMa", ma, "operationalMa", activeMa, "stationAreas", areaReport)));
+                "shadowMa", ma, "operationalMa", activeMa, "stationAreas", areaReport,
+                "switchStates", switchStates)).getAsJsonObject();
+        live.add("operatingNetwork",JSON.toJsonTree(operatingView));snapshot=bytes(JSON.toJson(live));
         synchronized (update) { generation++; update.notifyAll(); }
     }
     private void handle(HttpExchange x) throws IOException {
+        if("/api/v10/routes".equals(x.getRequestURI().getPath())&&!"GET".equals(x.getRequestMethod())){routeControl(x);return;}
         if ("/api/v5/switch".equals(x.getRequestURI().getPath())) { control(x); return; }
         if ("/api/v6/sr".equals(x.getRequestURI().getPath())) { srControl(x); return; }
         if ("/api/v6/ma/revoke".equals(x.getRequestURI().getPath())) { revokeControl(x); return; }
@@ -188,16 +232,46 @@ public final class SkyPccPlugin extends JavaPlugin {
             case "/api/v5/shadow-ma" -> reply(x, 200, "application/json", shadowMa);
             case "/api/v6/operational-ma" -> reply(x, 200, "application/json", operationalMa);
             case "/api/v7/station-areas" -> reply(x, 200, "application/json", stationAreas);
-            case "/api/v5/config" -> reply(x, 200, "application/json", bytes(JSON.toJson(Map.of("updateMode", mode, "pollIntervalMillis", interval, "controlEnabled", controlEnabled))));
+            case "/api/v8/operating-network" -> reply(x, 200, "application/json", operatingNetwork);
+            case "/api/v10/routes" -> reply(x,200,"application/json",routeCatalog);
+            case "/api/v5/config" -> reply(x, 200, "application/json", bytes(JSON.toJson(Map.of("updateMode", mode,
+                    "pollIntervalMillis", interval, "controlEnabled", controlEnabled, "requireHttpsForControl", requireHttpsForControl))));
             case "/api/v5/events" -> stream(x);
             case "/", "/index.html" -> reply(x, 200, "text/html", assets.get("index.html"));
             case "/assets/app.js" -> reply(x, 200, "text/javascript", assets.get("app.js"));
+            case "/assets/operating-map.js" -> reply(x, 200, "text/javascript", assets.get("operating-map.js"));
             case "/assets/i18n.js" -> reply(x, 200, "text/javascript", assets.get("i18n.js"));
             case "/assets/styles.css" -> reply(x, 200, "text/css", assets.get("styles.css"));
             case "/assets/day_logo.png" -> reply(x, 200, "image/png", assets.get("day_logo.png"));
             case "/assets/night_logo.png" -> reply(x, 200, "image/png", assets.get("night_logo.png"));
             default -> reply(x, 404, "text/plain", bytes("Not found"));
         }
+    }
+    private void routeControl(HttpExchange x) throws IOException {
+        var h=x.getRequestHeaders();
+        if(!ControlAccess.permitted(controlEnabled,controlToken,x.getRequestMethod(),h.getFirst("Authorization"),h.getFirst("Content-Type"))){
+            reply(x,403,"application/json",bytes("{\"status\":\"REJECTED\",\"reason\":\"CONTROL_AUTH_REQUIRED\"}"));return;
+        }
+        // Same-origin browser writes only, with the existing HTTPS control policy.
+        String origin=h.getFirst("Origin"),host=h.getFirst("Host");
+        try{if(origin!=null){var uri=URI.create(origin);if(!Objects.equals(uri.getRawAuthority(),host)
+            ||!Set.of("http","https").contains(uri.getScheme()))throw new IllegalArgumentException();}}
+        catch(RuntimeException ex){reply(x,403,"application/json",bytes("{\"status\":\"REJECTED\",\"reason\":\"ORIGIN_REJECTED\"}"));return;}
+        if(requireHttpsForControl&&!(x instanceof HttpsExchange)&&!x.getRemoteAddress().getAddress().isLoopbackAddress()){
+            reply(x,403,"application/json",bytes("{\"status\":\"REJECTED\",\"reason\":\"HTTPS_REQUIRED\"}"));return;
+        }
+        var body=x.getRequestBody().readNBytes(65537);if(body.length>65536){reply(x,413,"application/json",bytes("{}"));return;}
+        try{
+            var o=JsonParser.parseString(new String(body,StandardCharsets.UTF_8)).getAsJsonObject();
+            if(!o.keySet().equals(Set.of("requestId","action","line","actor","session","expectedRevision","definition","decision")))throw new IllegalArgumentException();
+            var r=new RouteEditingService.Request(UUID.fromString(o.get("requestId").getAsString()),o.get("action").getAsString(),o.get("line").getAsString(),
+                "PCC:"+UUID.fromString(o.get("actor").getAsString()),"PCC",o.get("session").isJsonNull()?null:UUID.fromString(o.get("session").getAsString()),
+                o.get("expectedRevision").getAsBigDecimal().longValueExact(),o.get("definition").isJsonNull()?null:JSON.fromJson(o.get("definition"),RouteEditingService.Definition.class),
+                o.get("decision").isJsonNull()?null:o.get("decision").getAsString());
+            var future=routeGateway.submit(r,editingSource,work->getServer().getAsyncScheduler().runNow(this,t->work.run()),System.currentTimeMillis());
+            var result=future.getNow(null);
+            reply(x,result==null?202:200,"application/json",bytes(JSON.toJson(result==null?Map.of("requestId",r.requestId(),"status","PENDING","reason","QUEUED"):result)));
+        }catch(RuntimeException ex){reply(x,400,"application/json",bytes("{\"status\":\"REJECTED\",\"reason\":\"INVALID_REQUEST\"}"));}
     }
     private void control(HttpExchange x) throws IOException {
         var h = x.getRequestHeaders();

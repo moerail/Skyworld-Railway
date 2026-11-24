@@ -12,8 +12,7 @@ final class DriverSafety {
     }
     static void brake(Train train) {
         train.driverEmergencyHold = true;
-        train.automaticRun = null;
-        train.clearStationMotion();
+
         train.pauseUntilMillis = 0;
         train.clearPlayerPush();
         train.manualTakeover = true;
@@ -29,7 +28,6 @@ final class DriverSafety {
         train.activeAtpReason = "NO_DRIVER";
     }
     static void maintainBrake(Train train) {
-        train.automaticRun = null;
         train.driveControlEnabled = true;
         train.powerNotch = 0;
         train.brakeNotch = 7;

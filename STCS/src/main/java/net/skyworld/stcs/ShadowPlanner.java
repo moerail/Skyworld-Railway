@@ -12,6 +12,10 @@ final class ShadowPlanner {
     }
     static Result plan(ShadowGraph g,String start,double offset,double length,MaSettings settings,
             Map<String,String> switches,Set<String> obstacles) {
+        return plan(g,start,offset,length,settings,switches,obstacles,List.of());
+    }
+    static Result plan(ShadowGraph g,String start,double offset,double length,MaSettings settings,
+            Map<String,String> switches,Set<String> obstacles,List<String> requiredPath) {
         double horizon=settings.lookAheadMeters(),margin=settings.marginMeters();
         var first=g.edges.get(start);
         if(first==null||!Double.isFinite(offset)||offset<0||offset>first.distanceMeters()+.1)
@@ -22,7 +26,12 @@ final class ShadowPlanner {
             if(!seen.add(e.id())) {end="LOOP_LIMIT";break;}
             path.add(e); distance+=e.distanceMeters();
             if(distance>=horizon) {end="LOOKAHEAD_LIMIT";break;}
-            var next=g.next(e,switches); if(next.edge()==null) {end=next.reason();break;} e=next.edge();
+            var next=g.next(e,switches); if(next.edge()==null) {end=next.reason();break;}
+            if(!requiredPath.isEmpty()) {
+                if(path.size()>=requiredPath.size()) {end="ROUTE_END";break;}
+                if(!next.edge().id().equals(requiredPath.get(path.size()))) {end="ROUTE_POINT_UNCONFIRMED";break;}
+            }
+            e=next.edge();
         }
         double limit=offset+Math.min(horizon,settings.maxAuthorityDistanceMeters());
         String limitReason=settings.maxAuthorityDistanceMeters()<horizon?"MA_DISTANCE_LIMIT":"LOOKAHEAD_LIMIT";
@@ -40,7 +49,7 @@ final class ShadowPlanner {
         List<RailGraph.Edge> pending=new ArrayList<>(); double capacity=0;
         for(var item:path) {
             boolean sourceSwitch="switch".equals(g.nodes.get(item.from()).type());
-            if(!pending.isEmpty()||sourceSwitch) {
+            if(settings.checkExitCapacity() && (!pending.isEmpty()||sourceSwitch)) {
                 pending.add(item); capacity=sourceSwitch?item.distanceMeters():capacity+item.distanceMeters();
                 // Marker names do not end a physical exit. Follow the validated path
                 // across END/station/signal nodes until the full consist can clear.
@@ -87,7 +96,7 @@ final class ShadowPlanner {
             accepted.addAll(bundle);
             for(var item:bundle) acceptedDistance+=item.distanceMeters();
         }
-        double endMargin=reason.equals("TRACK_END")?0:reason.startsWith("SWITCH_")?g.guard:margin;
+        double endMargin=reason.equals("TRACK_END")||reason.equals("ROUTE_END")?0:reason.startsWith("SWITCH_")?g.guard:margin;
         if(!accepted.isEmpty() && "switch".equals(g.nodes.get(accepted.getLast().to()).type()))
             endMargin=Math.max(endMargin,g.guard);
         double availableEnd=Math.max(0,acceptedDistance-endMargin);

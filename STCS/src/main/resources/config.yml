@@ -7,6 +7,12 @@ scan:
 graph:
   file: railgraph.json
   pretty-print: true
+  # Wall-clock seconds; only loaded rail cells are verified, never loads chunks.
+  review-interval-seconds: 60
+  # Log routine local graph scans/reviews. New/changed faults and exceptions always log.
+  log-successful-reviews: false
+  # Bound the number of source scans / chunk-verification tasks launched per server tick.
+  sources-per-tick: 4
 
 telemetry:
   # STF publishes display telemetry frequently, while RailGraph reconciliation remains low-frequency.
@@ -22,6 +28,10 @@ occupancy:
 ma:
   # Shadow snapshots remain non-executable. ACTIVE manual trains use the separate v6 operational grant.
   enabled: true
+  # Require enough route beyond a point for the whole train before granting MA.
+  # false allows MA into a shorter exit; conflicts, point checks and distance caps still apply.
+  # Applies to FS, SH and SR. Existing configurations default to true.
+  check-exit-capacity: true
   # Directed-route search horizon (10..10000 m). Preview does not reserve every edge found.
   look-ahead-meters: 600.0
   # Minimum point eligibility distance (0..10000 m); fixed range when dynamic-lock is disabled.
@@ -57,4 +67,4 @@ ma:
     low-remaining-meters: 50.0
 
 messages:
-  prefix: '&6[STCS]&r '
+  prefix: '&e[STCS]&r '

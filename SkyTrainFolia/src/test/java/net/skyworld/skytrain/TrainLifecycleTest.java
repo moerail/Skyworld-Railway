@@ -19,8 +19,6 @@ public final class TrainLifecycleTest {
         check(train.memberEvidence().get(first).state().equals("UNLOADED"), "Late observation cannot undo unload");
         train.moving = true; train.powerNotch = 4; train.driveControlEnabled = true;
         train.seedCurrentSpeed(.8); train.memberSpeed(second, .8);
-        train.automaticRun = new AutomaticRun("station",
-                AutomaticSignSpec.parse("station", "5", "continue", .4), 100, false, false);
         TrainManager.haltForMissingMember(train);
         check(train.snapshot(first) == null, "Ordinary driving snapshots cleared");
         check(train.memberEvidence().get(first).position().x == 10, "Occupancy evidence survives safe stop");
@@ -29,7 +27,6 @@ public final class TrainLifecycleTest {
         check(train.memberEvidence().get(first).state().equals("OBSERVED"), "Fresh return updates evidence");
         check(train.currentSpeed() == 0 && train.maxMemberSpeed() == 0, "HMI speed is cleared");
         check(!train.moving && train.powerNotch == 0 && train.emergencyBrake, "Missing member stops traction with EB");
-        check(train.automaticRun == null, "Old station action cannot restart the train");
         check(train.memberCount() == 2 && train.contains(first), "Temporary removal retains original member identities");
         check(!train.addMember(first), "Returning original entity does not duplicate a slot");
         check(train.removeMember(first), "Permanent removal clears the member");
@@ -37,8 +34,7 @@ public final class TrainLifecycleTest {
         check(train.indexOf(second) == 0, "Surviving member can become leader");
         check(!train.removeMember(first), "Duplicate removal is idempotent");
         TrainManager.haltForMissingMember(train);
-        TrainManager.authorizeAutomatic(train, false, .001);
-        check(!train.emergencyBrake && !train.manualTakeover, "Stationary surviving train can be explicitly rearmed");
+        check(train.emergencyBrake && !train.moving && train.powerNotch==0, "Missing-member stop cannot restart itself");
         System.out.println("Train lifecycle removal and safe-stop tests passed");
     }
     private static void check(boolean value, String message) { if (!value) throw new AssertionError(message); }

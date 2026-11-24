@@ -89,14 +89,14 @@ final class UiMessages {
         String display = train.properties().displayName == null || train.properties().displayName.isBlank()
                 ? train.name()
                 : train.properties().displayName;
-        String automaticStatus = plugin.automaticStatus(train);
-        String drive = train.driveControlEnabled || train.automaticRun != null
+        boolean external=plugin.automation()!=null&&plugin.automation().owns(train);
+        String drive = train.driveControlEnabled
                 ? text(language,
                         "train.drive.manual",
                         reverser(language, train.reverser),
                         train.powerNotch,
                         train.emergencyBrake ? "EB" : "B" + train.brakeNotch)
-                : text(language, automaticStatus.equals("ready") ? "train.drive.auto" : "train.drive.inactive");
+                : text(language, external ? "train.drive.auto" : "train.drive.inactive");
         TrainProperties properties = train.properties();
         String summary = text(language,
                 "train.summary",
@@ -125,7 +125,6 @@ final class UiMessages {
                     : text(language, "train.mileage.unknown");
             summary += text(language, "train.mileage", mileage.lineName(), position);
         }
-        summary += text(language, "train.auto.status", text(language, "train.auto." + automaticStatus));
         return summary;
     }
 
@@ -221,7 +220,7 @@ final class UiMessages {
         add("protection.isolated", "已切除", "Isolated", "Isolée", "切離し中", "Изолирован");
         add("protection.noStcs", "STCS不可用", "STCS unavailable", "STCS indisponible", "STCS利用不可", "STCS недоступен");
         add("protection.noRbc", "控制通道未实现", "Control link not implemented", "Canal de contrôle non réalisé", "制御通信は未実装", "Канал управления не реализован");
-        add("protection.alpha", "开发版：MA仅供影子测试，ATP不动作。恢复中仍保持制动。", "Development alpha: shadow MA only, no ATP intervention. Recovering still holds brakes.", "Version alpha : MA indicative, sans intervention ATP. La reprise maintient le frein.", "開発版：MAは試験表示のみ、ATP介入なし。復帰中は制動を保持します。", "Версия разработки: только теневая MA, без вмешательства ATP. При восстановлении тормоза удерживаются.");
+        add("protection.alpha", "开发版：默认请求FS，启用可执行ATP；行车需有效MA，恢复中保持制动。", "Development build: FS requested by default; executable ATP enabled. A valid MA is required; recovery holds brakes.", "Version de développement : FS demandé par défaut, ATP exécutoire actif ; MA valide requise, frein maintenu en reprise.", "開発版：既定でFSを要求し実行型ATPを有効化。有効なMAが必要で、復帰中は制動を保持します。", "Версия разработки: по умолчанию запрос FS и действующая ATP; нужна MA, при восстановлении тормоза удерживаются.");
         add("protection.activeExperimental", "实验性强制保护：仅手动列车、有效可执行MA才允许运行；尚待实服验证。", "Experimental enforced channel: manual train and valid executable MA required; live validation pending.", "Canal actif expérimental : train manuel et MA exécutable valide requis ; validation sur serveur en attente.", "実験的な保護有効経路：手動列車と有効な実行可能 MA が必要。実サーバー検証は今後です。", "Экспериментальная защита: нужны ручной поезд и действующая исполняемая MA; проверка на сервере ожидается.");
         add("ma.activeLink", "可执行许可链路在线", "Operational permission link live", "Liaison d'autorisation opérationnelle active", "運転許可通信が有効", "Канал разрешений на движение подключён");
         add("ma.activePending", "可执行 MA 尚未下发，请保持停车并查看 HMI。", "Executable MA not allocated yet; remain stopped and check the HMI.", "MA exécutable non encore attribuée ; restez arrêté et consultez l'affichage.", "実行可能な MA は未発行です。停止して車上表示を確認してください。", "Исполняемая MA ещё не выдана; оставайтесь на месте и проверьте HMI.");
@@ -246,6 +245,7 @@ final class UiMessages {
         add("ma.trainNotFound", "当前 STCS 列车表中找不到该车。", "Train not found in the current STCS roster.", "Train introuvable dans la liste STCS actuelle.", "現在の STCS 列車一覧に見つかりません。", "Поезд отсутствует в текущем списке STCS.");
         add("ma.manualCheckUnavailable", "手动驾驶状态检查不可用。", "Manual driving check unavailable.", "Vérification de conduite manuelle indisponible.", "手動運転状態の確認を利用できません。", "Проверка ручного управления недоступна.");
         add("ma.releaseUnavailable", "车载 MA 释放接口不可用。", "Onboard MA release unavailable.", "Libération de la MA embarquée indisponible.", "車上 MA 解放機能を利用できません。", "Бортовое освобождение MA недоступно.");
+        add("ma.RELEASE_PENDING", "MA 释放尚未确认，保持制动；请等待释放完成。失败后可重试 /stcs ma release。", "MA release is not confirmed; brakes remain held. Wait for completion, or retry /stcs ma release after failure.", "Libération MA non confirmée ; freins maintenus. Attendez la fin ou réessayez /stcs ma release après un échec.", "MA 解放は未確認です。制動を保持して完了を待ってください。失敗時は /stcs ma release を再実行してください。", "Освобождение MA не подтверждено; тормоза удерживаются. Дождитесь завершения или повторите /stcs ma release после сбоя.");
         add("ma.ackUnavailable", "TR 确认接口不可用。", "Trip acknowledgement unavailable.", "Acquittement du déclenchement indisponible.", "トリップ確認機能を利用できません。", "Подтверждение TR недоступно.");
         add("ma.RELEASED", "已释放车前MA预约，车身占用记录保留。", "Forward MA reservations released; occupancy retained.", "Réservations MA en avant libérées ; occupation conservée.", "前方 MA 予約を解放しました。占有記録は保持されます。", "Резервирование MA впереди снято; занятость сохранена.");
         add("ma.MANUAL_ONLY", "此指令仅适用于手动列车。", "This command applies only to manual trains.", "Cette commande ne concerne que les trains manuels.", "この指令は手動列車専用です。", "Эта команда применяется только к ручным поездам.");
@@ -438,7 +438,7 @@ final class UiMessages {
         add("error.drive-end-seat", "仅列车两端最外侧车厢的乘客可申请驾驶。", "Only passengers in the outermost carts at either end may claim driving.", "Seuls les passagers des wagonnets d’extrémité peuvent prendre la conduite.", "編成両端の最外側の車両に乗車してください。", "Получить управление можно только в крайних вагонетках на концах состава.");
         add("error.tims-hold", "TIMS 停车保持：请查看 /st info，确认完整并停稳后 /st tims ack。", "TIMS brake hold: check /st info, restore integrity, stop and /st tims ack.", "Maintien TIMS : /st info, rétablir l’intégrité, arrêter puis /st tims ack.", "TIMS 停止保持：/st info で確認し、完全性回復・停車後 /st tims ack。", "TIMS удерживает тормоза: проверьте /st info, восстановите целостность, остановитесь и выполните /st tims ack.");
         add("error.tims-ack", "全列未停稳或完整性未连续确认；不可解除 TIMS 保持。", "Train not fully stopped or integrity not confirmed; TIMS hold retained.", "Arrêt complet ou intégrité non confirmé : maintien TIMS conservé.", "全車停止または完全性未確認。TIMS 保持を継続。", "Не весь поезд остановлен или целостность не подтверждена; удержание TIMS сохранено.");
-        add("tims.ack-auto", "TIMS 保持已确认解除；自动列车请执行 /st start <列车名> 重新启动。", "TIMS hold acknowledged. Restart the automatic train with /st start <train>.", "Maintien TIMS acquitté. Redémarrez le train automatique avec /st start <train>.", "TIMS 保持解除を確認しました。自動列車は /st start <列車名> で再始動してください。", "Удержание TIMS подтверждено. Запустите автоматический поезд через /st start <train>.");
+        add("tims.ack-auto", "TIMS 保持已确认解除；请检查SAL任务状态，必要时由管理员恢复。", "TIMS hold acknowledged; check the SAL task and ask an administrator to resume if needed.", "Maintien TIMS acquitté ; vérifiez la tâche SAL et demandez une reprise si nécessaire.", "TIMS 保持を解除しました。SAL の状態を確認し、必要なら管理者が運転を再開してください。", "Удержание TIMS снято; проверьте задание SAL и при необходимости обратитесь к администратору.");
         add("tims.ack", "TIMS 保持已确认解除；仍保持制动，TR 请按 ack → release 流程恢复并重新申请 MA。", "TIMS hold acknowledged; brakes remain. Recover TR via ack then release and request new MA.", "Maintien TIMS acquitté ; freins maintenus. Reprise TR : ack, release puis nouvelle MA.", "TIMS 確認済み。制動継続。TR は ack、release、MA 再要求の順で復帰。", "TIMS подтверждён; тормоза удерживаются. Для выхода из TR выполните ack, release и новый запрос MA.");
         add("info.position-none", "位置：尚无报告。", "Position: no report yet.", "Position : aucun rapport.", "位置：報告なし。", "Положение: сообщений ещё нет.");
         add("info.position-current", "当前位置（行驶端）：%s %.2f, %.2f, %.2f | %s", "Current position (travel end): %s %.2f, %.2f, %.2f | %s", "Position actuelle (extrémité de marche) : %s %.2f, %.2f, %.2f | %s", "現在位置（進行端）：%s %.2f, %.2f, %.2f | %s", "Текущее положение (конец по направлению движения): %s %.2f, %.2f, %.2f | %s");
@@ -531,7 +531,7 @@ final class UiMessages {
         add("train.conduction.manual",
                 "人工", "Manual", "Manuel", "手動", "Ручное");
         add("train.conduction.automatic",
-                "自动（无ATP）", "Automatic (no ATP)", "Automatique (sans ATP)", "自動（ATPなし）", "Автоматическое (без ATP)");
+                "SAL自动", "SAL automatic", "Automatique SAL", "SAL自動", "Автоматическое SAL");
         add("train.mileage",
                 " | 线路: %s | 里程: %s",
                 " | Line: %s | Mileage: %s",
@@ -558,24 +558,6 @@ final class UiMessages {
                 "Auto",
                 "自動", "Авто");
         add("train.drive.inactive", "未启用自动", "Auto inactive", "Auto inactif", "自動運転無効", "Автоматика неактивна");
-        add("train.auto.status", " | 自动牌子: %s", " | Automatic signs: %s",
-                " | Panneaux automatiques : %s", " | 自動看板: %s", " | Автоматические таблички: %s");
-        add("train.auto.ready", "已启用（仍需满足牌子激活条件）", "Armed (sign activation still required)",
-                "Autorisés (activation du panneau requise)", "有効（看板の作動条件が必要）", "Готовы (ещё нужна активация таблички)");
-        add("train.auto.driver", "被阻止：仍有司机占用，请先 release", "Blocked: driver still owns control; release first",
-                "Bloqués : conducteur présent, libérer la commande", "無効: 運転権を解放してください", "Заблокированы: машинист сохраняет управление; сначала release");
-        add("train.auto.release", "被阻止：手动接管未明确释放，请先 release", "Blocked: manual takeover not explicitly released",
-                "Bloqués : reprise manuelle non libérée explicitement", "無効: 手動操作が明示的に解放されていません", "Заблокированы: ручной перехват явно не освобождён");
-        add("train.auto.rearm", "被阻止：已释放，停稳后重新设置 mode auto", "Blocked: released; stop and select mode auto again",
-                "Bloqués : commande libérée, sélectionner mode auto à l'arrêt", "無効: 解放済み、停車後に mode auto を再設定", "Заблокированы: управление освобождено; остановитесь и снова задайте mode auto");
-        add("train.auto.eb", "被阻止：紧急制动仍在施加", "Blocked: emergency brake applied",
-                "Bloqués : freinage d'urgence actif", "無効: 非常制動中", "Заблокированы: включён экстренный тормоз");
-        add("train.auto.handle", "被阻止：手动手柄仍启用", "Blocked: manual handle still enabled",
-                "Bloqués : commande manuelle active", "無効: 手動ハンドルが有効", "Заблокированы: ручной контроллер ещё включён");
-        add("train.auto.manual", "被阻止：配置模式为 manual", "Blocked: configured mode is manual",
-                "Bloqués : mode manuel configuré", "無効: 設定モードが手動", "Заблокированы: настроен ручной режим");
-        add("train.auto.unavailable", "不可用：列车未注册", "Unavailable: train not registered",
-                "Indisponibles : train non enregistré", "利用不可: 列車が未登録", "Недоступны: поезд не зарегистрирован");
         add("train.drive.manual",
                 "%s P%d %s",
                 "%s P%d %s",

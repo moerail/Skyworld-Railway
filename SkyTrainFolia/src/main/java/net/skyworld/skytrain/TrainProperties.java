@@ -16,10 +16,19 @@ final class TrainProperties {
     volatile Double automaticTargetSpeed;
 
     void setAutomaticTargetSpeed(String value) {
-        double speed = AutomaticSignSpec.velocity(value);
+        double speed = targetSpeed(value);
         if (!Double.isFinite(speed) || speed < 0 || speed > 100)
             throw new UiException("V_target must be between 0 and 100 blocks/tick.", "V_target должна быть от 0 до 100 блоков/тик.");
         automaticTargetSpeed = speed;
+    }
+    private static double targetSpeed(String value) {
+        String text=value.trim().toLowerCase(Locale.ROOT).replace(" ","");double factor=1;
+        for(String unit:new String[]{"km/h","kmh","m/s","m/t","b/t","mph"})if(text.endsWith(unit)) {
+            factor=switch(unit){case "km/h","kmh"->1.0/72;case "m/s"->1.0/20;case "mph"->.44704/20;default->1;};
+            text=text.substring(0,text.length()-unit.length());break;
+        }
+        try{return Double.parseDouble(text.replace(',','.'))*factor;}
+        catch(NumberFormatException ex){throw new UiException("Invalid V_target: "+value,"Недопустимый V_target: "+value);}
     }
     volatile String collisionMode = "default";
     volatile boolean playersEnter = true;
@@ -69,7 +78,8 @@ final class TrainProperties {
         properties.requirePoweredCart = section.getBoolean("require-powered-cart", false);
         properties.soundEnabled = section.getBoolean("sound-enabled", true);
         properties.keepChunksLoaded = section.getBoolean("keep-chunks-loaded", true);
-        properties.conductionMode = ConductionMode.parse(section.getString("conduction-mode", "manual"));
+        // A persisted legacy auto flag is not an external STA ownership lease.
+        properties.conductionMode = ConductionMode.MANUAL;
         properties.gravity = section.getDouble("gravity", 1.0);
         properties.friction = section.getDouble("friction", 1.0);
         properties.waitTicks = section.getInt("wait-ticks", 0);

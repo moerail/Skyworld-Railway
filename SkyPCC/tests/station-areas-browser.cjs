@@ -26,7 +26,7 @@ const server=http.createServer((req,res)=>{
     operationalEvents:{status:'AVAILABLE',session:'test',latestSequence:0,events:[]}};
   else {
     const name=req.url==='/'?'index.html':req.url.startsWith('/assets/')?req.url.slice(8):'';
-    if(!['index.html','app.js','i18n.js','styles.css','day_logo.png','night_logo.png'].includes(name)){res.writeHead(404);res.end();return;}
+    if(!['index.html','app.js','operating-map.js','i18n.js','styles.css','day_logo.png','night_logo.png'].includes(name)){res.writeHead(404);res.end();return;}
     body=fs.readFileSync(path.join(root,name));
     type=name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':name.endsWith('.png')?'image/png':'text/html';
   }

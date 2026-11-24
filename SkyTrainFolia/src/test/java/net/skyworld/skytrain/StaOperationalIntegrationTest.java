@@ -20,6 +20,9 @@ public final class StaOperationalIntegrationTest {
         var valid = StaOperationalIntegration.select(snapshot, train, lease, 3, 1100, session,
                 List.of(source), false, "FORWARD");
         assert valid.available() && valid.remainingMeters() == 30 && valid.ceilingMps() == 80 / 3.6;
+        var automatic = new TrainTelemetrySnapshot(train,"test",7,1000,"world",0,0,0,
+                0,0,0,1,0,0,1,10,2,true,false,TrainMode.AUTOMATIC,"SkyATO-Lite",source.cab());
+        assert StaOperationalIntegration.select(snapshot,train,lease,3,1100,session,List.of(automatic),false,"FORWARD").available();
         assert !StaOperationalIntegration.select(snapshot, train, lease, 4, 1100, session,
                 List.of(source), false, "FORWARD").available();
         assert !StaOperationalIntegration.select(snapshot, train, lease, 3, 2501, session,

@@ -43,6 +43,8 @@ final class DriverControlService {
         }
         synchronized (driverLock) {
             UUID playerId = player.getUniqueId();
+            if (plugin.automation()!=null && plugin.automation().owns(train))
+                throw new UiException("列车正在执行自动任务，请先停止任务。", "Train has an active automatic task.");
             if (!player.isOnline() || player.isDead() || !(player.getVehicle() instanceof Minecart seat)
                     || cartLookup.apply(seat) != train) throw new IllegalArgumentException("error.drive-board");
             if (trainLookup.apply(train.id()) != train) return false;
@@ -72,10 +74,19 @@ final class DriverControlService {
             train.lastSelectedReverser=Reverser.BACKWARD;
             // A fresh declaration never inherits traction from an earlier driver/session.
             DriverSafety.revokeAuthority(train);
+            if(train.protectionMode==ProtectionMode.SHADOW && train.currentSpeed()<=.001 && train.maxMemberSpeed()<=.001)
+                train.protectionMode = ProtectionMode.ACTIVE;
+            boolean[] defaultFsRequested={false};
             ScheduledTask check = player.getScheduler().runAtFixedRate(plugin, task -> {
                 synchronized (driverLock) {
                     if (!DriverSafety.sameSession(leaseId, driverLeaseIds.get(playerId))) { task.cancel(); return; }
+                    if(train.operatingMode!=OperatingMode.SB)defaultFsRequested[0]=true;
                     if (!isDriver(player, train)) revokeDriver(playerId, null, "SEAT_LOST");
+                    else if (!defaultFsRequested[0] && train.operatingMode==OperatingMode.SB && train.protectionMode==ProtectionMode.ACTIVE
+                            && !train.tims.view(System.currentTimeMillis()).brakeHeld() && !train.activeAtp.releasePending()
+                            && Bukkit.getCurrentTick()%20==0) {
+                        if(plugin.automation()!=null)defaultFsRequested[0]=plugin.automation().requestFs(train,playerId,leaseId);
+                    }
                 }
             }, () -> revokeDriverLease(playerId, leaseId), 1L, 1L);
             if (check == null) {
@@ -218,6 +229,7 @@ final class DriverControlService {
 
     void releaseManualControl(Player player, Train train) {
         if (train == null) throw new UiException("没有找到要释放的列车，请靠近列车后重试。", "Поезд для освобождения не найден; подойдите к нему и повторите.");
+        UUID releasedLease=null;
         synchronized (driverLock) {
             if (trainLookup.apply(train.id()) != train) throw new UiException("列车已不存在。", "Поезд больше не существует.");
             UUID playerId = player.getUniqueId();
@@ -230,6 +242,7 @@ final class DriverControlService {
                         : "Не удалось подтвердить, что вы прежний машинист; выполните /st drive, затем /st release, либо обратитесь к администратору.");
             }
             DriverSafety.revokeAuthority(train);
+            if(driver!=null)releasedLease=driverLeaseIds.get(playerId);
             train.manualReleaseConfirmed = true;
             trainDrivers.remove(train.id(), playerId);
             driverTargets.remove(playerId, train.id());
@@ -237,6 +250,9 @@ final class DriverControlService {
             driverNames.remove(playerId);
             cancelDriverCheck(playerId);
             if (driver != null) publishDriverEvent(train, playerId, player.getName(), "DRIVER_RELEASED", "EXPLICIT_RELEASE");
+            // Receipt publication is lock-free; make it visible before a no-driver snapshot.
+            if(releasedLease!=null&&plugin.automation()!=null)
+                plugin.automation().manualReleased(train,playerId,releasedLease,System.currentTimeMillis());
         }
         saveAction.run();
     }

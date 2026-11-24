@@ -1,5 +1,33 @@
 # Architecture and Maintenance Boundaries
 
+## Current release — 2026-11-24
+
+STA2.7.0 / STF5.0.2 / STCS4.3.5 / SAL0.5.0 / PCC2.4.1. The older protocol baselines below are historical. PCC exposes the v5 display API and authenticated v10 route-editing API; SAL owns route drafts, publications and conflict state. STCS owns topology and MA; STF executes physical actions through STA.
+
+[Route editor, ownership and restart contract](PCC-ROUTE-EDITING.en.md). PCC highlight and equipment filters are browser-only display preferences; they do not affect arbitration or graph state. Up/down preference, whole single-track section reservation, general multi-reversal search and the Python daemon remain [design only](TRAFFIC-PLANNING-DAEMON-DESIGN.md).
+
+
+## Traffic planning and Python daemon design draft — 2026-11-20
+
+The proposed four-contract design covers mileage-based up/down direction rules, atomic single-track section reservations,
+general reversal-aware planning, and a snapshot-based Python computation interface. STCS retains authoritative commits;
+fault and restart recovery preserve occupancy and possibly entered reservations. This is a design draft, not an implemented protocol.
+See [traffic planning and daemon contracts](TRAFFIC-PLANNING-DAEMON-DESIGN.md).
+
+## STF 5.0 / SAL 0.3 control ownership — 2026-11-20
+
+SAL owns operation and human consent, STCS owns topology/authority/routing, STF owns vehicle execution through STA.
+The legacy STF automatic-sign controller and station-motion state machine have been removed, together with their automatic-mode entry.
+Parked-to-manual handback and manual-to-parked handover use immutable driver leases and explicit one-shot release receipts;
+absence of a driver is never consent. See [handover and breaking-change contract](SAL-MANUAL-HANDOVER.md).
+
+## Incremental RailGraph — 2026-11-19
+
+STCS 4.3.0 owns incremental physical topology, loaded-only scans and configurable 60-second rail reviews.
+STA 2.4.0 adds v9 opaque edge-dependency contracts; SAL 0.2.0 consumes STCS routing conclusions and revalidates only affected routes.
+Unload diagnostics do not invalidate known connections; physical faults and unknown connections remain distinct.
+See [contract, versions and migration](RAILGRAPH-INCREMENTAL.md). The v5 baseline below is historical; executable v6 permissions and additive v7–v9 contracts coexist.
+
 ## Current Protocol Baseline
 
 STF 3.0.0 / STCS 3.0.0 / STA 1.0.0 / SkyPCC 1.0.0 use STA v5.

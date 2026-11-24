@@ -1,0 +1,2 @@
+# Target speed; still limited by STF profile, route protection and MA.
+cruise-blocks-per-tick: 0.4

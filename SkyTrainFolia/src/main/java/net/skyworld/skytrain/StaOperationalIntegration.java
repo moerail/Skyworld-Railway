@@ -25,7 +25,7 @@ final class StaOperationalIntegration {
         if (!grant.telemetrySession().equals(session))
             return OperationalPermission.unavailable("SESSION_CHANGED", graphRevision, controlSession);
         var source = history.stream().filter(s -> s.sequence() == grant.telemetrySequence()).findFirst().orElse(null);
-        if (source == null || !source.trainId().equals(train) || source.mode() != TrainMode.MANUAL
+        if (source == null || !source.trainId().equals(train)
                 || now < source.observedAtMillis() || now - source.observedAtMillis() > 1500)
             return OperationalPermission.unavailable("SOURCE_UNAVAILABLE", graphRevision, controlSession);
         boolean shunting=grant.mode().equals("SH");

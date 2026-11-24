@@ -222,7 +222,7 @@ final class TrainListener implements Listener {
         }
         event.setCancelled(true);
         event.setDamage(0.0);
-        tell(event.getAttacker(), "&c这辆列车受保护，只能使用 /st remove 或 destroy 控制牌回收。", "&cПоезд защищён; удалить его можно только через /st remove или табличку destroy.");
+        tell(event.getAttacker(), "&c这辆列车受保护，请使用 /st remove 回收。", "&cПоезд защищён; удалить его можно через /st remove.");
     }
 
     @EventHandler
@@ -245,30 +245,6 @@ final class TrainListener implements Listener {
         }
 
         String firstLine = ChatColor.stripColor(event.getLine(0) == null ? "" : event.getLine(0)).trim();
-        TrainSignHeader automaticHeader = TrainSignHeader.parse(firstLine);
-        if (automaticHeader != null && AutomaticSigns.action(event.getLine(1))) {
-            if (!event.getPlayer().hasPermission("skytrain.admin")) {
-                event.setCancelled(true);
-                event.getPlayer().sendMessage(ChatColor.RED + ui.literal(event.getPlayer(), "Missing permission: skytrain.admin", "Нет права: skytrain.admin"));
-                return;
-            }
-            try {
-                manager.automaticSigns().validate(event.getBlock(),firstLine,event.getLine(1),event.getLine(2),event.getLine(3));
-                event.setLine(0,ChatColor.GOLD+automaticHeader.display());
-                String actionLine=ChatColor.stripColor(event.getLine(1)).trim().toLowerCase(java.util.Locale.ROOT);
-                org.bukkit.Bukkit.getRegionScheduler().runDelayed(manager.plugin(),event.getBlock().getLocation(),t -> {
-                    if (!event.isCancelled()) {
-                        if (actionLine.startsWith("station")) stationManager.registerSign(event.getBlock(),event.getLine(3));
-                        manager.automaticSigns().register(event.getBlock());
-                    }
-                },1L);
-                event.getPlayer().sendMessage(ChatColor.GREEN + ui.literal(event.getPlayer(), "Automatic sign registered: ", "Автоматическая табличка зарегистрирована: ") + actionLine);
-            } catch (IllegalArgumentException ex) {
-                event.setCancelled(true);
-                event.getPlayer().sendMessage(ChatColor.RED + ui.error(event.getPlayer(), ex));
-            }
-            return;
-        }
         if (!SignHeaders.isSkyTrain(firstLine)) {
             return;
         }
@@ -327,39 +303,17 @@ final class TrainListener implements Listener {
             return;
         }
 
-        if ("station".equalsIgnoreCase(action)) {
-            try {
-                StationManager.StationDefinition station = stationManager.registerSign(
-                        event.getBlock(), event.getLine(3));
-                event.setLine(1, "station");
-                event.setLine(3, station.departure());
-                event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.GREEN
-                        + ui.literal(event.getPlayer(), "车站停车标已创建。UUID: ", "Маркер остановки станции создан. UUID: ") + ChatColor.YELLOW + station.id());
-            } catch (IllegalArgumentException ex) {
-                event.setCancelled(true);
-                event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.RED + ui.error(event.getPlayer(), ex));
-                return;
-            }
-            return;
-        }
 
-        if ("property".equalsIgnoreCase(action)) {
-            event.setLine(1, "property");
-            event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.GREEN
-                    + ui.literal(event.getPlayer(), "属性控制牌已创建。", "Табличка свойства создана."));
-            return;
-        }
 
         event.setCancelled(true);
         event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.RED
-                + ui.literal(event.getPlayer(), "不支持的控制牌类型。第二行目前支持 switch、station、property、origin、balise、end。", "Неподдерживаемый тип таблички. Вторая строка поддерживает switch, station, property, origin, balise, end."));
+                + ui.literal(event.getPlayer(), "不支持的控制牌类型。第二行目前支持 switch、origin、balise、end。", "Неподдерживаемый тип таблички. Вторая строка поддерживает switch, origin, balise, end."));
         return;
 
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     void onBlockBreak(BlockBreakEvent event) {
-        manager.automaticSigns().remove(event.getBlock());
         if (infrastructureManager.removeSign(event.getBlock())) {
             event.getPlayer().sendMessage(ChatColor.GOLD + "[SkyTrain] " + ChatColor.YELLOW
                     + ui.literal(event.getPlayer(), "线路基础设施定义已删除。", "Определение инфраструктуры линии удалено."));
@@ -382,9 +336,6 @@ final class TrainListener implements Listener {
     @EventHandler
     void onBlockRedstone(BlockRedstoneEvent event) {
         switchManager.onRedstoneChanged(event.getBlock());
-        if (event.getOldCurrent() != event.getNewCurrent()) {
-            manager.automaticSigns().redstone(event.getBlock());
-        }
     }
 
     private void tell(Entity entity, String message, String ru) {

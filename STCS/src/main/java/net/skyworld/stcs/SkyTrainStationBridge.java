@@ -13,6 +13,8 @@ final class SkyTrainStationBridge {
     private final StcsPlugin plugin;
     private Plugin skyTrain;
     private Method listMethod;
+    private volatile boolean available;
+    boolean available(){return available;}
 
     SkyTrainStationBridge(StcsPlugin plugin) {
         this.plugin = plugin;
@@ -22,10 +24,12 @@ final class SkyTrainStationBridge {
         try {
             Plugin current = resolvePlugin();
             if (current == null) {
+                available=false;
                 return List.of();
             }
             Object result = listMethod.invoke(current);
             if (!(result instanceof List<?> list)) {
+                available=false;
                 return List.of();
             }
             List<StcsMarker> stations = new ArrayList<>();
@@ -37,8 +41,10 @@ final class SkyTrainStationBridge {
                     }
                 }
             }
-            return List.copyOf(stations);
+            if(stations.size()!=list.size()){available=false;return List.of();}
+            available=true;return List.copyOf(stations);
         } catch (ReflectiveOperationException | RuntimeException ex) {
+            available=false;
             plugin.getLogger().fine("SkyTrain station query unavailable: " + ex.getMessage());
             skyTrain = null;
             listMethod = null;

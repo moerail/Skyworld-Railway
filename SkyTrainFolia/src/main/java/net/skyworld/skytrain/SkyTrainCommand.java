@@ -1028,7 +1028,7 @@ final class SkyTrainCommand implements TabExecutor {
             return partial(input, List.of("default", "none"));
         }
         if (List.of("conduction", "conductionmode", "operationmode", "controlmode", "mode").contains(key)) {
-            return partial(input, List.of("manual", "automatic"));
+            return partial(input, List.of("manual"));
         }
         return List.of();
     }
