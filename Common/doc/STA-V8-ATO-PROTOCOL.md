@@ -1,5 +1,13 @@
 # STA v8 ATO 编号与接口契约
 
+**[新增／修正 · SAL 0.8.0 / STF 5.1.4 · 2026-11-26]** depot纳管提示可补发、确认码过期刷新，停稳阈值与STF一致；出库接客和回库共用支持途中折返的分段寻路，经STCS释放旧MA、STA换向后逐段运行。hotbar等待区块加载不再清除手动牵引档，实际牵引仍被保护禁止。 [本版增量契约](SAL-MANEUVERS-AND-HANDOVER.md)
+
+**[修正 · SAL 0.7.7 / STCS 4.3.6 · 2026-11-26]** 双车回库保留已选路径和库位，临时咽喉交通由 STCS 限制/延长 MA，不再因其他运行列车经过就丢计划。自动排道岔不得撤销另一列车 MA；目的库位净空、停放车障碍及真实故障检查保留。 [新版回库规则](SAL-RETURN-TRAFFIC.md)
+
+**[新增／修正 · 2026-11-26]** STA2.9.2 / STF5.1.2 / SAL0.7.4：管理员 /sal override <列车名或UUID> 保持制动，确认撤销MA后退出SAL并保留手动状态，完成后可 /st drive。保留车身占用、TIMS及TR/PT，不授予行车许可。坡道定位改用STF经STA上报的实际railXYZ，不再floor实体坐标猜轨道。 [完整契约](SAL-OVERRIDE-AND-SLOPES.md)
+
+**[新增／修改 · 2026-11-26]** 本轮当前版本 STA2.9.0 / SAL0.7.0 / PCC2.6.0（STF5.1.2、STCS4.3.5）。公共station、awake线路＋始发点、GLOBAL偏好车池／RESTRICTED限制、独立JVM快照计算与提交围栏，以[共享派车契约](SAL-SHARED-DISPATCH.md)／[English contract](SAL-SHARED-DISPATCH.en.md)为准。下文若涉及旧站名归属、每线必须有车辆段、awake车辆段＋线路，只作历史说明，不再使用。STCS的占用、MA和STA→STF执行权边界不变。
+
 本说明最初随 STA 2.3.1、STF 4.1.1、STCS 4.2.1、SkyATO-Lite 0.1.1、SkyPCC 2.2.0 发布。
 当前增量建图配套版本与新增 v9 依赖契约见 [RailGraph 增量说明](RAILGRAPH-INCREMENTAL.md)；本页的 v8 ATO 编号不变。
 协议仍为 v8；这是原 v8 Java 服务的增量契约，插件版本与协议版本分别管理。
@@ -93,3 +101,10 @@ AtoProtocolContractTest 检查标准映射、接口族重号、Message/Packet �
 验证结果：2026-11-19 完整构建成功，26.2、26.3 各 97 项 Java 测试通过（启用断言），包含新增契约测试及既有
 权限、序列围栏、TIMS、MA、释放竞态测试。日志为 `Common/logs/ato-protocol-20261119.log`，
 五个配套 JAR 与 SHA256 清单位于 `Latest/`。本补丁未再次运行实车场景，未修改生产服务器。
+
+
+## **[修改 · 2026-11-25] 中心停车与库位容量**
+
+**[破坏性修改 · 2026-11-25]** depot改为列车中心对牌；空间不足时只在本库位边界内调整计划中心，整列放不下则换位。同股道相邻库位沿轨中分并留净间隔；单端深处先停，双端评估两侧合法路径；出入库都排除车身阻挡。PCC显示容量、类型、范围和目标偏移。旧车头停车位置须手动调整，station语义不变。
+
+配套 STA2.8.0 / STF5.1.0 / STCS4.3.5 / SAL0.6.0 / PCC2.5.0；以上旧版章节保留为历史实现说明，depot旧领车参考以本次中心参考为准。[完整边界、配置、契约与重启规则](SAL-CENTRE-STABLING.md) · [English](SAL-CENTRE-STABLING.en.md)

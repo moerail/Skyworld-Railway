@@ -1,5 +1,44 @@
 # SkyRail Suite — 文語體鐵道運轉詳細規程
 
+**[追加／改訂 · SAL 0.8.0 / STF 5.1.4 · 2026-11-26]** 移管の知らせは再送し、期限切れの符号は更新す。出庫迎車と入庫は途中折返しの分割経路を共用し、STCSのMA解放を確かめてSTAにより換向す。チャンク待機は手動力行段を消さず、実牽引のみ禁ず。 [Details](doc/SAL-MANEUVERS-AND-HANDOVER.en.md)
+
+**[改訂 · SAL 0.7.7 / STCS 4.3.6 · 2026-11-26]** 二列車同時に入庫すとも、既定の進路と庫位を保つ。一時の競合は STCS の MA により待ちて再開す。自動転轍にて他列車の MA を取り消さず。庫位空間・留置車・真の故障の検査は従前のごとし。 [Concurrent returns](doc/SAL-RETURN-TRAFFIC.en.md)
+
+**[改訂 · STF 5.1.3 · 2026-11-26]** 自動運転、従前の P2/B4 固定を改む。発車は P4、定速に近づけば力行を弱め、常用制動 B6、停車保持 B7 とす。段数の上限は設定し得る。MA・ATP・TIMS・車両制限は従前のごとし。 [Automatic cab handles](doc/AUTOMATIC-DRIVING-HANDLES.en.md)
+
+**[修正 · SAL0.7.6 · 2026-11-26]** 入庫待機・庫位再確認中も既承認進路を更新し1500ms失効を防止。既定2秒は目標を保持し、車体経路の一時不明をトポロジー変更としません。継続不明はFAULT、実際の空間・庫位変更は停車後に再選択。詳細理由と配車履歴の区分を追加。 [Return rechecks](doc/SAL-RETURN-RECHECK.en.md)
+
+**[追加／修正 · 2026-11-26 · SAL0.7.6 / PCC2.6.4]** 線路座標と方向を同一STF観測に統一。定位不確実時は即制動し既定2秒再確認。境界0.75ブロック・投影1.5ブロックの有限設定に対応。独立観測で別分岐を確認すれば早期に復旧へ移行。MAは新設・拡張しません。元の障害を保存し/sal statusとPCC本文に表示します。 [Localisation policy](doc/SAL-LOCALISATION-TOLERANCE.en.md)
+
+**[追加／修正 · 2026-11-26]** STA2.9.2 / STF5.1.2 / SAL0.7.6：管理者の /sal override <列車名またはUUID> は制動・MA撤回確認後にSALを解除し、手動状態を保持。完了後 /st drive。車体占有・TIMS・TR/PTは維持。勾配定位はSTFからSTA経由の実railXYZを使用し、実体座標の切り捨てを廃止。 [Override/slope contract](doc/SAL-OVERRIDE-AND-SLOPES.en.md)
+
+**[追加 · SAL0.7.6 · 2026-11-26]** 配車要求に車両別の候補除外、正逆方向経路、迎車上限、他車の古い観測・車体不明・図外位置、障害辺、計算結果失効の理由を追加。既存保護は緩和せず、他車のTIMS保持だけでは全体を遮断しません。診断件数は有限で、既存PCCの理由欄に表示します。
+
+**[変更 · SAL0.7.6 / PCC2.6.4 · 2026-11-26]** 訪問間は最短の合法な有向軌道経路を採用し、長い迂回路があるだけでは拒否しません。明示した設備・辺は制約を維持。方向・図の故障・閉路・MA検査は継続します。PCCは未完成草稿の確認済み前半も実軌道に沿って表示し、未確認部分のみ推定線とします。 [Path policy](doc/SAL-ROUTE-PATHS.en.md)
+
+**[追加／変更 · 2026-11-26]** PCC2.6.4 / SAL0.7.6 / STA2.9.2：最初の検証失敗区間を訪問番号・設備名・IDで表示。両端を強調し、診断クリックで移動します。修正後に再検証してください。右の≡をマウス・タッチでドラッグし、離した時だけ一度送信、取消時は送信しません。ハンドルにフォーカスして上下キーでも移動可能。訪問UUID・停車時間・折返し属性は保持し、保存→検証→公開は別操作です。
+
+**[修正 · PCC2.6.4 · 2026-11-26]** 定期更新で未変更のSAL設備・路線ボタンを再生成しません。狭い画面でも列車未選択の編集欄を維持します。SALクリックを地図ドラッグから除外し、プレビューが駅選択を妨げないよう修正。一時的なカタログ障害では草稿・入力を保持し、古いデータでの書込みを無効化します。実際の競合は手動解消が必要です。PCC更新後はCtrl+F5。
+
+## **[破壊的変更 · 2026-11-26] 共用停車點及び共通配車**
+
+STA2.9.2 / STF5.1.4 / STCS4.3.6 / SAL0.8.0 / PCC2.6.4.
+
+station第四行を一意の停車點名とす。標識設置のみにて路線へ加へず。awake第三行を運行路線、第四行を始發停車點とす。舊awakeは改記まで無効、舊stationは一意名へ移行す。/sal station list にて照合すべし。depot標識及び車輛歸屬は保存す。
+
+新設路線はGLOBALを既定とし、優先留置群は任意とす。RESTRICTEDのみ一群以上を必須とし、舊路線の制限は維持す。PCCにて方式・優先秒數・迎車上限・待列と裁定を閲す。
+
+旧説明のstation帰属・全路線の車両基地必須・awake基地/路線記法は本節に置き換わります。 [§8](#section-8). [共有配車契約（英語）](doc/SAL-SHARED-DISPATCH.en.md) · [中国語本番テスト手順](../SkyATO-Lite/TEST.zh.md)
+
+
+**[改定 · 2026-11-25]** STF5.1.2 / SAL0.7.6：前後方向選擇ノ後ニFS/MAヲ要求ス。車體ノ一部ガdepot標識ヲ覆ヒ三秒停車セバ亂數六桁ノ確認符ヲ示ス。`/sal handover` ハ停車中直チニ發行、`/sal handover <確認符>` ノ後 `/st release` ニテ移管ス。自動入庫ノ中央停止ハ改メズ。
+
+
+**[非互換改定 · 2026-11-25]** depot ハ列車中央ヲ標識ニ合ス。予定中央ハ當該列位ノ境界内ニ限リ補正シ、全長ヲ收容シ得ザレバ他ノ列位ヲ選ブ。同股道ノ隣接標識間ヲ沿軌中分シ間隙ヲ置ク。片端線ハ奧ヨリ、兩端線ハ雙方ノ合法經路ヲ評價シ、他車ニ塞ガレタル經路ヲ除ク。PCCニ容量・出入口・境界・偏移ヲ示ス。舊先頭基準ノ留置車ハ手動ニテ再配置スベシ。stationハ改メズ。
+
+STA2.9.2 / STF5.1.4 / STCS4.3.6 / SAL0.8.0 / PCC2.6.4. [中文契约](doc/SAL-CENTRE-STABLING.md) · [English contract](doc/SAL-CENTRE-STABLING.en.md)
+
+
 ## **[2026-11-24] 新設／改定：PCC 2.4.1 選擇標示**
 
 ~~瀏覽器固有ノ焦點外枠ヲ用ヰル。~~ 今次ヨリ實軌道ニ沿フ線及ビ設備ノ小圓ヲ用ヰ、畫面上ノ線幅ヲ一定トス。地圖擴大ニ因ル巨大化ヲ除キ、鼠標選擇及ビ鍵盤焦點ノ標示ヲ保ツ。
@@ -41,11 +80,11 @@
 
 | ファイル / 構成 | 版 | 役割 |
 | --- | --- | --- |
-| SkyworldTrainAPI / STA | **2.7.0** | 型付き契約、テレメトリ、運転・指令サービス |
-| SkyTrainFolia / STF | **5.0.2** | 編成、物理、チャンク票、手動運転、TIMS、ATP、実体操作 |
-| STCS | **4.3.5** | 工務、軌道図、測位、在線、予約、MAと進路裁定 |
-| SkyATO-Lite / SAL | **0.5.0** | 運行計画、呼出、停車、乗客Title、入庫と移管。実体は直接操作しない |
-| SkyPCC / PCC | **2.4.1** | 工務/運行Web地図、車両基地一覧、認証付き指令操作 |
+| SkyworldTrainAPI / STA | **2.9.2** | 型付き契約、テレメトリ、運転・指令サービス |
+| SkyTrainFolia / STF | **5.1.4** | 編成、物理、チャンク票、手動運転、TIMS、ATP、実体操作 |
+| STCS | **4.3.6** | 工務、軌道図、測位、在線、予約、MAと進路裁定 |
+| SkyATO-Lite / SAL | **0.8.0** | 運行計画、呼出、停車、乗客Title、入庫と移管。実体は直接操作しない |
+| SkyPCC / PCC | **2.6.4** | 工務/運行Web地図、車両基地一覧、認証付き指令操作 |
 
 ## 目次
 
@@ -73,15 +112,17 @@
 
 | ファイル / 構成 | 版 | 役割 |
 | --- | --- | --- |
-| SkyworldTrainAPI / STA | **2.7.0** | 型付き契約、テレメトリ、運転・指令サービス |
-| SkyTrainFolia / STF | **5.0.2** | 編成、物理、チャンク票、手動運転、TIMS、ATP、実体操作 |
-| STCS | **4.3.5** | 工務、軌道図、測位、在線、予約、MAと進路裁定 |
-| SkyATO-Lite / SAL | **0.5.0** | 運行計画、呼出、停車、乗客Title、入庫と移管。実体は直接操作しない |
-| SkyPCC / PCC | **2.4.1** | 工務/運行Web地図、車両基地一覧、認証付き指令操作 |
+| SkyworldTrainAPI / STA | **2.9.2** | 型付き契約、テレメトリ、運転・指令サービス |
+| SkyTrainFolia / STF | **5.1.4** | 編成、物理、チャンク票、手動運転、TIMS、ATP、実体操作 |
+| STCS | **4.3.6** | 工務、軌道図、測位、在線、予約、MAと進路裁定 |
+| SkyATO-Lite / SAL | **0.8.0** | 運行計画、呼出、停車、乗客Title、入庫と移管。実体は直接操作しない |
+| SkyPCC / PCC | **2.6.4** | 工務/運行Web地図、車両基地一覧、認証付き指令操作 |
 
 **[新設 · 2026-11-21]** 今回の成果物はSAL固定運行・出入庫、手動/自動移管、RailGraph局所更新、実行型MA/ATP表示、PCC独立運行地図です。指令はSAL青色 `[SkyATO-Lite]`、STF灰色、STCS黄色。旧既定接頭辞だけを移行し、独自設定は保持します。バージョン欄にSALを追加し、旧ATP非介入表示を修正しました。
 
-**[改定 · 2026-11-21]** 線區名:up|downノ優先方向、單線驛間全體予約、多段折返シ汎用探索及ビPython計算守護プロセスハ設計草案ニ留マル。現行出入庫ノ兩方向評價ヲ以テ、任意配線ノ多段轉向實裝ト稱スベカラズ。
+~~**[改定 · 2026-11-21]** 線區名:up|downノ優先方向、單線驛間全體予約、多段折返シ汎用探索及ビPython計算守護プロセスハ設計草案ニ留マル。現行出入庫ノ兩方向評價ヲ以テ、任意配線ノ多段轉向實裝ト稱スベカラズ。~~
+
+**[改訂 · SAL 0.8.0]** 迎車・入庫に最大4回の換向を行ふ有界探索を實裝す。上下行優先、單線驛間全體予約、無制限の汎用入換及びPython計畫デーモンは設計に留まる。 [Details](doc/SAL-MANEUVERS-AND-HANDOVER.en.md)
 
 [TRAFFIC-PLANNING-DAEMON-DESIGN](doc/TRAFFIC-PLANNING-DAEMON-DESIGN.md)
 
@@ -98,11 +139,11 @@
 5. 更新時に台帳を消去しません。SHA256はファイル照合用です。Sourceと参照文書・画像は同梱し、切り戻しは整合したバックアップを使います。
 
 ```text
-SkyworldTrainAPI-2.7.0.jar
-SkyTrainFolia-5.0.2.jar
-STCS-4.3.5.jar
-SkyATO-Lite-0.5.0.jar
-SkyPCC-2.4.1.jar
+SkyworldTrainAPI-2.9.2.jar
+SkyTrainFolia-5.1.4.jar
+STCS-4.3.6.jar
+SkyATO-Lite-0.8.0.jar
+SkyPCC-2.6.4.jar
 ```
 
 [SHA256](../Latest/SHA256.json) · [LICENSE](LICENSE) · [ASSET-LICENSE](ASSET-LICENSE.md)
@@ -450,151 +491,63 @@ graph:
 
 <a id="section-8"></a>
 
-## 8. SAL運行路線・標識・運転権移管
+## 8. SAL — 共用停車點及び共通配車
 
-**[新設 · 2026-11-21]** 一回の呼出で一運行。無限周回や時刻表運転ではありません。最初と最後はstation、同じ駅の複数訪問も可能です。分岐が曖昧なら応答子/分岐器を中間点として結びます。SALは車両を生成しないのでSTF編成と基地を先に用意します。
+**[破壊的変更 · 2026-11-26]** station第四行を一意の停車點名とす。標識設置のみにて路線へ加へず。awake第三行を運行路線、第四行を始發停車點とす。舊awakeは改記まで無効、舊stationは一意名へ移行す。/sal station list にて照合すべし。depot標識及び車輛歸屬は保存す。
 
-### 指令と設備選択
+新設路線はGLOBALを既定とし、優先留置群は任意とす。RESTRICTEDのみ一群以上を必須とし、舊路線の制限は維持す。PCCにて方式・優先秒數・迎車上限・待列と裁定を閲す。
 
-1. 発車方向を向いてLine1を作成し、必要なら方位を明示します。
-2. 最初のstationを置き、順路の図上設備の近くでbindします。8ブロック内の複数候補は60秒内にchoose。UUIDまたはstation ID指定も可能です。
-3. 新stationは設置順に追加されます。listで確認、removeは1始まりの訪問番号を削除。初駅に戻るなら同stationを再度結びます。
-4. station結合末尾のreverseはその訪問の停車後折返しです。任意地点で自由に反転する機能ではありません。
-5. previewは2分、閉環が有効なら緑、その他は赤。緑は線路開通やMAではありません。validateで検証を保存、publishで呼出可能にします。
-~~6. タスクのある路線は編集不可。編集・関連設備変更は再検証、無関係の図変更では公開を維持します。~~
+共用station/depotを登録し、既存TokenでPCC編集へ入り、設備・方向・訪問順を指定して保存→検証→公開。GLOBALの優先群は任意、RESTRICTEDは必須です。ゲームとPCCの競合は両側を凍結し、手動解消が必要です。
 
-**[新設／改定]** 先ニdepotヲ登錄シ、應答子・分岐器・有向邊・當路線stationヲ選ブ。實標識ヲ改書セズ、訪問順・停車秒・折返シヲ定ム。保存・驗證・公開ハ別操作、既存任務ハ舊公開版ヲ保持ス。
-7. depot・速度・messageを置き、編成を作成して所属を指定、ボタンかawakeで呼びます。
+| Sign | 1 | 2 | 3 | 4 |
+| --- | --- | --- | --- | --- |
+| Depot | [SAL] | depot | maintown | L5-1 |
+| Public stop | [SAL] | station | 15 | MainStart |
+| Call | [SAL] | awake | MainTour | MainStart |
+| Title | [SAL] | message | Welcome | 5 |
+| Cruise | [SAL] | property | v_target | 40kmh |
+
+`[SkyATOL]` = `[SAL]`.
+
+削除済み旧記法: ~~station: 15 / Line1 (route ownership)~~; ~~awake: maintown / Line1~~; ~~/sal awake maintown Line1~~.
+
+Bで呼ぶとA→B→C→AをB→C→A→Bへ回転し、終了後入庫します。同一駅の複数訪問はPCCの名前@訪問UUIDを使用。末尾の始発重複は閉路別名です。実行中任務は元の公開版を保持します。
 
 ```text
-/sal route create Line1
-/sal route direction Line1 east
-/sal route bind Line1
+/sal station list
+/sal route create MainTour
+/sal route direction MainTour east
+/sal route bind MainTour <deviceUUID>
 /sal route choose 1
-/sal route bind Line1 <deviceUUID>
-/sal route bind Line1 <stationID> reverse
-/sal route list Line1
-/sal route remove Line1 <index>
-/sal route preview Line1
-/sal route preview Line1 off
-/sal route validate Line1
-/sal route publish Line1
-```
-
-### 標識の各行
-
-`[SAL]` = `[SkyATOL]`
-
-#### depot
-
-```text
-[SAL]
-depot
-maintown
-L1
-```
-
-depotの3行目はmaintown基地、4行目L1庫位。L2/L3は別標識で、分散設置も可能です。基地庫位は始発駅ではありません。awake以外はRailGraph登録済み軌道柱に関連付けます。
-
-#### station
-
-```text
-[SAL]
-station
-15
-Line1
-```
-
-stationの3行目は停車秒数、4行目SAL路線名。先に路線作成。別の駅名欄はなく、PCCでは路線と順番で表示します。
-
-#### awake
-
-```text
-[SAL]
-awake
-maintown
-Line1
-```
-
-awakeの3行目は基地、4行目路線。標識/支持ブロックへの赤石立上りで呼出。下の軌道は不要。通電継続や起動だけでは呼び出さず、重複は統合します。
-
-#### property / v_target
-
-```text
-[SAL]
-property
-V_target
-36km/h
-```
-
-propertyは現在V_targetのみ、4行目に速度。v_target略式は3行目速度、4行目空白。km/h・kmh・m/s・m/t・b/t・mph、単位なしはブロック/tick。車両・編成・ATP上限は有効です。
-
-```text
-[SkyATOL]
-v_target
-36km/h
-
-```
-
-#### message
-
-```text
-[SAL]
-message
-Skyworld
-5
-```
-
-messageの3行目は文字通りの文章、4行目秒数。自列車乗客に中央Titleを表示し、新文面は即座に上書き。キューや指令実行はしません。
-
-### 編成・呼出・運行
-
-**[改定]** チルノ — SAL
-
-管理者が組成済み停止編成内でhomeを基地に設定します。L1固定ではありません。人間の運転権がない新車は所属庫位へ押すとSTFが低速で停車保持します。呼出候補は新鮮で完全な観測、TIMS保持なし、人間運転士/別タスクなしが条件です。
-
-```text
-/st create demo 6
+/sal route list MainTour
+/sal route remove MainTour 3
+/sal route supply MainTour global 30 120
+/sal route depot MainTour maintown
+/sal route depot MainTour none
+/sal route preview MainTour
+/sal route validate MainTour
+/sal route publish MainTour
+/sal route close MainTour
+/sal route resolve MainTour DISCARD
+/sal route retire MainTour
+/sal route delete MainTour
 /sal train home maintown
-/sal train home
-/sal awake maintown Line1
+/sal awake MainTour MainStart
 /sal status
-```
-
-呼出→出庫→初駅乗車→運行/停車→終駅→適切な庫位予約→入庫停止。無乗車でも一回完了。乗客は入庫まで乗れても次周は駅で再呼出します。同路線の適格車が初駅未発車なら優先再利用し、入庫を取り消し、必要な安全換向後に停車時間を最初から計り直します。発車後/故障車は再利用しません。
-
-出入庫はRailGraph上で探索し、現在の実体分岐方向で候補を削りません。STCSが進路を裁定しSTA/STFが転換。換向は旧MA解放→停止/換向確認→実際の先頭位置で再計画。庫位・空間・経路不足なら停止待機です。
-
-### 手動/自動移管
-
-自動→手動：完全停止・完全観測のPARKED庫内待機車でタスク/故障保持がない場合に `/sal release`。完了後、編成端車両で `/st drive`。入庫走行中は不可。
-
-手動→自動：運転権を持って有効庫位で連続3秒完全停止、SAL確認、30秒内に明示的 `/st release` または第2ボタン。実際の基地を所属にして待機、直ちに発車はしません。
-
-未確認release、下車、切断、移動、運転士/庫位変更、期限切れでは移管しません。手動状態は保存。運転者skyatolite.driver+skytrain.use、管理skyatolite.adminが必要です。
-
-```text
-/sal release
-/st drive
-```
-
-### 空車・障害・タスク
-
-```text
 /sal stop <trainUUID>
 /sal resume <trainUUID>
 /sal finish <trainUUID>
 ```
 
-stopは停止保持、resumeは停止/完全性/図確認後まず入庫、finishは信頼できる測位と完全停止後MA解放・終了。引数は列車UUIDです。
+既定500msの集約後、同じ公開版・始発訪問の迎車を優先再利用し、それ以外は待機SAL車両を最大割当・最小費用で選びます。走行可能経路、車体障害、完全で新鮮な観測、有人運転権、既存任務は必須条件です。推定迎車秒数＋非優先群加算（既定30秒）＋任意の在庫加算、迎車上限120秒。待ち時間を重み付けし120秒で理由付き失効となります。
 
-STFチャンク票は乗客不要。非同期読込後に所有リージョンで追加し、未準備なら牽引禁止。空サーバー全体停止は別設定pause-when-empty-seconds=-1で無効化します。
+専用JVMスレッドは不変スナップショットだけを計算します。SALは確定前に図・公開版・有効期限・車体位置/方向/編成・帰属・運転権を再照合します。MAと進路の唯一の権限はSTCS、STA経由でSTFが実体を操作します。外部Pythonデーモンは導入しません。
 
-TIMSは実際の完全性回復後に最大3回再試行。構成員変更・再生成・在線消去はしません。実欠車/異常間隔/手動Tripは点検が必要です。
+既存SAL待機車は再移管不要です。手動車体がdepotに重なり3秒停止すると6桁確認コードを提示。/sal handover で即時要求、/sal handover <code> で承認し運転士が /st release を実行します。単独の解放は承諾になりません。入庫待機車は /sal release 後 /st drive で手動運転できます。
 
-経路逸脱はPCC警報。停止・完全性・測位確認後にSR承認待ち。各区間ごと管理者承認が必要で、無限自動許可はしません。
+再起動で未確定要求は取り消し、既存任務はRECOVERY_REQUIREDを保持。保存・定位・MA異常を低費用で無視しません。GLOBALは適合する任意グループへ入庫、RESTRICTEDは許可群だけです。中心停止と全車体空間判定を維持。ETAは完全な混雑・加速モデルではなく、予測再配置や任意の多段折返しも未実装です。
 
-[SAL-MANUAL-HANDOVER](doc/SAL-MANUAL-HANDOVER.md) · [SAL-DEPOT-AND-RETIREMENT](doc/SAL-DEPOT-AND-RETIREMENT.md)
+[共有配車契約（英語）](doc/SAL-SHARED-DISPATCH.en.md) · [中国語本番テスト手順](../SkyATO-Lite/TEST.zh.md)
 
 <a id="section-9"></a>
 
@@ -883,3 +836,7 @@ node SkyPCC/tests/operating-map-browser.cjs
 
 
 [舊規程全文（履歷用・現行運轉ニ用フベカラズ）](doc/manual-baseline-20261120/README.ja.classical.md)
+
+## 操作の補記 · SAL 0.8.0 / STF 5.1.4
+
+手動にて車体の一部を depot の標に重ね3秒停車すべし。/sal handover にて直ちに符号を得ることも可。30秒以内に /sal handover CODE として確かめ、次いで /st release を明示す。単なる解放は同意にあらず。未送達は再送し、期限切れは新符号とす。迎車・入庫は整列の空間を確かめ最大4回換向す。短き線路・占用・保護保持を無視せず。再起動後は管理者の復旧確認を待つ。チャンク待機は手柄を保つも実牽引を禁じ、新たな中立・制動を優先す。

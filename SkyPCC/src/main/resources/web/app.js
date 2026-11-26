@@ -743,7 +743,10 @@
         reason, executable: code(event.details?.executable || 'false') });
       else if (event.type === 'MA_RELEASED') message.textContent = t('{driver} released forward MA reservation. Train occupancy retained.', { driver });
       else if (event.type === 'INTEGRITY_CHANGED') message.textContent = `${t('Train integrity')}: ${reason}`;
-      else if (event.type === 'MA_UNAVAILABLE' && event.reason === 'ROUTE_DEVIATION') message.textContent = t('Automatic train left its service route. Brakes held; approve SR segments to guide it home.');
+      else if (event.type === 'MA_UNAVAILABLE' && event.reason === 'ROUTE_DEVIATION') {
+        message.textContent = t('Automatic route tracking failed. Brakes held; approve SR segments to guide it home.');
+        if(event.details?.detail)message.textContent+=' '+t('Original cause: {reason}',{reason:event.details.detail});
+      }
       else if (event.type === 'MA_UNAVAILABLE' && event.reason === 'DISPATCHER_REVOKED') message.textContent = code('DISPATCHER_REVOKED');
       else if (event.type === 'MA_UNAVAILABLE') message.textContent = t('Executable MA unavailable for {train} ({reason}). Stop at the last confirmed EoA.', {
         train: event.trainName || event.trainId, reason });
@@ -751,7 +754,7 @@
         operator: driver, train: event.trainName || event.trainId, node: event.details?.targetNodeId || '--' });
       else if (event.type === 'ATP_MODE_CHANGED') message.textContent = t('{operator} changed ATP mode: {from} → {to}.', { operator: event.details?.actorName || event.details?.actorId || '--', from: code(event.details?.previous || 'UNKNOWN'), to: code(event.details?.next || 'UNKNOWN') });
       else message.textContent = `${event.source}: ${code(event.type)} (${reason})`;
-      message.title = `${event.type} / ${event.reason || '--'}`;
+      message.title = `${event.type} / ${event.reason || '--'}${event.details?.detail?'\n'+event.details.detail:''}${event.details?.position?'\n'+event.details.position:''}${event.details?.phase?'\n'+event.details.phase:''}`;
       row.append(time, severity, train, message);
       fragment.append(row);
     }
@@ -1009,7 +1012,7 @@
     ui.inspectorEmpty.hidden = Boolean(train)||!!window.PccOperatingMap?.hasPanel();
     ui.inspectorBack.hidden = !train;
     ui.cameraControls.hidden = !train || !!window.PccOperatingMap?.active();
-    document.querySelector('.workspace').classList.toggle('has-selection', Boolean(train));
+    document.querySelector('.workspace').classList.toggle('has-selection', Boolean(train) || !!window.PccOperatingMap?.hasPanel());
     if (!train) return;
     const following = state.followTrainId === train.trainId;
     const positioned = available && train.graphCurrent && !train.stale && Boolean(state.edges.get(train.edgeId)?.path?.length);
@@ -1206,6 +1209,7 @@
     requestAnimationFrame(updateScaleStyles);
   });
   window.addEventListener('pcc-infrastructure-filter', () => { renderInfrastructureSelection(); scheduleLabelLayout(); });
+  window.addEventListener('pcc-operating-panel', updateInspector);
   ui.highlightDecrease.onclick = () => setHighlight(state.highlightScale - .25);
   ui.highlightIncrease.onclick = () => setHighlight(state.highlightScale + .25);
   ui.highlightSizeValue.onclick = () => setHighlight(1);
@@ -1218,7 +1222,7 @@
     zoom(event.deltaY < 0 ? 0.82 : 1.22, event.clientX, event.clientY);
   }, { passive: false });
   ui.railMap.addEventListener('pointerdown', event => {
-    if (state.followTrainId || event.target.closest('.train-marker, .switch-hit, .infrastructure-hit')) return;
+    if (state.followTrainId || event.target.closest('.train-marker, .switch-hit, .infrastructure-hit, .op-device, .op-route, .op-stopping-centre')) return;
     state.dragging = { x: event.clientX, y: event.clientY, view: { ...state.view } };
     ui.railMap.classList.add('dragging');
     ui.railMap.setPointerCapture(event.pointerId);

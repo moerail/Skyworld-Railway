@@ -1,2 +1,24 @@
 # Target speed; still limited by STF profile, route protection and MA.
 cruise-blocks-per-tick: 0.4
+
+# Uncertain positioning always brakes. No movement authority is created or extended here.
+localisation:
+  position-tolerance-blocks: 1.5
+  endpoint-tolerance-blocks: 0.75
+  confirmation-ms: 2000
+
+# Along-track usable space; no chunk loading and no change to STCS authority.
+depot:
+  net-gap-blocks: 2.0
+  boundary-margin-blocks: 2.0
+  stopping-tolerance-blocks: 0.5
+  # Brake and recheck before discarding a return target; unknown body faults instead of churn.
+  recheck-ms: 2000
+
+# Pure snapshot matching runs on a dedicated JVM worker; no external daemon.
+dispatch:
+  batch-window-ms: 500
+  request-timeout-ms: 120000
+  compute-budget-ms: 500
+  # Optional approximate parked-stock penalty; zero disables it.
+  last-vehicle-penalty-seconds: 0

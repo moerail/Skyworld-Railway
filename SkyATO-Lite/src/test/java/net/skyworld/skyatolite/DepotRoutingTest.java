@@ -28,7 +28,7 @@ public final class DepotRoutingTest {
             e("os","o","s","east","common",-20,0,0,0),e("su","s","u","straight","west",0,0,40,0),e("ut","u","t","east","west",40,0,100,0),
             e("sv","s","v","diverging","north",0,0,0,100),e("vt","v","t","east","south",0,100,100,0)),List.of())));
         var start=branch.locate(new Topology.Pos("world",-19.5,64.0625,.5),1,0,0);
-        rejects(()->branch.plan(start,List.of(Topology.Target.node("t"))));
+        assert branch.plan(start,List.of(Topology.Target.node("t"))).edges(0).equals(List.of("os","su","ut"));
         assert branch.shortest(start,Topology.Target.node("t")).edges(0).equals(List.of("os","su","ut"));
         var session=new AuthoritySession();assert session.needsSubmit(5,List.of("ab"));session.accepted(5,List.of("ab"));
         for(int tick=0;tick<100;tick++)assert !session.needsSubmit(5,List.of("ab")):"Progress alone must not resubmit MA";

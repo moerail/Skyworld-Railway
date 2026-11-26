@@ -291,6 +291,14 @@ dialog p { overflow-wrap: anywhere; }
 .op-direction { fill: none; stroke-width: 2px; vector-effect: non-scaling-stroke; pointer-events: none; }
 .op-visit { fill: var(--bg); stroke: var(--cyan); stroke-width: 2px; vector-effect: non-scaling-stroke; pointer-events: none; }
 .op-device { cursor: pointer; }
+.route-validation-issues {padding-left:18px;color:var(--red,#d35050);overflow-wrap:anywhere;}
+.route-validation-issues button {height:auto;white-space:normal;text-align:left;color:inherit;}
+.route-validation-issues small {display:block;margin:4px 0;}
+#routeVisits .validation-problem {border-left:3px solid var(--red,#d35050);padding-left:6px;}
+#routeVisits li {position:relative;padding-right:38px;}
+.route-drag-handle {position:absolute;right:0;top:3px;width:32px;cursor:grab;touch-action:none;user-select:none;font-size:22px;}
+.route-drag-handle:active {cursor:grabbing;}
+#routeVisits .route-dragging {background:var(--surface);box-shadow:0 2px 8px #0004;outline:2px solid var(--cyan);}
 .op-device.selected .op-berth-box { stroke: var(--amber); }
 .op-device.invalid { opacity: .35; }
 #routeEditorPanel { font-size: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
@@ -320,3 +328,8 @@ dialog p { overflow-wrap: anywhere; }
 .highlight-tools input[type=color] {width:34px;height:34px;min-width:0;padding:5px;border:0;background:transparent;cursor:pointer;}
 .infrastructure-children {padding-left:20px;display:grid;grid-template-columns:1fr;gap:4px;}
 #infrastructureSelectionLayer {pointer-events:none;}
+
+.op-storage-boundary {stroke:var(--cyan);stroke-width:4;stroke-opacity:.35;vector-effect:non-scaling-stroke;pointer-events:none;}
+.op-stopping-centre {fill:none;stroke:var(--amber);stroke-width:2;vector-effect:non-scaling-stroke;pointer-events:auto;}
+
+.entry-reference {display:block;overflow-wrap:anywhere;color:var(--muted);font-size:10px;}

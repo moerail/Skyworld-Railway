@@ -13,6 +13,10 @@ final class OperatingProjection {
     record Task(String depot,String line,String phase,String reason,String berth) {}
     static List<Train> trains(Map<UUID,String> homes,Map<UUID,Task> jobs,Collection<AutomaticTrainService.View> observations,
             List<Slot> slots,long now) {
+        return trains(homes,jobs,observations,slots,now,(slot,v)->new AutomaticTrainService.ParkingTarget(slot.position().world(),slot.position().x(),slot.position().y(),slot.position().z(),slot.id()));
+    }
+    static List<Train> trains(Map<UUID,String> homes,Map<UUID,Task> jobs,Collection<AutomaticTrainService.View> observations,
+            List<Slot> slots,long now,java.util.function.BiFunction<Slot,AutomaticTrainService.View,AutomaticTrainService.ParkingTarget> targets) {
         Map<UUID,AutomaticTrainService.View> views=new HashMap<>();observations.forEach(v->views.put(v.train(),v));
         Set<UUID> ids=new LinkedHashSet<>(homes.keySet());ids.addAll(jobs.keySet());ids.addAll(views.keySet());
         List<Train> result=new ArrayList<>();
@@ -22,8 +26,8 @@ final class OperatingProjection {
             Position p=v==null?null:new Position(v.world(),v.x(),v.y(),v.z());
             var matches=new ArrayList<Slot>();
             if(fresh&&v.speedBlocksPerTick()<=.001&&"COMPLETE".equals(v.integrity())&&!v.integrityHeld())
-                for(var slot:slots)if(slot.valid()&&new AutomaticTrainService.ParkingTarget(slot.position().world(),slot.position().x(),slot.position().y(),slot.position().z(),slot.id()).contains(v.world(),v.x(),v.y(),v.z()))matches.add(slot);
-            String status=job!=null?"RUNNING":!fresh||!"COMPLETE".equals(v.integrity())||v.integrityHeld()?"UNKNOWN":matches.size()==1?"PARKED":v.status().equals("MANUAL_DRIVER")?"MANUAL":"IDLE";
+                for(var slot:slots)if(slot.valid()){var target=targets.apply(slot,v);if(target!=null&&target.contains(v))matches.add(slot);}
+            String status=job!=null?"RUNNING":!fresh||!v.bodyKnown()||!"COMPLETE".equals(v.integrity())||v.integrityHeld()?"UNKNOWN":matches.size()==1?"PARKED":v.status().equals("MANUAL_DRIVER")?"MANUAL":"IDLE";
             String berth=status.equals("PARKED")?matches.getFirst().id():job==null?null:job.berth();
             result.add(new Train(id,v==null?id.toString():v.name(),home,job==null?"":job.line(),status,job==null?"":job.phase(),
                 job==null?(fresh?"": "OBSERVATION_UNAVAILABLE"):job.reason(),berth,p,v==null?0:v.observedAt(),fresh));

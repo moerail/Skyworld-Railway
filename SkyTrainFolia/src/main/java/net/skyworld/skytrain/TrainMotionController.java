@@ -48,6 +48,13 @@ final class TrainMotionController {
         this.audio = audio;
     }
 
+    /** Loading inhibits actuation, not the driver's selected handle. */
+    static ActiveAtpState.Decision chunkAvailability(Train train,ActiveAtpState.Decision decision,boolean ready){
+        if(ready)return decision;
+        train.activeAtpReason="CHUNKS_LOADING";
+        return ActiveAtpState.Decision.hold(train.operatingMode,"CHUNKS_LOADING");
+    }
+
     void tickMember(Train train, Minecart cart, ScheduledTask task) {
         UUID entityId = cart.getUniqueId();
         if (!host.validateMemberTick(train, cart, task)) return;
@@ -238,10 +245,7 @@ final class TrainMotionController {
             atp=ActiveAtpState.Decision.hold(train.operatingMode,"TIMS_"+train.tims.view(now).reason());
             train.activeAtpBrakeLevel=8;train.activeAtpLimitMps=0.0;train.activeAtpReason=atp.reason();
         }
-        if(!chunksReady) {
-            atp=ActiveAtpState.Decision.hold(train.operatingMode,"CHUNKS_LOADING");
-            train.powerNotch=0;train.activeAtpReason="CHUNKS_LOADING";
-        }
+        atp=chunkAvailability(train,atp,chunksReady);
         if (train.dispatcherBrake.held()) {
             atp = ActiveAtpState.Decision.hold(train.operatingMode,
                     train.dispatcherBrake.trip() ? "DISPATCHER_REVOKED" : "DISPATCHER_REROUTE");

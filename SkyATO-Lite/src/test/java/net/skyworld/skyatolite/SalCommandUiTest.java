@@ -20,6 +20,7 @@ public final class SalCommandUiTest {
         assert driver.stream().anyMatch(s -> s.contains("/sal release"));
         assert driver.stream().noneMatch(s -> s.contains("/sal awake") || s.contains("/sal route"));
         var admin = SalCommandUi.help(true);
+        assert admin.stream().anyMatch(s->s.contains("/sal override"));assert driver.stream().noneMatch(s->s.contains("/sal override"));
         for(var command:new String[]{"create","direction","bind","choose","list","remove","preview","validate","publish"})
             assert admin.stream().anyMatch(s -> s.contains("/sal route "+command));
         var rich = (TextComponent)SalCommandUi.component("handover");

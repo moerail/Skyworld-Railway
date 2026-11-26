@@ -1,5 +1,5 @@
 name: SkyATO-Lite
-version: 0.5.0
+version: 0.8.0
 main: net.skyworld.skyatolite.SkyATOLitePlugin
 api-version: '1.13'
 folia-supported: true

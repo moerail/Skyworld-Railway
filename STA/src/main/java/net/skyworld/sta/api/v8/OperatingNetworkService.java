@@ -14,20 +14,31 @@ public interface OperatingNetworkService {
         public Route {if(!Set.of("DRAFT","VALIDATED","PUBLISHED").contains(status))throw new IllegalArgumentException("Route status");segments=List.copyOf(segments);stops=List.copyOf(stops);}
     }
     record Train(UUID id,String name,String home,String line,String status,String phase,String reason,String berth,
-            Position position,long observedAtMillis,boolean fresh,long routeVersion) {
+            Position position,long observedAtMillis,boolean fresh,long routeVersion,Position stoppingCenter,Double stoppingOffsetBlocks) {
+        public Train(UUID id,String name,String home,String line,String status,String phase,String reason,String berth,Position position,long observedAtMillis,boolean fresh,long routeVersion){this(id,name,home,line,status,phase,reason,berth,position,observedAtMillis,fresh,routeVersion,null,null);}
         public Train(UUID id,String name,String home,String line,String status,String phase,String reason,String berth,Position position,long observedAtMillis,boolean fresh){
             this(id,name,home,line,status,phase,reason,berth,position,observedAtMillis,fresh,0);
         }
     }
-    record Berth(String id,String name,Position position,boolean valid,List<UUID> parkedTrains,UUID reservedBy) {
+    /** Resolved graph coordinates in metres; dimensions/tolerance in Minecraft blocks (not wire encodings). */
+    record ParkingGeometry(int Q_TP_Alignment,double D_Location,double Q_Stop_Location_Tolerance,
+            double usableLengthBlocks,double maxTrainLengthBlocks,String access,String reason,List<Position> boundary) {
+        public ParkingGeometry {boundary=List.copyOf(boundary);}
+    }
+    record Berth(String id,String name,Position position,boolean valid,List<UUID> parkedTrains,UUID reservedBy,ParkingGeometry geometry) {
+        public Berth(String id,String name,Position position,boolean valid,List<UUID> parkedTrains,UUID reservedBy){this(id,name,position,valid,parkedTrains,reservedBy,null);}
         public Berth {parkedTrains=List.copyOf(parkedTrains);}
     }
     record Depot(String name,List<Berth> berths,List<Train> parkedTrains,List<Train> runningTrains,List<Train> otherTrains) {
         public Depot {berths=List.copyOf(berths);parkedTrains=List.copyOf(parkedTrains);runningTrains=List.copyOf(runningTrains);otherTrains=List.copyOf(otherTrains);}
     }
+    /** Advisory dispatch status, never a movement permission. */
+    record Dispatch(UUID id,String line,String station,String status,UUID train,String depot,long requestedAtMillis,
+            Double pickupSeconds,Double cost,String reason) {}
     record Snapshot(int schemaVersion,String status,UUID producerSession,long graphRevision,long emittedAtMillis,
-            List<Route> routes,List<Depot> depots,List<Train> trains) {
-        public Snapshot {if(schemaVersion!=SCHEMA_VERSION)throw new IllegalArgumentException("Operating network schema");Objects.requireNonNull(producerSession);routes=List.copyOf(routes);depots=List.copyOf(depots);trains=List.copyOf(trains);}
+            List<Route> routes,List<Depot> depots,List<Train> trains,List<Dispatch> dispatch) {
+        public Snapshot(int schemaVersion,String status,UUID producerSession,long graphRevision,long emittedAtMillis,List<Route> routes,List<Depot> depots,List<Train> trains){this(schemaVersion,status,producerSession,graphRevision,emittedAtMillis,routes,depots,trains,List.of());}
+        public Snapshot {dispatch=List.copyOf(dispatch);if(schemaVersion!=SCHEMA_VERSION)throw new IllegalArgumentException("Operating network schema");Objects.requireNonNull(producerSession);routes=List.copyOf(routes);depots=List.copyOf(depots);trains=List.copyOf(trains);}
     }
     default int operatingSchemaVersion(){return SCHEMA_VERSION;}
     /** Immutable snapshot; callers never read SAL storage or Bukkit world objects. */

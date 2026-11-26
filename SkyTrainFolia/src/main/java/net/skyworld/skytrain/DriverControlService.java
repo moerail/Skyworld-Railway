@@ -82,8 +82,7 @@ final class DriverControlService {
                     if (!DriverSafety.sameSession(leaseId, driverLeaseIds.get(playerId))) { task.cancel(); return; }
                     if(train.operatingMode!=OperatingMode.SB)defaultFsRequested[0]=true;
                     if (!isDriver(player, train)) revokeDriver(playerId, null, "SEAT_LOST");
-                    else if (!defaultFsRequested[0] && train.operatingMode==OperatingMode.SB && train.protectionMode==ProtectionMode.ACTIVE
-                            && !train.tims.view(System.currentTimeMillis()).brakeHeld() && !train.activeAtp.releasePending()
+                    else if (!defaultFsRequested[0] && DriverSafety.defaultFsReady(train,System.currentTimeMillis())
                             && Bukkit.getCurrentTick()%20==0) {
                         if(plugin.automation()!=null)defaultFsRequested[0]=plugin.automation().requestFs(train,playerId,leaseId);
                     }

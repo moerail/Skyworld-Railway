@@ -58,6 +58,12 @@ final class TrainAutomation implements AutomaticTrainService, net.skyworld.sta.a
         return sessions.entrySet().stream().filter(e->live.contains(e.getKey())&&!e.getValue().release&&!e.getValue().parking).map(e->
                 new DriverDeskSnapshot(e.getKey(),e.getValue().owner,e.getValue().owner,"ACTIVE")).toList();
     }
+    static List<Position> body(Train t,long now) {
+        var ids=new ArrayList<>(t.members());if(t.reversed)Collections.reverse(ids);var result=new ArrayList<Position>();
+        for(var id:ids){var m=t.snapshot(id);if(m==null||now<m.timeMillis||now-m.timeMillis>1000)return List.of();result.add(new Position(m.worldName,m.x,m.y,m.z));}
+        if(result.stream().anyMatch(p->!p.world().equals(result.getFirst().world())))return List.of();return List.copyOf(result);
+    }
+    static boolean atTarget(Train t,ParkingTarget target,long now){var p=AutomaticTrainService.reference(body(t,now),target.Q_TP_Alignment());return p!=null&&target.contains(p.world(),p.x(),p.y(),p.z());}
     public Collection<View> trains() {
         List<View> result=new ArrayList<>(); long now=System.currentTimeMillis();
         for(Train t:plugin.observedTrains()) {
@@ -68,7 +74,7 @@ final class TrainAutomation implements AutomaticTrainService, net.skyworld.sta.a
             result.add(new View(t.id(),t.name(),ids,m.worldName,m.x,m.y,m.z,direction.getX(),direction.getY(),direction.getZ(),
                     Math.max(t.currentSpeed(),t.maxMemberSpeed()),Math.max(1,t.spacing*(ids.size()-1)+1),m.timeMillis,
                     integrity.state().name(),integrity.reason(),integrity.brakeHeld(),t.operatingMode.name(),s==null||s.parking?null:s.owner,
-                    s==null?(plugin.manualDesks().stream().anyMatch(d->d.trainId().equals(t.id()))?"MANUAL_DRIVER":"IDLE"):s.status,s==null?0:s.travelled));
+                    s==null?(plugin.manualDesks().stream().anyMatch(d->d.trainId().equals(t.id()))?"MANUAL_DRIVER":"IDLE"):s.status,s==null?0:s.travelled,net.skyworld.sta.api.v8.AtoProtocol.Packet.VEHICLE_FEEDBACK.header(),body(t,now)));
         }
         return List.copyOf(result);
     }
@@ -127,7 +133,7 @@ final class TrainAutomation implements AutomaticTrainService, net.skyworld.sta.a
         if(plugin.manualDesks().stream().anyMatch(d->d.trainId().equals(id)))return "MANUAL_DRIVER";
         long now=System.currentTimeMillis();var members=t.members();if(members.isEmpty())return "NO_MEMBERS";
         var front=t.snapshot(members.get(t.reversed?members.size()-1:0));
-        if(front==null||now<front.timeMillis||now-front.timeMillis>1000||!target.contains(front.worldName,front.x,front.y,front.z))return "NOT_AT_BERTH";
+        if(front==null||now<front.timeMillis||now-front.timeMillis>1000||!atTarget(t,target,now))return "NOT_AT_BERTH";
         if(t.maxMemberSpeed()>.4||t.tims.view(now).brakeHeld())return "PROTECTION_HOLD";
         if(t.protectionMode!=ProtectionMode.ACTIVE||t.operatingMode==OperatingMode.TR||t.operatingMode==OperatingMode.PT)return "PROTECTION_HOLD";
         var s=new Session(owner);s.parking=true;s.status="PARKED";
@@ -137,7 +143,7 @@ final class TrainAutomation implements AutomaticTrainService, net.skyworld.sta.a
             if(receipt!=null) {
                 long current=System.currentTimeMillis();var latest=t.snapshot(members.get(t.reversed?members.size()-1:0));
                 if(!receipt.equals(manualReleases.get(id))||!stopped(t,current)||latest==null
-                    ||!target.contains(latest.worldName,latest.x,latest.y,latest.z))return;
+                    ||!atTarget(t,target,current))return;
             }
             sessions.put(id,s);installed[0]=true;
             if(receipt!=null)manualReleases.remove(id,receipt);
@@ -155,6 +161,16 @@ final class TrainAutomation implements AutomaticTrainService, net.skyworld.sta.a
         if(s==null||!s.owner.equals(owner)||t==null)return "NOT_OWNER";
         if(!stopped(t,System.currentTimeMillis())||t.tims.view(System.currentTimeMillis()).brakeHeld())return "STOP_FIRST";
         s.release=true; return "RELEASING";
+    }
+    public synchronized String handoffToManual(UUID id,UUID owner,UUID administrator){
+        Objects.requireNonNull(administrator);var t=train(id);if(t==null)return "UNKNOWN_TRAIN";var s=sessions.get(id);
+        String result=manualHandoffStatus(s,owner,stopped(t,System.currentTimeMillis()));if(!result.equals("RELEASING"))return result;
+        s.manualRelease=true;s.release=true;return "RELEASING";
+    }
+    static String manualHandoffStatus(Session s,UUID owner,boolean stopped){
+        if(s==null)return stopped?"ALREADY_MANUAL":"STOP_FIRST";
+        if(owner==null?!s.parking:!s.owner.equals(owner))return "NOT_OWNER";
+        return stopped?"RELEASING":"STOP_FIRST";
     }
     public String reverse(UUID id,UUID owner) {
         var s=sessions.get(id);var t=train(id);
@@ -273,13 +289,10 @@ final class TrainAutomation implements AutomaticTrainService, net.skyworld.sta.a
         CabOrientation.alignAutomatic(t);
         // Front/rear cab plus FORWARD always agrees with the selected train direction.
         t.reverser=Reverser.FORWARD;t.emergencyBrake=false;t.moving=true;
-        double target=i.cruiseBlocksPerTick();
-        if(t.activeAtpLimitMps!=null)target=Math.min(target,t.activeAtpLimitMps*plugin.getConfig().getDouble("infrastructure.blocks-per-meter",1)/20);
-        if(i.stopAtTarget())target=Math.min(target,Math.sqrt(2*Math.max(.0005,plugin.vehicleProfile().brakeAcceleration(4))*Math.max(0,s.remaining-.04)));
-        double speed=t.currentSpeed();
-        t.powerNotch=target>speed+.004?2:0;
-        t.brakeNotch=target<.001?7:speed>target+.002?4:0;
-        if(s.remaining<=.04 && i.stopAtTarget())t.powerNotch=0;
+        Double atpLimit=t.activeAtpLimitMps==null?null:t.activeAtpLimitMps*plugin.getConfig().getDouble("infrastructure.blocks-per-meter",1)/20;
+        var handles=AutomaticHandlePolicy.select(plugin.vehicleProfile(),AutomaticHandlePolicy.Settings.read(plugin.getConfig()),
+                t.currentSpeed(),i.cruiseBlocksPerTick(),atpLimit,s.remaining,i.stopAtTarget());
+        t.powerNotch=handles.power();t.brakeNotch=handles.brake();
         s.status=i.phase();
     }
     private static void hold(Train t,Session s,String reason) {t.powerNotch=0;t.brakeNotch=7;t.moving=true;t.driveControlEnabled=true;s.status=reason;}
@@ -290,6 +303,7 @@ final class TrainAutomation implements AutomaticTrainService, net.skyworld.sta.a
         var s=sessions.get(t.id());return s==null?List.of():s.corridor.stream().map(c->new AutomationController.ChunkPosition(c.world(),c.x(),c.z())).toList();
     }
     public boolean requestFs(Train t,UUID driver,UUID lease) {
+        if(!DriverSafety.defaultFsReady(t,System.currentTimeMillis()))return false;
         var service=plugin.getServer().getServicesManager().load(net.skyworld.sta.api.v8.AutomaticAuthorityService.class);
         if(service!=null)service.requestFs(net.skyworld.sta.api.v8.AtoProtocol.Packet.FS_REQUEST.header(),t.id(),driver,lease);
         return service!=null;

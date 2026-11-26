@@ -1,5 +1,13 @@
 # MA exit capacity and PCC HTTPS policy
 
+**[修改 · STF 5.1.3 · 2026-11-26]** 自动驾驶不再固定 P2/B4：起步默认 P4，接近目标速度收档，常用制动默认 B6，停车保持 B7。可配置档位上限；MA、ATP、TIMS 和车型限制不变。 [档位配置](AUTOMATIC-DRIVING-HANDLES.md)
+
+**[修正 · SAL0.7.6 · 2026-11-26]** 回库库位复核、障碍保持、等待重新选位时维护原已接受进路的静默续租，避免超过1500ms心跳失效。复核默认2秒；车身暂不确定不再误报拓扑改变并立即丢目标。持续未知停为FAULT，真实空间／库位问题停稳后重选；状态显示具体原因并明确区分历史派车记录。 [详细说明](SAL-RETURN-RECHECK.md)
+
+**[新增／修正 · 2026-11-26 · SAL0.7.6 / PCC2.6.4]** 轨道坐标和方向统一取自同一份STF遥测，避免转弯时混用不同帧。定位暂态立即制动、默认复核2秒；节点容差0.75格、投影误差仍默认1.5格，均可有限配置。两份独立观测确认不同分支则提前恢复；不新建或扩大MA。原始故障持久保留并在PCC事件正文与/sal status直接显示。 [详细契约](SAL-LOCALISATION-TOLERANCE.md)
+
+**[2026-11-26 · SAL0.7.0]** New keys in SAL config.yml: dispatch.batch-window-ms=500 (100–5000), request-timeout-ms=120000 (5000–600000), compute-budget-ms=500 (50–2000), last-vehicle-penalty-seconds=0 (0–3600). Missing keys use defaults. Pure matching runs on a dedicated JVM worker. Supply mode, preference seconds and pickup cap are per-route draft/publication policy, edited in PCC or /sal route supply; they are not global config keys. [Dispatch contract](SAL-SHARED-DISPATCH.en.md)
+
 Both switches default to `true`, including existing configurations that omit the
 new keys. Change the corresponding plugin's `config.yml`, restart the server,
 and refresh the PCC page.
@@ -54,3 +62,10 @@ HTTP 会明文传输令牌，应仅在可信网络中使用；公网连接建议
 
 For HTTPS access keep the existing reverse-proxy/TLS setup. This switch does not
 provision a certificate or replace the HTTP listener with a TLS listener.
+
+
+## **[修改 · 2026-11-25] 中心停车与库位容量**
+
+**[破坏性修改 · 2026-11-25]** depot改为列车中心对牌；空间不足时只在本库位边界内调整计划中心，整列放不下则换位。同股道相邻库位沿轨中分并留净间隔；单端深处先停，双端评估两侧合法路径；出入库都排除车身阻挡。PCC显示容量、类型、范围和目标偏移。旧车头停车位置须手动调整，station语义不变。
+
+配套 STA2.8.0 / STF5.1.0 / STCS4.3.5 / SAL0.6.0 / PCC2.5.0；以上旧版章节保留为历史实现说明，depot旧领车参考以本次中心参考为准。[完整边界、配置、契约与重启规则](SAL-CENTRE-STABLING.md) · [English](SAL-CENTRE-STABLING.en.md)

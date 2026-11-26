@@ -43,7 +43,16 @@ public final class LiteCoreTest {
         rejects(()->broken.plan(broken.locate(new Topology.Pos("world",10.5,64.0625,.5),1,0,0),List.of(Topology.Target.pos(new Topology.Pos("world",10.5,64.0625,.5)))));
         var alternate=edge("ac","a","c","up","down",0,0,100,100);
         var ambiguous=new Topology(new Gson().toJson(new Topology.Image(5,1,nodes,List.of(ab,bc,cd,da,alternate),List.of())));
-        rejects(()->ambiguous.plan(ambiguous.locate(new Topology.Pos("world",.5,64.0625,50.5),0,0,-1),List.of(Topology.Target.node("c"))));
+        var chosen=ambiguous.plan(ambiguous.locate(new Topology.Pos("world",.5,64.0625,50.5),0,0,-1),List.of(Topology.Target.node("c")));
+        assert chosen.edges(0).equals(List.of("da","ac")):"A longer alternate loop is not an ambiguity error";
+        assert Math.abs(chosen.length()-(50+Math.sqrt(20000)))<.001;
+        var twin=edge("zc","a","c","up2","down2",0,0,100,100);
+        for(var ordering:List.of(List.of(ab,bc,cd,da,alternate,twin),List.of(twin,da,cd,bc,ab,alternate))){
+            var tied=new Topology(new Gson().toJson(new Topology.Image(5,1,nodes,ordering,List.of())));
+            assert tied.plan(tied.locate(new Topology.Pos("world",.5,64.0625,50.5),0,0,-1),List.of(Topology.Target.node("c"))).edges(0).equals(List.of("da","ac")):"Equal-cost alternatives must remain deterministic across graph ordering";
+        }
+        var repeated=g.plan(g.locate(new Topology.Pos("world",.5,64.0625,.5),1,0,0),List.of(Topology.Target.pos(new Topology.Pos("world",.5,64.0625,.5))));
+        assert Math.abs(repeated.length()-400)<.001:"A same-position leg must traverse a positive loop, not accept zero length";
         var forced=ambiguous.plan(ambiguous.locate(new Topology.Pos("world",.5,64.0625,50.5),0,0,-1),List.of(Topology.Target.edge("ab"),Topology.Target.node("c")));
         assert forced.parts().stream().anyMatch(p->p.edge().id().equals("ab"))&&forced.parts().stream().noneMatch(p->p.edge().id().equals("ac")):
             "An explicit directed graph edge must resolve the branch rather than follow the other turnout exit";
@@ -53,6 +62,6 @@ public final class LiteCoreTest {
             "SAL must use STCS routing issues, not interpret an unload diagnostic as disconnection";
         var confirmedBreak=new Topology(new Gson().toJson(new Topology.Image(7,1,nodes,List.of(ab,bc,cd,da),List.of(),List.of(new Topology.Issue("b","none","rail_broken")),1)));
         rejects(()->confirmedBreak.plan(confirmedBreak.locate(new Topology.Pos("world",10.5,64.0625,.5),1,0,0),List.of(Topology.Target.node("c"))));
-        System.out.println("PASS SAL syntax, speed aliases, directed loop, broken loop, branch ambiguity, progress and message positions");
+        System.out.println("PASS SAL syntax, directed shortest path versus detour, positive same-position loop, explicit branch, broken track, progress and messages");
     }
 }

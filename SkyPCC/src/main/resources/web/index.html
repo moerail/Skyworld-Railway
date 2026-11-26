@@ -49,7 +49,7 @@
         <select id="operatingDepot"><option value="" data-i18n="All depots">All depots</option></select>
         <div id="operatingWorldField" hidden><label class="field-label" for="operatingWorld" data-i18n="World">World</label><select id="operatingWorld"></select></div>
         <p id="operatingStatus" class="area-status" role="status"></p>
-        <div id="operatingRoutesList"></div>
+        <div id="operatingRoutesList"></div><details id="dispatchPanel" open><summary data-i18n="Dispatch queue and decisions">Dispatch queue and decisions</summary><ul id="dispatchList" class="operating-list"></ul></details>
         <div id="depotSummary" hidden>
           <h2 id="depotName" class="operating-heading"></h2>
           <details open><summary><span data-i18n="Total berths">Total berths</span> <b id="berthCount">--</b></summary><ul id="berthList" class="operating-list"></ul></details>
@@ -120,7 +120,10 @@
         <div class="route-actions"><button id="routeBegin" data-i18n="Edit selected route">Edit selected route</button><button id="routeExit" data-i18n="Exit editor">Exit editor</button></div>
         <label class="field-label" for="routeName" data-i18n="New route name">New route name</label><input id="routeName" maxlength="64" autocomplete="off">
         <button id="routeCreate" data-i18n="Create draft">Create draft</button>
-        <label class="field-label" for="routeDepots" data-i18n="Bound depots (at least one)">Bound depots (at least one)</label><select id="routeDepots" multiple size="3"></select>
+        <label class="field-label" for="routeDepots" data-i18n="Preferred depot groups">Preferred depot groups</label><select id="routeDepots" multiple size="3"></select>
+        <label class="field-label" for="routeSupply" data-i18n="Vehicle supply">Vehicle supply</label><select id="routeSupply"><option value="GLOBAL" data-i18n="Global shared fleet">Global shared fleet</option><option value="RESTRICTED" data-i18n="Selected groups only">Selected groups only</option></select>
+        <label class="field-label" for="routePreference" data-i18n="Preference tolerance seconds">Preference tolerance seconds</label><input id="routePreference" type="number" min="0" max="3600" value="30">
+        <label class="field-label" for="routePickup" data-i18n="Maximum pickup estimate seconds">Maximum pickup estimate seconds</label><input id="routePickup" type="number" min="1" max="3600" value="120">
         <label class="field-label" for="routeDirection" data-i18n="Initial direction">Initial direction</label><select id="routeDirection"><option value="east">east →</option><option value="west">west ←</option><option value="north">north ↑</option><option value="south">south ↓</option></select>
         <p class="operating-note" data-i18n="Click a balise, track segment or matching SAL station to append a visit. Existing signs are not rewritten.">Click a balise, track segment or matching SAL station to append a visit. Existing signs are not rewritten.</p>
         <ol id="routeVisits" class="route-visits"></ol>

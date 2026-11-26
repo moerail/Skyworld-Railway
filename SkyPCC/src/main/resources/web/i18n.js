@@ -2,6 +2,27 @@
   'use strict';
   const languages = ['zh', 'en', 'fr', 'ja'];
   const rows = [
+["Dispatch queue and decisions","派车队列与结果","File et décisions d’affectation","配車待ちと結果"],
+["Preferred depot groups","偏好停车组（可不选）","Groupes de garage préférés (facultatif)","優先留置グループ（省略可）"],
+["Vehicle supply","车辆来源范围","Périmètre des véhicules","車両供給範囲"],
+["Global shared fleet","全局共享车池","Parc partagé global","全体共有車両"],
+["Selected groups only","仅选中停车组","Groupes sélectionnés uniquement","選択グループのみ"],
+["Preference tolerance seconds","偏好容忍代价（秒）","Tolérance de préférence (secondes)","優先許容コスト（秒）"],
+["Maximum pickup estimate seconds","预计接客时间上限（秒）","Estimation maximale avant prise en charge (s)","迎車予測時間上限（秒）"],
+["Awake entry reference","awake始发访问引用（可复制）","Référence de départ awake (copiable)","awake始発訪問参照（コピー可）"],
+["Pickup {eta}s, cost {cost}s","预计接客 {eta} 秒，评分 {cost} 秒","Prise en charge estimée : {eta}s, coût : {cost}s","迎車予測 {eta} 秒、コスト {cost} 秒"],
+['STORAGE_TOPOLOGY_UNCERTAIN','股道拓扑故障或未确认','Topologie de garage incertaine','留置線トポロジー未確認'],
+["Centre berth: max {length} blocks · {access}","中心停车 · 最大车长 {length} 格 · {access}","Arrêt centré · longueur max. {length} blocs · {access}","中央停止・最大長 {length} ブロック・{access}"],
+["Planned centre offset: {offset} blocks","计划中心偏移 {offset} 格","Décalage prévu du centre : {offset} blocs","予定中心オフセット {offset} ブロック"],
+["SINGLE_ENDED","单端","Accès à une extrémité","片端出入"],
+["DOUBLE_ENDED","双端","Accès aux deux extrémités","両端出入"],
+["STORAGE_BOUNDARY_UNKNOWN","库位边界未确认","Limites de garage inconnues","留置境界未確認"],
+["STORAGE_NO_EXIT","没有出入口","Aucun accès","出入口なし"],
+["STORAGE_REVERSE_EDGE_UNKNOWN","缺少双向轨道图连接","Connexion inverse inconnue","逆方向接続未確認"],
+["STORAGE_DUPLICATE_POSITION","库位停车点重叠","Positions de garage superposées","留置位置重複"],
+["STORAGE_LOOP_OR_LIMIT","库位股道成环或搜索超限","Boucle ou limite de recherche","環状または探索上限"],
+["STORAGE_LOOP","库位股道成环","Voie de garage en boucle","留置線が環状"],
+["STORAGE_LOCATION_UNKNOWN","库位定位不确定","Position de garage inconnue","留置位置不明"],
 ['Balise','应答器','Balise','地上子'],['End','END 终点','END · fin','END 終点'],['Origin','ORIGIN 原点','ORIGIN · origine','ORIGIN 起点'],['Switch','道岔','Aiguillage','分岐器'],
 ["Selection highlight","选中高亮","Surbrillance de sélection","選択ハイライト"],
 ["Decrease highlight size","缩小高亮","Réduire la surbrillance","ハイライトを縮小"],
@@ -1256,9 +1277,35 @@
   codes.push(...[["EDIT_FROZEN","Editing frozen","编辑已冻结","Édition gelée","編集凍結中"],["CONCURRENT_EDIT","Concurrent editing detected; both sides frozen","检测到并发编辑，两侧均已冻结","Édition concurrente : les deux côtés sont gelés","同時編集を検出、両側を凍結"],["STALE_REVISION_FROZEN","Stale draft version; editing frozen","草稿版本已过期，编辑冻结","Version périmée ; édition gelée","草稿版が古いため編集凍結"],["DEPOT_REQUIRED","Bind at least one depot","至少绑定一个车辆段","Lier au moins un dépôt","基地を最低1箇所指定"],["DEPOT_NOT_FOUND","Bound depot is unavailable","绑定的车辆段不存在","Dépôt lié introuvable","指定基地がありません"],["SAVE_FIRST","Save this draft before validation","请先保存草稿再验证","Enregistrer avant vérification","検証前に草稿を保存"],["VALIDATE_FIRST","Validate the saved draft before publishing","请先验证已保存的草稿","Vérifier le brouillon enregistré avant publication","保存済み草稿の検証が必要"],["EDIT_SESSION_REQUIRED","Begin a new edit session","请重新进入此线路的编辑会话","Ouvrir une nouvelle session d’édition","新しい編集セッションが必要"],["LINE_IN_USE","Route has active tasks; retire it instead","线路仍有任务，请先停用或结束任务","Tâches actives ; désactiver d’abord","実行中タスクあり。先に休止してください"],["RESOLVED","Conflict resolved; nothing published","冲突已解消，未自动发布","Conflit résolu sans publication","競合解決済み、自動公開なし"],["CREATED","Draft created","草稿已创建","Brouillon créé","草稿作成済み"],["EDITING","Editing session started","编辑会话已开启","Session ouverte","編集開始"],["UPDATE","Pending proposal updated; not saved","待存方案已更新，尚未保存","Proposition modifiée, non enregistrée","編集案更新済み、未保存"],["SAVE","Draft saved; published version unchanged","草稿已保存，发布版未改变","Brouillon enregistré, publication inchangée","草稿保存済み、公開版は維持"],["VALIDATE","Draft validated","草稿验证通过","Brouillon vérifié","草稿検証済み"],["PUBLISH","New version published; existing tasks unchanged","新版本已发布，既有任务保持原版","Version publiée, tâches existantes inchangées","新版公開済み、既存タスクは旧版維持"],["RETIRE","Route retired; existing tasks retained","线路已停用，既有任务保留","Ligne désactivée, tâches conservées","路線休止、既存タスク維持"],["EDIT_CLOSED","Editing closed","编辑会话已关闭","Édition fermée","編集終了"],["DELETED","Route deleted","线路已删除","Ligne supprimée","路線削除済み"],["LINE_EXISTS","Route name already exists","线路名已存在","Nom de ligne déjà utilisé","路線名が存在します"],["STATION_ROUTE_MISMATCH","Station belongs to another route","车站绑定其他线路","Station d’une autre ligne","別路線の駅です"],["REVERSE_REQUIRES_STATION","Reversal must occur at a station","折返必须设在车站","Rebroussement en station uniquement","折返しは駅のみ"],["AUTHENTICATED","Editor authenticated","编辑权限验证通过","Éditeur authentifié","編集認証済み"]]);
   rows.push(["Cancel","取消","Annuler","取消"]);
   rows.push(["Closed draft","闭环草稿","Brouillon bouclé","閉環草稿"]);
+  rows.push(
+    ['Original cause: {reason}','原始原因：{reason}','Cause initiale : {reason}','最初の原因：{reason}'],
+    ['Automatic route tracking failed. Brakes held; approve SR segments to guide it home.','自动线路跟踪失效，已保持制动；请逐段批准SR引导回库。','Suivi automatique indisponible. Freinage maintenu ; autoriser des segments SR pour le retour.','自動経路追跡に失敗。制動保持中。SR区間を承認して入庫を誘導してください。'],
+    ['Remove visit','删除本次访问','Supprimer la visite','訪問を削除'],
+    ['Drag to reorder; use arrow keys for keyboard sorting','拖动排序；键盘可用上下方向键调整','Glisser pour réordonner ; flèches au clavier','ドラッグで並べ替え。キーボードは上下キー'],
+    ['Problem segment: #{from} {start} → #{to} {end}','问题区间：第{from}点 {start} → 第{to}点 {end}','Segment en défaut : nº{from} {start} → nº{to} {end}','問題区間：第{from}点 {start} → 第{to}点 {end}'],
+    ['Only the first failing segment is shown; fix it and validate again.','当前列出首个失败区间；修正后请再次验证。','Seul le premier segment en défaut est affiché ; corriger puis vérifier à nouveau.','最初の失敗区間を表示しています。修正後に再検証してください。']
+  );
   const catalog = Object.fromEntries(rows.map(([en, zh, fr, ja]) => [en, {en, zh, fr, ja}]));
   catalog['Poste de commande centralisée'].en = 'Centralized traffic control centre';
+  codes.push(
+    ['SINGLE_ENDED','Single-ended','单端','Accès à une extrémité','片端出入'],
+    ['DOUBLE_ENDED','Double-ended','双端','Accès aux deux extrémités','両端出入'],
+    ['STORAGE_BOUNDARY_UNKNOWN','Storage boundary unknown','库位边界未确认','Limites de garage inconnues','留置境界未確認'],
+    ['STORAGE_NO_EXIT','No storage entrance','没有出入口','Aucun accès','出入口なし'],
+    ['STORAGE_REVERSE_EDGE_UNKNOWN','Reverse graph edge unknown','缺少双向轨道图连接','Connexion inverse inconnue','逆方向接続未確認'],
+    ['STORAGE_DUPLICATE_POSITION','Overlapping storage markers','库位停车点重叠','Positions de garage superposées','留置位置重複'],
+    ['STORAGE_LOOP_OR_LIMIT','Storage loop or search limit','库位股道成环或搜索超限','Boucle ou limite de recherche','環状または探索上限'],
+    ['STORAGE_LOOP','Storage track loop','库位股道成环','Voie de garage en boucle','留置線が環状'],
+    ['STORAGE_LOCATION_UNKNOWN','Storage position unknown','库位定位不确定','Position de garage inconnue','留置位置不明'],
+    ['STORAGE_TOPOLOGY_UNCERTAIN','Storage topology uncertain','股道拓扑故障或未确认','Topologie de garage incertaine','留置線トポロジー未確認']
+  );
+  codes.push(['DISPATCH_QUEUED','Queued','等待派车','En attente','配車待ち'],['DISPATCH_ASSIGNED','Assigned','已派车','Affecté','配車済み'],['DISPATCH_REUSED','Reused','复用站台列车','Véhicule réutilisé','停車中の車両を再利用'],['DISPATCH_REJECTED','Rejected','未能派车','Non affecté','配車不可'],['DISPATCH_MERGED','Merged','已合并接客请求','Demande regroupée','迎車要求を統合'],['DISPATCH_CANCELLED','Cancelled','已取消','Annulé','取消済み']);
   const codeKeys = {};
+  codes.push(
+    ['存在多条路径，请追加道岔/应答器绑定','Multiple paths; add a switch/balise visit','存在多条路径，请追加道岔/应答器绑定','Plusieurs chemins ; ajouter une aiguille/balise','複数経路があります。分岐器・応答子を追加してください'],
+    ['路径不通或方向不符','No path or incompatible direction','路径不通或方向不符','Aucun chemin ou sens incompatible','経路不通または方向不一致'],
+    ['回到首站时方向不符，需显式折返','Return direction differs; specify a reversal','回到首站时方向不符，需显式折返','Sens de retour incompatible ; préciser un rebroussement','始発到着方向が不一致。折返しを指定してください']
+  );
   codes.push(
     ['WAITING_TR','Waiting for onboard Trip','等待车端确认 TR','Attente du Trip embarqué','車上 TR 確認待ち'],
     ['REVOKED_TR','MA revoked; onboard TR confirmed','MA 已撤销，车端已确认 TR','MA révoquée ; TR confirmé','MA 取消・車上 TR 確認済み'],

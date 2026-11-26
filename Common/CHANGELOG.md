@@ -1,3 +1,94 @@
+## 2026-11-26 — SAL 0.8.0 / STF 5.1.4 handover, maneuvers and manual handles
+
+- Separate consent-code issue and successful prompt delivery; retry failed delivery, refresh expiry and align stop tolerance with STF. Explicit two-step consent and physical commit gates remain.
+- Shared bounded RailGraph planner for pickup/depot return: intermediate and initial reversals, actual rear as new leading end, multi-edge whole-body clearance, separate MA legs and confirmed release/reverse handshakes. No global deadlock solver or device-relocation feature.
+- Preserve manually selected traction while chunks load; effective traction prohibition and protection braking remain. Existing TIMS, driver-loss, explicit release and Trip behavior is unchanged.
+- Add maneuver geometry/state-machine and chunk-handle regressions; extend handover delivery/expiry checks. No test server startup or production operation.
+
+## 2026-11-26 — SAL 0.7.7 / STCS 4.3.6 concurrent return traffic
+
+- Retain selected return plans/centres during live throat traffic; stop treating other running SAL jobs as permanent access obstructions. Whole destination clearance, exclusive berth selection and stored/faulted/manual blockers remain.
+- Automatic point alignment cannot enter the dispatcher handshake to withdraw a different train’s MA. Explicit PCC dispatcher and controlled self-reroute behavior retain their guards.
+- Maintain established route heartbeats before fleet geometry/dispatch work. No change to the 1500ms watchdog, STA APIs, ATP or occupancy protection.
+- Add two-automatic-train runtime conflict/continuation regression and split route/destination geometry checks. Production raw events were lost after restart; no claim of exhaustive production diagnosis, deployment or server startup.
+
+## 2026-11-26 — STF 5.1.3 automatic cab handles
+
+- Replace fixed P2/B4 automatic driving with configurable P4 departure and B6 service braking; taper traction near cruise, retain B7 final hold. Recompute the normal stop envelope with a reaction allowance.
+- SAL/STA interfaces and STCS authority remain unchanged; existing ATP, vehicle physics, TIMS, Trip and distance-fence enforcement are retained. Manual driving is unaffected.
+- Regression integrates every bundled vehicle profile for departure clearance and docking, plus handle bounds, cruise taper, ATP caps and invalid telemetry. No server operation or production deployment.
+
+## 2026-11-26 — SAL0.7.6 return rechecks and route-heartbeat retention
+
+- Keep accepted-route heartbeats while braking for berth checks, obstacles or replacement selection. No new path/authority is created during a hold.
+- Classify target/slot/centre/space/body failures; retain targets for a default2s recheck. Persistent body uncertainty faults; real changes replan only while stopped. Geometry and whole-body margins remain strict.
+- Detailed status, throttled issue logs, completion/last-return-issue logging and explicit dispatch-history label. Existing STF/STA/STCS/PCC versions unchanged.
+- Regression uses the actual silent MA scheduler and1500ms watchdog, plus point-setting invariance, fit/unknown-body distinction and stop/recheck outcomes. No local server startup or production deployment.
+
+## 2026-11-26 — SAL0.7.5/PCC2.6.4 coherent localisation and bounded recheck
+
+- Query STCS with railXYZ and motionXYZ from one telemetry frame, then continuously project actual position; do not mix an older rail anchor with a newer orthogonal tangent.
+- Configurable finite1.5block projection /0.75block endpoint /2000ms recheck defaults. Brake throughout uncertainty, retain plan, renew accepted lease only. Independent wrong-branch observations beyond the node zone recover early; same observation rereads do not count twice. STCS/ATP remain authoritative.
+- Persist original failure/time, show it in status/operating projection/PCC event text, add bounded context and one confirmed-recovery console notice. No new API control or protocol numbering.
+- Regression: coherent curve frame, slope, transient recovery, timeout, repeated evidence, wrong branch, scaled graph, plan replacement, config limits, persistence and safe event text. No production operation or test-server startup.
+
+## 2026-11-26 — slope rail anchoring and administrative manual override
+
+STA2.9.2 / STF5.1.2 / STCS4.3.5 / SAL0.7.4 / PCC2.6.3.
+
+- Reproduce entity-floor versus actual rail-block mismatch on slopes. SAL consumes existing same-session fresh STF railXYZ telemetry through STA and keeps continuous projection/real-deviation checks.
+- Admin /sal override by name/UUID: persist manual reservation, brake, confirm STCS withdrawal/inactive permission, STF handoff, observed completion. No ledger clearing or TIMS/TR/PT acknowledgement. Handle old leases after restart via existing protection-channel revocation; unavailable/active permission is not success.
+- STA adds a default handoffToManual method on the existing RELEASE Packet; STF verifies stopped/owner and retains safety holds. SAL command remains admin-only.
+- New regressions cover slope coordinate mismatch, telemetry freshness/identity/graph, override stop/owner/pending/failure/restart/permission proof, TIMS retention and ordering. No server deployment/startup or production acceptance.
+
+## 2026-11-26 — SAL0.7.3 dispatch rejection diagnostics
+
+- Explain eligibility, scope, forward/reverse attempts, ETA cap, unknown/stale/off-graph other-train envelopes, known-body obstacles and stale graph/computation results. Preserve reasons through pending requests and timeout history.
+- Eligibility and obstacle predicates are unchanged; other-train TIMS hold alone is not a global obstacle. Diagnostic-only unfiltered path comparison never grants MA or becomes an executable plan.
+- STA2.9.1/PCC2.6.3 unchanged; replace SAL only for this compatible set. No server startup/deployment or production root-cause claim.
+
+## 2026-11-26 — shortest operational paths and confirmed track previews
+
+- SAL0.7.2/PCC2.6.3 with STA2.9.1: shortest directed distance replaces strict multi-path rejection. Stable equal-cost choice, positive same-position loops, explicit-waypoint constraints and existing direction/transition/closure checks.
+- Validation, task planning, entry rotation and previews use the same planner. Unfinished draft prefixes follow sampled rails; unknown connections remain estimated.
+- Regression covers detours, ties with reordered graph arrays, explicit branch, positive loops, broken routes and bent partial-preview geometry. No production deployment or test-server startup.
+
+## 2026-11-26 — directed error locations and drag ordering
+
+- SAL reports the first failing directed visit pair with one-based indices, device names and IDs via additive STA v10 Reply.issues. Closure, localisation and reversal errors retain context; no speculative cascade after an unknown arrival.
+- PCC shows clickable diagnostics and marks both visits. Replace up/down buttons with mouse/touch ≡ grips, edge scrolling and keyboard arrow support; submit once on release, cancel without UPDATE. Visit identity, dwell and reversal persist; draft/publication rules remain.
+- Compatible update: STA2.9.1 / SAL0.7.1 / PCC2.6.2. STF5.1.1 and STCS4.3.5 unchanged.
+
+## 2026-11-26 — PCC2.6.1 editor interaction hotfix
+
+- Preserve the narrow-screen editor during polling without a selected train.
+- Exclude SAL targets from drag pointer capture; make draft previews transparent to hit testing.
+- Keep unchanged map/list elements and pending user input stable; serialize catalog polling and preserve edits through transient failure.
+- Add real held-pointer, narrow-screen and unavailable/recovery browser regressions. No SAL, STA, STCS or STF behavior changes. Replace only PCC for an installation already on the2026.11.26 compatible set, then Ctrl+F5.
+
+## 2026-11-26 — public stops and shared dispatch
+
+- **BREAKING:** station line4 becomes a globally unique public name; no placement auto-append. awake becomes route/departure stop, optionally stop@visitUUID. Schema1 stations migrate with aliases; old awake stays disabled until rewritten. Preserve trains, berths, homes, ledgers and route references.
+- Stable visit UUIDs and circular entry rotation. Draft/publication isolation, pinned jobs and persistent edit conflict freeze remain.
+- New GLOBAL optional preferences and RESTRICTED permitted groups; legacy restricted scope retained. Finite preference penalty, pickup cap, aging and maximum-cardinality minimum-cost batch matching. No proactive redistribution.
+- Dedicated JVM snapshot worker; SAL commit fences version, time, body/position/direction/members, home and ownership. STCS remains MA authority; no external daemon or direct entity access.
+- PCC public station selection, policy, entry references and dispatch decisions. Additive STA v8 Dispatch snapshot / v10 DispatchPolicy and visitId.
+- STA2.9.0 / STF5.1.1 / STCS4.3.5 / SAL0.7.0 / PCC2.6.0. Both cores:118 tests each; fixture browser and467 translation keys pass. No production deployment or live driving acceptance in this round; local test server stopped.
+- Seven language manuals, five driver guides, module docs, bilingual contracts and [Chinese production test](../SkyATO-Lite/TEST.zh.md).
+
+## 2026-11-25 — direction-gated MA and six-digit handover
+
+**[FIX · 2026-11-25]** STF5.1.1 / SAL0.6.1: default manual FS/MA request waits for forward/reverse selection, not neutral driver acquisition. A stopped train overlapping a depot marker receives a random six-digit handover code after3seconds. `/sal handover` requests one immediately while stopped over the marker; `/sal handover <code>` confirms, then `/st release` commits. Automatic return still uses centre alignment.
+
+## 2026-11-25 — centre-aligned multi-berth storage
+
+- **BREAKING:** depot uses train middle, including manual capture/handover and SR return; existing front-aligned stock needs manual repositioning.
+- RailGraph-only storage spines, midpoint boundaries, net gap, direction-independent centre clamp, whole-train capacity and unknown-boundary rejection.
+- Deep-first single-ended allocation, both-direction double-ended approaches, whole-body obstruction-aware dispatch and inbound planning. STCS authority remains mandatory.
+- STA full-body immutable feedback and centre/tolerance fields; PCC capacity, access type, boundary and planned-centre display.
+- Compatible set: STA2.8.0 / STF5.1.0 / STCS4.3.5 / SAL0.6.0 / PCC2.5.0.
+- No automatic reshuffle, berth merging or new entrance-role configuration. Restart keeps recovery holds and all ledgers.
+
 ## SkyPCC 2.4.1 — 2026-11-24
 
 - 修复 SVG 选中设备／轨道的巨大原生焦点外框；改为固定屏幕宽度的路径和圆环高亮，保留键盘焦点反馈。

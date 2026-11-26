@@ -1,7 +1,7 @@
 (() => {
  'use strict';
  const {t,code}=PccI18n,NS='http://www.w3.org/2000/svg';
- const names=['railMap','operatingRoute','operatingDepot','operatingStatus','operatingRoutesList','depotSummary','depotName','berthCount','berthList','parkedCount','parkedList','operatingCount','operatingList','otherCount','otherList','layerInfrastructure','layerBalise','layerEnd','layerOrigin','layerSwitch','layerSal','layerRoutes','layerLive','routeEditorPanel','routeEditorStatus','enterRouteEditor','routeAuthDialog','routeToken','routeAuthResult','routeAuthConfirm','routeAuthClose','editRoute','routeBegin','routeExit','routeName','routeCreate','routeDepots','routeDirection','routeVisits','routeSave','routeValidate','routePublish','routeRetire','routeDelete','routeConflict','routeResolution','routeResolve','routeConflictDiff'];
+ const names=['railMap','operatingRoute','operatingDepot','operatingStatus','operatingRoutesList','depotSummary','depotName','berthCount','berthList','parkedCount','parkedList','operatingCount','operatingList','otherCount','otherList','layerInfrastructure','layerBalise','layerEnd','layerOrigin','layerSwitch','layerSal','layerRoutes','layerLive','routeEditorPanel','routeEditorStatus','enterRouteEditor','routeAuthDialog','routeToken','routeAuthResult','routeAuthConfirm','routeAuthClose','editRoute','routeBegin','routeExit','routeName','routeCreate','routeDepots','routeSupply','routePreference','routePickup','dispatchList','routeDirection','routeVisits','routeSave','routeValidate','routePublish','routeRetire','routeDelete','routeConflict','routeResolution','routeResolve','routeConflictDiff'];
  const ui=Object.fromEntries(names.map(id=>[id,document.getElementById(id)]));
  const commitActions=ui.routeSave.parentElement;ui.routeVisits.before(commitActions);commitActions.classList.add('route-commit-actions');
  const right=document.querySelector('.right-panel');right.insertBefore(ui.depotSummary,document.getElementById('inspectorEmpty'));
@@ -9,9 +9,11 @@
  function el(tag,text,cls){const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e;}
  const legend=document.getElementById('operatingLegend');legend.classList.remove('map-legend');legend.style.display='contents';legend.hidden=false;document.getElementById('infrastructureLegend').append(legend);
  const overlay=svg('g',{id:'operatingLayer'}),routeLayer=svg('g',{id:'operatingRouteLayer'}),deviceLayer=svg('g',{id:'salDeviceLayer'}),previewLayer=svg('g',{id:'routePreviewLayer'});
+ previewLayer.setAttribute('pointer-events','none');
  overlay.append(routeLayer,deviceLayer,previewLayer);ui.railMap.insertBefore(overlay,document.getElementById('trainLayer'));
  let report=null,receivedAt=0,clockOffset=0,catalog=null,catalogAt=0,labelScale=1.5,inspecting=false,token='',actor=crypto.randomUUID?crypto.randomUUID():uuid(),session=null,lineState=null,working=null,preview=[],loop=false,pending=false,authed=false,dirty=false,lastMessage='',lastReason=null,candidates=null;
- let minSequence=0,producer=null;
+ let minSequence=0,producer=null,catalogLoading=false,panelOpen=false,validationIssues=[],drag=null,dragFrame=0;
+ const issueList=el('ul',null,'route-validation-issues');issueList.id='routeValidationIssues';issueList.hidden=true;ui.routeEditorStatus.after(issueList);
  const renderKeys=new WeakMap();
  function uuid(){const bytes=crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;const h=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;}
  const clone=v=>JSON.parse(JSON.stringify(v));
@@ -39,7 +41,13 @@
   if(selected){const u=unit(),step=Math.max(1,Math.floor(pts.length/12));for(let i=step;i<pts.length;i+=step){const a=pts[i-1],b=pts[i],dx=b.x-a.x,dz=b.z-a.z,n=Math.hypot(dx,dz);if(n<.001)continue;const x=dx/n,z=dz/n;parent.append(svg('path',{d:`M ${b.x-6*u*x+3*u*z},${b.z-6*u*z-3*u*x} L ${b.x},${b.z} L ${b.x-6*u*x-3*u*z},${b.z-6*u*z+3*u*x}`,class:'op-direction',stroke:color(name)}));}}
  }
  function render(){
-  const live=fresh(),u=unit(),selection=ui.operatingRoute.value;routeLayer.replaceChildren();deviceLayer.replaceChildren();previewLayer.replaceChildren();
+  const live=fresh(),u=unit(),selection=ui.operatingRoute.value;
+  // Timestamps and telemetry polling do not change map geometry. Keep click targets
+  // alive between pointerdown/up and preserve focused route-list buttons.
+  const key=JSON.stringify([PccI18n.language,u,labelScale,selection,ui.operatingDepot.value,candidates?[...candidates]:null,report?.routes,catalog?.devices,report?.depots?.map(d=>[d.name,d.berths]),report?.trains?.filter(t=>t.stoppingCenter).map(t=>[t.id,t.home,t.stoppingCenter,t.stoppingOffsetBlocks]),authed,working,preview,loop,lineState?.validated,dirty]);
+  routeLayer.classList.toggle('op-stale',!live);ui.operatingStatus.textContent=live?t('{n} operating routes',{n:(report.routes||[]).length}):t('Operating data unavailable');
+  if(renderKeys.get(overlay)===key){applyLayers();summary(live);renderDispatch(live);refreshEditor();return;}
+  renderKeys.set(overlay,key);routeLayer.replaceChildren();deviceLayer.replaceChildren();previewLayer.replaceChildren();
   routeLayer.classList.toggle('op-stale',!live);ui.operatingRoutesList.replaceChildren();
   ui.operatingStatus.textContent=live?t('{n} operating routes',{n:(report.routes||[]).length}):t('Operating data unavailable');
   for(const route of report?.routes||[]){
@@ -50,14 +58,21 @@
   // The RailGraph canvas and its camera are shared by every layer.
   for(const d of devices()){
    if(d.type==='edge'||!['station','depot','awake','property','v_target','message'].includes(d.type))continue;
-   const p=d.position?screen(d.position):null;if(!p)continue;const marker=svg('g',{class:`op-device op-${d.type}${d.valid?'':' invalid'}${d.type==='depot'&&ui.operatingDepot.value&&d.name.startsWith(ui.operatingDepot.value+'/')?' selected':''}`,'data-device-id':d.id});
+   const berth=d.type==='depot'?(report?.depots||[]).flatMap(x=>x.berths).find(b=>b.id===d.name):null;
+   const p=d.position?screen(d.position):null;if(!p)continue;const marker=svg('g',{class:`op-device op-${d.type}${d.valid&&(!berth||berth.valid)?'':' invalid'}${d.type==='depot'&&ui.operatingDepot.value&&d.name.startsWith(ui.operatingDepot.value+'/')?' selected':''}`,'data-device-id':d.id});
    if(d.type==='depot')marker.append(svg('rect',{x:p.x-4*u,y:p.z-4*u,width:8*u,height:8*u,class:'op-berth-box'}));else marker.append(svg('circle',{cx:p.x,cy:p.z,r:3.5*u,class:'op-stop'}));
-   title(marker,`${d.name} · ${d.type}\n${d.id}`);label(marker,p,d.name||d.type,u);marker.onclick=()=>pick('device',d.id);deviceLayer.append(marker);
+   title(marker,`${d.name} · ${d.type}\n${d.id}${berth?.geometry?"\n"+(berth.geometry.reason?code(berth.geometry.reason):t('Centre berth: max {length} blocks · {access}',{length:Number(berth.geometry.maxTrainLengthBlocks).toFixed(1),access:code(berth.geometry.access)})):""}`);label(marker,p,d.name||d.type,u);marker.onclick=()=>pick('device',d.id);deviceLayer.append(marker);
+  }
+  for(const depot of report?.depots||[])if(ui.operatingDepot.value===depot.name)for(const berth of depot.berths||[]){
+    const boundary=berth.geometry?.boundary||[];if(boundary.length>=2)deviceLayer.append(svg('polyline',{points:boundary.map(screen).map(p=>`${p.x},${p.z}`).join(' '),fill:'none',class:'op-storage-boundary'}));
+  }
+  for(const train of report?.trains||[])if(live&&train.stoppingCenter&&(!ui.operatingDepot.value||train.home===ui.operatingDepot.value)){
+    const p=screen(train.stoppingCenter),mark=svg('circle',{cx:p.x,cy:p.z,r:5*u,class:'op-stopping-centre'});title(mark,t('Planned centre offset: {offset} blocks',{offset:Number(train.stoppingOffsetBlocks||0).toFixed(1)}));deviceLayer.append(mark);
   }
   // Backward-compatible display when an older provider has no device catalog.
   if(!catalog?.devices)for(const depot of report?.depots||[])for(const berth of depot.berths||[]){const p=screen(berth.position);const marker=svg('g',{class:`op-berth${ui.operatingDepot.value===depot.name?' selected':''}`,'data-berth-id':berth.id});marker.append(svg('rect',{x:p.x-4*u,y:p.z-4*u,width:8*u,height:8*u,class:'op-berth-box'}));label(marker,p,berth.name,u);deviceLayer.append(marker);}
-  if(authed&&working){for(const s of preview)drawPath(previewLayer,{...s,estimated:!loop||s.estimated},working.name,loop?(lineState?.validated&&!dirty?'VALIDATED':'CLOSED_DRAFT'):'DRAFT',true);working.visits.forEach((v,i)=>{const d=device(v.deviceId);if(!d)return;const p=screen(d.position);previewLayer.append(svg('circle',{cx:p.x,cy:p.z,r:5*u,class:'op-visit'}));label(previewLayer,p,String(i+1)+(v.reverse?' ↶':''),u);});}
-  applyLayers();summary(live);refreshEditor();
+  if(authed&&working){for(const s of preview)drawPath(previewLayer,s,working.name,loop?(lineState?.validated&&!dirty?'VALIDATED':'CLOSED_DRAFT'):'DRAFT',true);working.visits.forEach((v,i)=>{const d=device(v.deviceId);if(!d)return;const p=screen(d.position);previewLayer.append(svg('circle',{cx:p.x,cy:p.z,r:5*u,class:'op-visit'}));label(previewLayer,p,String(i+1)+(v.reverse?' ↶':''),u);});}
+  applyLayers();summary(live);renderDispatch(live);refreshEditor();
  }
  const infrastructureTypes={balise:'layerBalise',end:'layerEnd',origin:'layerOrigin',switch:'layerSwitch'};
  function infrastructureVisible(type){return ui.layerInfrastructure.checked&&(!infrastructureTypes[type]||ui[infrastructureTypes[type]].checked);}
@@ -68,11 +83,20 @@
   for(const id of ['trainLayer','authorityLayer'])document.getElementById(id).style.display=ui.layerLive.checked?'':'none';
   for(const edge of document.querySelectorAll('#edgeLayer .rail-edge')){if(!ui.layerLive.checked)edge.style.setProperty('stroke',edge.getAttribute('stroke'),'important');else edge.style.removeProperty('stroke');}
  }
+ function renderDispatch(live){
+  const rows=report?.dispatch||[];const key=JSON.stringify([PccI18n.language,live,rows]);if(renderKeys.get(ui.dispatchList)===key)return;renderKeys.set(ui.dispatchList,key);ui.dispatchList.replaceChildren();
+  if(!live){ui.dispatchList.append(el('li',t('Operating data unavailable')));return;}
+  if(!rows.length)ui.dispatchList.append(el('li',t('None')));
+  for(const d of rows.slice(0,20)){const li=el('li');li.append(el('span',d.line+' @ '+d.station+' · '+code('DISPATCH_'+d.status)));if(d.pickupSeconds!=null)li.append(el('small',t('Pickup {eta}s, cost {cost}s',{eta:Number(d.pickupSeconds).toFixed(1),cost:Number(d.cost).toFixed(1)})));li.append(el('small',(d.depot?d.depot+' · ':'')+(d.reason||'')));ui.dispatchList.append(li);}
+ }
  function summary(live){
   const depot=(report?.depots||[]).find(d=>d.name===ui.operatingDepot.value);ui.depotSummary.hidden=!depot||inspecting||authed;if(!depot)return;ui.depotName.textContent=depot.name;
   for(const[id,items]of [['berthCount',depot.berths],['parkedCount',depot.parkedTrains],['operatingCount',depot.runningTrains],['otherCount',depot.otherTrains]])ui[id].textContent=live?String(items.length):'--';
   function list(node,items,train){const sig=JSON.stringify([PccI18n.language,live,items.map(i=>[i.id,i.name,i.phase,i.fresh,i.routeVersion])]);if(renderKeys.get(node)===sig)return;renderKeys.set(node,sig);node.replaceChildren();if(!live){node.append(el('li',t('Operating data unavailable')));return;}if(!items.length)node.append(el('li',t('None')));for(const item of items){const li=el('li');const b=el('button',item.name);b.onclick=()=>train?window.dispatchEvent(new CustomEvent('pcc-select-train',{detail:{id:item.id}})):fit([item.position]);li.append(b);if(train)li.append(el('small',[item.line,item.routeVersion?'v'+item.routeVersion:'',item.phase,!item.fresh?t('Unknown'):''].filter(Boolean).join(' · ')));node.append(li);}}
-  list(ui.berthList,depot.berths,false);list(ui.parkedList,depot.parkedTrains,true);list(ui.operatingList,depot.runningTrains,true);list(ui.otherList,depot.otherTrains,true);
+  const geometryKey=JSON.stringify(depot.berths.map(b=>b.geometry));if(renderKeys.get(ui.berthList)!==geometryKey)renderKeys.delete(ui.berthList);
+  list(ui.berthList,depot.berths,false);
+  [...ui.berthList.children].forEach((li,i)=>{const b=depot.berths[i];if(!live||!b?.geometry)return;li.querySelector('.berth-capacity')?.remove();const g=b.geometry;
+    li.append(el('small',g.reason?code(g.reason):t('Centre berth: max {length} blocks · {access}',{length:Number(g.maxTrainLengthBlocks).toFixed(1),access:code(g.access)}),'berth-capacity'));});list(ui.parkedList,depot.parkedTrains,true);list(ui.operatingList,depot.runningTrains,true);list(ui.otherList,depot.otherTrains,true);
  }
  function fit(points){window.dispatchEvent(new CustomEvent('pcc-fit-points',{detail:{points:points.map(screen)}}));}
  function onPath(p,route){for(const s of route.segments||[])for(let i=1;i<s.points.length;i++){const a=s.points[i-1],b=s.points[i];if(a.world!==p.world)continue;const dx=b.x-a.x,dz=b.z-a.z,n=dx*dx+dz*dz,v=n?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/n)):0;if(Math.hypot(p.x-a.x-v*dx,p.z-a.z-v*dz)<1.5)return true;}return false;}
@@ -81,8 +105,7 @@
   if(authed&&session&&working){
    if(pending||lineState?.conflict||!catalogFresh())return true;
    if(!['station','balise','switch','origin','end','edge'].includes(d.type)){message(t('Choose a track device or matching station'));return true;}
-   if(d.type==='station'&&d.route!==working.name){message(t('Station belongs to another route'));return true;}
-   mutate(w=>w.visits.push({deviceId:d.id,reverse:false,dwellSeconds:d.type==='station'?d.number:null}));return true;
+   mutate(w=>w.visits.push({deviceId:d.id,reverse:false,dwellSeconds:d.type==='station'?d.number:null,visitId:uuid()}));return true;
   }
   if(d.type==='depot'){ui.operatingDepot.value=d.name.split('/')[0];render();return false;}
   const matches=lines().filter(l=>[l.draft,l.published].some(def=>def?.visits.some(v=>v.deviceId===d.id))||(report?.routes||[]).some(r=>r.name===l.name&&onPath(d.position,r)));
@@ -91,48 +114,90 @@
   render();return authed;
  }
  function message(text,reason=null){lastMessage=text;lastReason=reason;ui.routeEditorStatus.textContent=text;}
- function syncFields(){if(!working){ui.routeVisits.replaceChildren();return;}for(const opt of ui.routeDepots.options)opt.selected=working.depots.includes(opt.value);ui.routeDirection.value=Math.abs(working.dx)>=Math.abs(working.dz)?working.dx>=0?'east':'west':working.dz>=0?'south':'north';renderVisits();}
+ function syncFields(){if(!working){ui.routeVisits.replaceChildren();return;}for(const opt of ui.routeDepots.options)opt.selected=working.depots.includes(opt.value);const policy=working.dispatchPolicy||{supplyMode:working.depots.length?'RESTRICTED':'GLOBAL',preferenceSeconds:30,maxPickupSeconds:120};ui.routeSupply.value=policy.supplyMode;ui.routePreference.value=policy.preferenceSeconds;ui.routePickup.value=policy.maxPickupSeconds;ui.routeDirection.value=Math.abs(working.dx)>=Math.abs(working.dz)?working.dx>=0?'east':'west':working.dz>=0?'south':'north';renderVisits();}
  function renderVisits(){
+  cancelDrag(false);
   ui.routeVisits.replaceChildren();if(!working)return;const disabled=pending||lineState?.conflict||!session||!catalogFresh();
-  working.visits.forEach((visit,i)=>{const d=device(visit.deviceId),li=el('li');li.append(el('span',d?`${d.name} · ${d.type}`:visit.deviceId));li.title=visit.deviceId;
+  working.visits.forEach((visit,i)=>{const d=device(visit.deviceId),li=el('li');li.append(el('span',d?`${d.name} · ${d.type}`:visit.deviceId));li.title=visit.deviceId+"\n"+(visit.visitId||"");if(d?.type==='station'&&visit.visitId&&!(i>0&&i===working.visits.length-1&&visit.deviceId===working.visits[0].deviceId)){const ref=el('small',d.name+'@'+visit.visitId);ref.className='entry-reference';ref.title=t('Awake entry reference');li.append(ref);}
    if(d?.type==='station'){const dwell=el('input');dwell.type='number';dwell.min='0';dwell.max='86400';dwell.value=visit.dwellSeconds??d.number;dwell.title=t('Dwell seconds');dwell.disabled=disabled;dwell.onchange=()=>mutate(w=>w.visits[i].dwellSeconds=Number(dwell.value));li.append(dwell);const reverse=el('input');reverse.type='checkbox';reverse.checked=visit.reverse;reverse.disabled=disabled;reverse.onchange=()=>mutate(w=>w.visits[i].reverse=reverse.checked);const label=el('label');label.append(reverse,document.createTextNode(t('Reverse after stop')));li.append(label);}
-   for(const[caption,action]of [['↑',w=>{if(i>0)[w.visits[i-1],w.visits[i]]=[w.visits[i],w.visits[i-1]];}],['↓',w=>{if(i+1<w.visits.length)[w.visits[i+1],w.visits[i]]=[w.visits[i],w.visits[i+1]];}],['×',w=>w.visits.splice(i,1)]]){const b=el('button',caption);b.disabled=disabled;b.onclick=()=>mutate(action);li.append(b);}ui.routeVisits.append(li);
+   const remove=el('button','×');remove.type='button';remove.disabled=disabled;remove.title=t('Remove visit');remove.onclick=()=>mutate(w=>w.visits.splice(i,1));li.append(remove);
+   const handle=el('button','≡','route-drag-handle');handle.type='button';handle.disabled=disabled;handle.title=t('Drag to reorder; use arrow keys for keyboard sorting');handle.setAttribute('aria-label',handle.title);handle.onpointerdown=event=>beginDrag(event,li,handle,i);
+   handle.onkeydown=event=>{const step=event.key==='ArrowUp'?-1:event.key==='ArrowDown'?1:0;if(!step||handle.disabled)return;event.preventDefault();const to=i+step;if(to<0||to>=working.visits.length)return;mutate(w=>w.visits.splice(to,0,w.visits.splice(i,1)[0])).then(()=>ui.routeVisits.children[to]?.querySelector('.route-drag-handle')?.focus());};li.append(handle);ui.routeVisits.append(li);
   });
  }
+ function cancelDrag(redraw=true){
+  if(!drag)return;const current=drag;drag=null;cancelAnimationFrame(dragFrame);dragFrame=0;current.row.classList.remove('route-dragging');
+  if(ui.routeVisits.hasPointerCapture(current.pointerId))ui.routeVisits.releasePointerCapture(current.pointerId);
+  if(redraw){renderVisits();renderIssues();}
+ }
+ function placeDragged(){
+  if(!drag||!drag.moved)return;const next=[...ui.routeVisits.children].find(row=>row!==drag.row&&drag.y<row.getBoundingClientRect().top+row.getBoundingClientRect().height/2);
+  ui.routeVisits.insertBefore(drag.row,next||null);
+ }
+ function dragScroll(){
+  if(!drag)return;const box=right.getBoundingClientRect();const velocity=drag.y<box.top+45?-12:drag.y>box.bottom-45?12:0;
+  if(drag.moved&&velocity){right.scrollTop+=velocity;placeDragged();}dragFrame=requestAnimationFrame(dragScroll);
+ }
+ function beginDrag(event,row,handle,from){
+  if(handle.disabled||drag||!event.isPrimary||event.button!==0)return;event.preventDefault();
+  // Capture on the stable list, not the row being moved: DOM reordering would
+  // otherwise release capture and cancel the gesture halfway through.
+  drag={row,handle,from,pointerId:event.pointerId,startY:event.clientY,y:event.clientY,moved:false};ui.routeVisits.setPointerCapture(event.pointerId);dragFrame=requestAnimationFrame(dragScroll);
+ }
+ ui.routeVisits.addEventListener('pointermove',event=>{if(!drag||drag.pointerId!==event.pointerId)return;drag.y=event.clientY;if(Math.abs(drag.y-drag.startY)>5){drag.moved=true;drag.row.classList.add('route-dragging');}placeDragged();});
+ ui.routeVisits.addEventListener('pointerup',event=>{if(!drag||drag.pointerId!==event.pointerId)return;const from=drag.from,to=[...ui.routeVisits.children].indexOf(drag.row),moved=drag.moved;cancelDrag(false);if(moved&&from!==to)mutate(w=>w.visits.splice(to,0,w.visits.splice(from,1)[0]));else{renderVisits();renderIssues();}});
+ ui.routeVisits.addEventListener('pointercancel',()=>cancelDrag());
+ ui.routeVisits.addEventListener('lostpointercapture',()=>{if(drag)cancelDrag();});
+ window.addEventListener('keydown',event=>{if(event.key==='Escape'&&drag){event.preventDefault();cancelDrag();}});
  function refreshEditor(){
   ui.routeEditorPanel.hidden=!authed;ui.enterRouteEditor.disabled=authed;
+  const open=authed||!!ui.operatingDepot.value;if(open!==panelOpen){panelOpen=open;window.dispatchEvent(new Event('pcc-operating-panel'));}
   if(!authed)return;
+  renderIssues();
   if(lineState){const current=lines().find(l=>l.name===lineState.name);if(current)lineState=current;}
   const frozen=!!lineState?.conflict,unavailable=!catalogFresh();
+  if(drag&&(pending||frozen||unavailable||!session))cancelDrag();
   ui.routeEditorStatus.textContent=frozen?t('Editing frozen'):unavailable?t('Operating data unavailable'):lastMessage||t('Select a route or create a draft');
   ui.routeConflict.hidden=!frozen;
   for(const id of ['routeSave','routeValidate','routePublish','routeRetire','routeDelete'])ui[id].disabled=pending||frozen||unavailable||!session;
-  ui.routeDirection.disabled=pending||frozen||unavailable;ui.routeDepots.disabled=pending||frozen||unavailable;ui.routeBegin.disabled=pending||frozen||unavailable;ui.routeCreate.disabled=pending||unavailable;ui.routeResolve.disabled=pending||unavailable;
+  for(const id of ['routeSupply','routePreference','routePickup'])ui[id].disabled=pending||frozen||unavailable;ui.routeDirection.disabled=pending||frozen||unavailable;ui.routeDepots.disabled=pending||frozen||unavailable;ui.routeBegin.disabled=pending||frozen||unavailable;ui.routeCreate.disabled=pending||unavailable;ui.routeResolve.disabled=pending||unavailable;
   ui.routeSave.dataset.dirty=String(dirty);
   if(frozen){const options=[['DISCARD',t('Discard both pending edits')],...lineState.participants.map(p=>[p.actor,`${p.source} · ${p.actor}`])];populate(ui.routeResolution,options);const key=JSON.stringify(lineState.participants);if(renderKeys.get(ui.routeConflictDiff)!==key){renderKeys.set(ui.routeConflictDiff,key);ui.routeConflictDiff.replaceChildren();for(const party of lineState.participants){const section=el('details');section.append(el('summary',party.actor));const pre=el('pre',JSON.stringify(party.working,null,2));section.append(pre);ui.routeConflictDiff.append(section);}}}
   // Refresh disabled controls without replacing inputs while a user is typing.
   for(const input of ui.routeVisits.querySelectorAll('input,button'))input.disabled=pending||frozen||unavailable||!session;
+ }
+ function renderIssues(){
+  issueList.hidden=!validationIssues.length;
+  const key=JSON.stringify([PccI18n.language,validationIssues]);
+  if(renderKeys.get(issueList)!==key){renderKeys.set(issueList,key);issueList.replaceChildren();for(const issue of validationIssues){
+   const li=el('li'),button=el('button',t('Problem segment: #{from} {start} → #{to} {end}',{from:issue.fromIndex,start:issue.fromLabel||issue.fromDeviceId,to:issue.toIndex,end:issue.toLabel||issue.toDeviceId}));button.type='button';
+   button.onclick=()=>{const item=ui.routeVisits.children[issue.fromIndex-1];if(item){item.scrollIntoView({block:'nearest'});item.tabIndex=-1;item.focus({preventScroll:true});}};
+   li.append(button,el('small',code(issue.detail)),el('small',`${issue.fromDeviceId} → ${issue.toDeviceId}`));issueList.append(li);
+  }issueList.append(el('li',t('Only the first failing segment is shown; fix it and validate again.')));}
+  [...ui.routeVisits.children].forEach((item,i)=>item.classList.toggle('validation-problem',validationIssues.some(issue=>issue.fromIndex===i+1||issue.toIndex===i+1)));
  }
  async function request(action,definition=null,decision=null,line=null){
   const name=line??lineState?.name??ui.editRoute.value??'';
   const payload={requestId:uuid(),action,line:name,actor,session,expectedRevision:lineState?.name===name?lineState.revision:(lines().find(l=>l.name===name)?.revision||0),definition,decision};
   const deadline=Date.now()+35000;
   while(Date.now()<deadline){const response=await fetch('/api/v10/routes',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(payload)});const r=await response.json();if(response.status===202||r.status==='PENDING'){await new Promise(resolve=>setTimeout(resolve,200));continue;}if(response.status===403){authed=false;token='';session=null;throw Error(t('Control authentication required'));}const currentReply=Number(r.workspaceRevision||0)>=minSequence;minSequence=Math.max(minSequence,Number(r.workspaceRevision||0));if(r.line&&currentReply){lineState=r.line;const index=catalog?.lines.findIndex(l=>l.name===r.line.name);if(index>=0)catalog.lines[index]=r.line;}
+   if(currentReply&&action!=='HEARTBEAT'){validationIssues=r.issues||[];renderIssues();}
    if(r.status!=='APPLIED'){if(r.reason==='EDIT_SESSION_REQUIRED')session=null;message(code(r.reason),r.reason);refreshEditor();throw Error(code(r.reason));}
    if(currentReply){if(action!=='AUTH')session=r.session??null;if(r.preview)preview=r.preview;loop=!!r.closed;}if(action!=='HEARTBEAT')message(code(r.reason),r.reason);return r;
   }throw Error(t('Edit unconfirmed; inspect saved state before retrying'));
  }
  async function run(action){if(pending)return;pending=true;refreshEditor();try{return await action();}catch(error){message(error.message);}finally{pending=false;refreshEditor();}}
  async function mutate(change){if(!session||pending||lineState?.conflict||!catalogFresh())return;const before=clone(working);await run(async()=>{change(working);try{await request('UPDATE',working);dirty=true;}catch(error){working=before;throw error;}finally{syncFields();render();}});}
- async function loadCatalog(){try{const response=await fetch('/api/v10/routes',{cache:'no-store'});if(!response.ok)throw Error();const incoming=await response.json();if(incoming?.producerSession&&producer&&incoming.producerSession!==producer){minSequence=0;session=null;working=null;preview=[];}if(incoming?.producerSession)producer=incoming.producerSession;if(Number(incoming?.workspaceRevision||0)<minSequence)return;minSequence=Math.max(minSequence,Number(incoming?.workspaceRevision||0));catalog=incoming;catalogAt=Date.now();choices();render();}catch(_){catalogAt=0;catalog=null;refreshEditor();}}
+ async function loadCatalog(){if(catalogLoading)return;catalogLoading=true;try{const response=await fetch('/api/v10/routes',{cache:'no-store'});if(!response.ok)throw Error();const incoming=await response.json();if(incoming?.status!=='AVAILABLE'||incoming.schemaVersion!==1)throw Error();if(incoming?.producerSession&&producer&&incoming.producerSession!==producer){minSequence=0;session=null;working=null;preview=[];}if(incoming?.producerSession)producer=incoming.producerSession;if(Number(incoming?.workspaceRevision||0)<minSequence)return;minSequence=Math.max(minSequence,Number(incoming?.workspaceRevision||0));catalog=incoming;catalogAt=Date.now();choices();render();}catch(_){catalogAt=0;refreshEditor();}finally{catalogLoading=false;}}
  ui.enterRouteEditor.onclick=()=>{ui.routeToken.value='';ui.routeAuthResult.textContent='';ui.routeAuthDialog.showModal();};
  ui.routeAuthClose.onclick=()=>ui.routeAuthDialog.close();
  ui.routeAuthDialog.addEventListener('close',()=>{ui.routeToken.value='';if(!authed)token='';});
  ui.routeAuthConfirm.onclick=async()=>{if(pending)return;ui.routeAuthConfirm.disabled=true;token=ui.routeToken.value;ui.routeToken.value='';try{await request('AUTH',null,null,'');authed=true;ui.routeAuthDialog.close();working=null;lineState=null;session=null;window.dispatchEvent(new CustomEvent('pcc-select-train',{detail:{id:null}}));message(t('Select a route or create a draft'));render();}catch(error){token='';ui.routeAuthResult.textContent=error.message;}finally{ui.routeAuthConfirm.disabled=false;}};
  ui.routeBegin.onclick=()=>run(async()=>{if(session&&lineState?.name!==ui.editRoute.value)await request('CANCEL');session=null;const r=await request('BEGIN',null,null,ui.editRoute.value);working=clone(r.line.participants.find(p=>p.actor==='PCC:'+actor)?.working||r.line.draft);dirty=JSON.stringify(working)!==JSON.stringify(r.line.draft);ui.operatingRoute.value=r.line.name;syncFields();render();if(preview.length)fit(preview.flatMap(s=>s.points));});
  ui.editRoute.onchange=()=>{if(session&&lineState&&ui.editRoute.value!==lineState.name){ui.editRoute.value=lineState.name;message(t('Close this edit before selecting another route'));}else{lineState=lines().find(l=>l.name===ui.editRoute.value)||null;refreshEditor();}};
- ui.routeCreate.onclick=()=>run(async()=>{if(session)throw Error(t('Close this edit before selecting another route'));const [dx,dz]=({east:[1,0],west:[-1,0],north:[0,-1],south:[0,1]})[ui.routeDirection.value];const d={name:ui.routeName.value.trim(),dx,dz,visits:[],depots:[...ui.routeDepots.selectedOptions].map(o=>o.value)};const r=await request('CREATE',d,null,d.name);working=clone(r.line.draft);dirty=false;await loadCatalog();ui.editRoute.value=d.name;ui.operatingRoute.value=d.name;syncFields();render();});
+ ui.routeCreate.onclick=()=>run(async()=>{if(session)throw Error(t('Close this edit before selecting another route'));const [dx,dz]=({east:[1,0],west:[-1,0],north:[0,-1],south:[0,1]})[ui.routeDirection.value];const d={name:ui.routeName.value.trim(),dx,dz,visits:[],depots:[...ui.routeDepots.selectedOptions].map(o=>o.value),dispatchPolicy:{supplyMode:ui.routeSupply.value,preferenceSeconds:Number(ui.routePreference.value),maxPickupSeconds:Number(ui.routePickup.value)}};const r=await request('CREATE',d,null,d.name);working=clone(r.line.draft);dirty=false;await loadCatalog();ui.editRoute.value=d.name;ui.operatingRoute.value=d.name;syncFields();render();});
  ui.routeDepots.onchange=()=>{if(session)mutate(w=>w.depots=[...ui.routeDepots.selectedOptions].map(o=>o.value));};
+ for(const id of ['routeSupply','routePreference','routePickup'])ui[id].onchange=()=>{if(session)mutate(w=>w.dispatchPolicy={supplyMode:ui.routeSupply.value,preferenceSeconds:Number(ui.routePreference.value),maxPickupSeconds:Number(ui.routePickup.value)});};
  ui.routeDirection.onchange=()=>mutate(w=>{[w.dx,w.dz]=({east:[1,0],west:[-1,0],north:[0,-1],south:[0,1]})[ui.routeDirection.value];});
  for(const[id,action]of [['routeSave','SAVE'],['routeValidate','VALIDATE'],['routePublish','PUBLISH'],['routeRetire','RETIRE'],['routeDelete','DELETE']])ui[id].onclick=()=>run(async()=>{if(['RETIRE','DELETE'].includes(action)&&!confirm(t('Confirm route retirement or deletion?')))return;const r=await request(action);if(action==='SAVE')dirty=false;if(action==='DELETE'){working=null;lineState=null;session=null;preview=[];}await loadCatalog();render();});
  ui.routeResolve.onclick=()=>run(async()=>{const r=await request('RESOLVE',null,ui.routeResolution.value);working=r.session?clone(r.line.participants.find(p=>p.actor==='PCC:'+actor)?.working||r.line.draft):null;dirty=!!working&&JSON.stringify(working)!==JSON.stringify(r.line.draft);await loadCatalog();syncFields();render();});

@@ -1,5 +1,11 @@
 # Experimental onboard display only; no automatic traction or brake action.
 # Reload with /st reload after stopping all trains.
+automatic-driving:
+  # SAL/STA automatic cab handles. Reload with /st reload while trains are stopped.
+  # Missing or invalid values use defaults. Vehicle limits and ATP remain authoritative.
+  max-power-notch: 4
+  service-brake-notch: 6
+
 shadow-atp:
   enabled: true
   # Reserved activation gate. TRUE IS REJECTED until the FS execution chain exists.

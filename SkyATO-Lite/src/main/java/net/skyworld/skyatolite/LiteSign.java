@@ -8,7 +8,8 @@ record LiteSign(String action,String value,String option,double number) {
         String action=second.trim().toLowerCase(Locale.ROOT),value=third.trim(),option=fourth.trim();
         double number=0;
         switch(action) {
-            case "depot","awake" -> {name(value);name(option);}
+            case "depot" -> {name(value);name(option);}
+            case "awake" -> {name(value);var parts=option.split("@",-1);name(parts[0]);if(parts.length>2)throw new IllegalArgumentException("始发访问格式错误");if(parts.length==2)java.util.UUID.fromString(parts[1]);}
             case "station" -> {number=seconds(value);name(option);}
             case "message" -> {if(value.isBlank())throw new IllegalArgumentException("第三行需要显示文字");number=seconds(option);if(number<=0)throw new IllegalArgumentException("显示秒数须大于零");}
             case "property" -> {if(!value.equalsIgnoreCase("v_target"))throw new IllegalArgumentException("property 仅支持 V_target");number=speed(option);}

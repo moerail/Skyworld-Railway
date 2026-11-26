@@ -1,4 +1,119 @@
-# SkyRail Suite 2026.11.24 — validation / 验证记录
+# SkyRail Suite 2026.11.26 — validation / 验证记录
+
+**[UPDATED · SAL 0.8.0]** Bounded intermediate-reversal pickup/return routing is shipped (up to4 reversals); unbounded shunting, direction-policy proposals and a Python planner remain separate design work. [Runtime contract](Common/doc/SAL-MANEUVERS-AND-HANDOVER.en.md).
+
+## 2026-11-26 — SAL 0.8.0 / STF 5.1.4 handover, maneuvers and manual handles
+
+- Separate consent-code issue and successful prompt delivery; retry failed delivery, refresh expiry and align stop tolerance with STF. Explicit two-step consent and physical commit gates remain.
+- Shared bounded RailGraph planner for pickup/depot return: intermediate and initial reversals, actual rear as new leading end, multi-edge whole-body clearance, separate MA legs and confirmed release/reverse handshakes. No global deadlock solver or device-relocation feature.
+- Preserve manually selected traction while chunks load; effective traction prohibition and protection braking remain. Existing TIMS, driver-loss, explicit release and Trip behavior is unchanged.
+- Add maneuver geometry/state-machine and chunk-handle regressions; extend handover delivery/expiry checks. No test server startup or production operation.
+
+## 2026-11-26 — SAL 0.7.7 / STCS 4.3.6 concurrent return traffic
+
+- Retain selected return plans/centres during live throat traffic; stop treating other running SAL jobs as permanent access obstructions. Whole destination clearance, exclusive berth selection and stored/faulted/manual blockers remain.
+- Automatic point alignment cannot enter the dispatcher handshake to withdraw a different train’s MA. Explicit PCC dispatcher and controlled self-reroute behavior retain their guards.
+- Maintain established route heartbeats before fleet geometry/dispatch work. No change to the 1500ms watchdog, STA APIs, ATP or occupancy protection.
+- Add two-automatic-train runtime conflict/continuation regression and split route/destination geometry checks. Production raw events were lost after restart; no claim of exhaustive production diagnosis, deployment or server startup.
+
+## 2026-11-26 — STF 5.1.3 automatic cab handles
+
+- Replace fixed P2/B4 automatic driving with configurable P4 departure and B6 service braking; taper traction near cruise, retain B7 final hold. Recompute the normal stop envelope with a reaction allowance.
+- SAL/STA interfaces and STCS authority remain unchanged; existing ATP, vehicle physics, TIMS, Trip and distance-fence enforcement are retained. Manual driving is unaffected.
+- Regression integrates every bundled vehicle profile for departure clearance and docking, plus handle bounds, cruise taper, ATP caps and invalid telemetry. No server operation or production deployment.
+
+## 2026-11-26 — SAL0.7.6 return rechecks and route-heartbeat retention
+
+- Keep accepted-route heartbeats while braking for berth checks, obstacles or replacement selection. No new path/authority is created during a hold.
+- Classify target/slot/centre/space/body failures; retain targets for a default2s recheck. Persistent body uncertainty faults; real changes replan only while stopped. Geometry and whole-body margins remain strict.
+- Detailed status, throttled issue logs, completion/last-return-issue logging and explicit dispatch-history label. Existing STF/STA/STCS/PCC versions unchanged.
+- Regression uses the actual silent MA scheduler and1500ms watchdog, plus point-setting invariance, fit/unknown-body distinction and stop/recheck outcomes. No local server startup or production deployment.
+- Final build passed125 Java test entry points on each of26.2 and26.3, including ReturnBerthGuardTest. PCC/STA/STCS/STF behavior and resources are unchanged in this patch; prior browser tests are not claimed as rerun. Documentation links and extracted distribution hashes are validated during packaging.
+
+
+## 2026-11-26 — SAL0.7.5/PCC2.6.4 coherent localisation and bounded recheck
+
+- Query STCS with railXYZ and motionXYZ from one telemetry frame, then continuously project actual position; do not mix an older rail anchor with a newer orthogonal tangent.
+- Configurable finite1.5block projection /0.75block endpoint /2000ms recheck defaults. Brake throughout uncertainty, retain plan, renew accepted lease only. Independent wrong-branch observations beyond the node zone recover early; same observation rereads do not count twice. STCS/ATP remain authoritative.
+- Persist original failure/time, show it in status/operating projection/PCC event text, add bounded context and one confirmed-recovery console notice. No new API control or protocol numbering.
+- Regression: coherent curve frame, slope, transient recovery, timeout, repeated evidence, wrong branch, scaled graph, plan replacement, config limits, persistence and safe event text. No production operation or test-server startup.
+- Final build passed124 Java test entry points on each of26.2 and26.3. PCC browser regression passed with visible original cause, context tooltip and HTML-safe rendering;476 four-language keys and edge-line checks passed. Source links and extracted package hashes are validated during packaging. The production route at693/70/-707 still requires user driving acceptance.
+
+
+## 2026-11-26 — slope rail anchoring and administrative manual override
+
+STA2.9.2 / STF5.1.2 / STCS4.3.6 / SAL0.7.4 / PCC2.6.3.
+
+- Reproduce entity-floor versus actual rail-block mismatch on slopes. SAL consumes existing same-session fresh STF railXYZ telemetry through STA and keeps continuous projection/real-deviation checks.
+- Admin /sal override by name/UUID: persist manual reservation, brake, confirm STCS withdrawal/inactive permission, STF handoff, observed completion. No ledger clearing or TIMS/TR/PT acknowledgement. Handle old leases after restart via existing protection-channel revocation; unavailable/active permission is not success.
+- STA adds a default handoffToManual method on the existing RELEASE Packet; STF verifies stopped/owner and retains safety holds. SAL command remains admin-only.
+- New regressions cover slope coordinate mismatch, telemetry freshness/identity/graph, override stop/owner/pending/failure/restart/permission proof, TIMS retention and ordering. No server deployment/startup or production acceptance.
+- Final offline build passed123 Java test entry points on each of26.2 and26.3, including ManualOverridePolicyTest, ManualOverrideFlowTest and TrainLocalisationTest. PCC assets are unchanged; prior browser results below are not a new live run. Package link/hash validation runs on the extracted distribution.
+
+
+## 2026-11-26 — SAL0.7.3 dispatch rejection diagnostics
+
+- Explain eligibility, scope, forward/reverse attempts, ETA cap, unknown/stale/off-graph other-train envelopes, known-body obstacles and stale graph/computation results. Preserve reasons through pending requests and timeout history.
+- Eligibility and obstacle predicates are unchanged; other-train TIMS hold alone is not a global obstacle. Diagnostic-only unfiltered path comparison never grants MA or becomes an executable plan.
+- STA2.9.1/PCC2.6.3 unchanged; replace SAL only for this compatible set. No server startup/deployment or production root-cause claim.
+
+Regression checks eligibility wording, bounded summaries, stale/unknown/off-graph blockers versus unrelated TIMS hold, ETA and restricted-scope reasons in the actual worker. Production test1/test2 being PARKED and TIMS CONFIRMED does not identify the remaining gate without current body/route-policy data.
+
+Final offline build passed120 Java test entry points on each of26.2 and26.3. Both diagnostics regressions passed. PCC resources and STA contracts are unchanged in this patch; previous browser validation is recorded below, not claimed as rerun. Documentation links and extracted distribution hashes are checked during packaging.
+
+## 2026-11-26 — shortest operational paths and confirmed track previews
+
+- SAL0.7.2/PCC2.6.3 with STA2.9.1: shortest directed distance replaces strict multi-path rejection. Stable equal-cost choice, positive same-position loops, explicit-waypoint constraints and existing direction/transition/closure checks.
+- Validation, task planning, entry rotation and previews use the same planner. Unfinished draft prefixes follow sampled rails; unknown connections remain estimated.
+- Regression covers detours, ties with reordered graph arrays, explicit branch, positive loops, broken routes and bent partial-preview geometry. No production deployment or test-server startup.
+- Final build passed119 Java entry points on each of26.2 and26.3. Updated PCC browser regression,474 translation keys and edge-line checks passed. Documentation links and extracted package hashes are validated during packaging.
+
+
+## 2026.11.26 — directed validation diagnostics and grip sorting
+
+STA2.9.1 / SAL0.7.1 / PCC2.6.2, STF5.1.1 / STCS4.3.5. Both cores passed119 Java entry points. New regression covers directed endpoint labels/IDs, immutable JSON contract, rejected validation and replay. Browser checks real mouse drag with no intermediate UPDATE, preserved full visits, keyboard reorder, Escape cancellation, touch-action policy, failing-pair highlighting/jump/clear, plus prior polling/mobile/auth/conflict behavior. All474 translation keys pass. Headless Edge touch injection failed to acknowledge/start a gesture; actual phone/tablet drag remains unverified, not a claimed pass. No server deployment, restart or production edit.
+
+## 2026.11.26 — PCC2.6.1 editor refresh and real pointer regression
+
+- Fixed narrow layouts clearing the editor's has-selection state on every train poll, despite an active SAL editor/depot panel.
+- SAL devices and route paths are excluded from map pointer capture; noninteractive draft previews no longer cover station targets.
+- Stable semantic rendering retains unchanged map/list DOM across telemetry timestamps. Catalog GET requests do not overlap; temporary failures retain local proposals and raw inputs while freshness checks disable writes.
+- Browser regression uses real CDP mouse press/release held across multiple telemetry/catalog polls, checks narrow-screen visibility, unchanged DOM identities, typed dwell preservation through unavailable/recovered catalogs, existing publication/conflict fencing. This covers the actual input path that previous synthetic click tests missed.
+- No test-server restart or production deployment. Offline build remains118 Java test entry points per core; PCC browser,467 translation keys and edge-line checks pass.
+
+
+## 2026.11.26 — public stops, circular entry and shared fleet dispatch
+
+STA2.9.0 / STF5.1.1 / STCS4.3.5 / SAL0.7.0 / PCC2.6.0.
+
+- Final offline build passed **118 Java test entry points on each of Shiroha26.2 and26.3**. New tests exercise non-greedy matching, finite preference/cap, aging, stable visits/closure ambiguity, B-C-A-B rotation, schema migration/legacy-awake fencing, pure worker path scoring and commit position/direction/member fences.
+- PCC fixture browser regression passed with public stops, policy persistence, copyable entry and dispatch queue/decision display, retaining token, conflict, layer and highlight checks. **467 four-language translation keys** pass.
+- No local test-server deployment/restart and no production access. The previous local26.2 server was shut down normally at the user's request. Existing production L5-1/L4-1 cars were not inspected, modified, remanaged or dispatched by this build.
+- This is offline algorithm/contract/browser regression, not physical driving acceptance, congestion benchmarking or fault-injection certification. ETA is approximate. Follow [the Chinese production test](SkyATO-Lite/TEST.zh.md) for real departures, reverse approaches, berth return, duplicate calls and optional cross-group fallback.
+- [Chinese contract](Common/doc/SAL-SHARED-DISPATCH.md) · [English contract](Common/doc/SAL-SHARED-DISPATCH.en.md). All historical validation entries below describe earlier rounds, not new actions.
+
+## 2026.11.25 — direction-gated default MA and relaxed manual consent
+
+STF5.1.1 / SAL0.6.1 with STA2.8.0 / STCS4.3.5 / PCC2.5.0.
+
+- Both26.2 and26.3 passed114 Java test entry points. Updated regressions cover neutral acquisition versus forward/reverse selection, existing protection holds, body-over-marker checks near both ends, adjacent-track rejection, random six-digit code shape, explicit request without the passive delay, code replacement, wrong driver/lease/code, movement/expiry and one-shot explicit-release fencing.
+- The default request trigger is STF's manual-driver scheduler; STCS continues to arbitrate the resulting MA. SAL's relaxed manual consent captures the current stopped centre, retains the marker association and does not change automatic return parking geometry.
+- Deployed and restarted the local26.2 test server. Live API remained AVAILABLE, graph97, line1 publication1; all30 formal-ledger occupied/reserved sets and signs/homes/route workspace matched the stopped-server backup. Console help confirmed both handover command forms. No live driver interaction was fabricated; in-game direction selection and partial-body consent still need player acceptance testing.
+- Updated the standalone Chinese SAL manual, multilingual manuals and handover/centre-parking notes; local Markdown links validated.
+
+
+## 2026.11.25 — centre-aligned multi-berth storage / 中心停车与同股道多库位
+
+Compatible set: STA2.8.0 / STF5.1.0 / STCS4.3.5 / SAL0.6.0 / PCC2.5.0.
+
+- **114 Java test entry points on each of Shiroha26.2 and26.3** passed. New coverage: immutable full-body feedback, front/middle/rear references, centre capture after reversing, stale or cross-world members, along-track scaled/curved storage spines, unknown and duplicate boundaries, single-ended deep-first selection, double-ended shortest approaches, centre clamping, oversized near berth with a larger usable alternative, obstruction before/after a target and another usable entrance.
+- PCC browser regression passed for berth capacity, curved boundaries and planned-centre display, plus existing token editing, draft/publication separation, conflict freeze, infrastructure sublayers and configurable highlights. **452 four-language keys** passed.
+- Deployed to the local26.2 server and restarted on2026-11-25. Live HTTP assets match source. Real browser checked two maintown berth capacities (L1:21blocks, L2:45blocks), both double-ended, visible boundaries and editor authentication/exit, with no JavaScript exceptions.
+- All30 formal-ledger occupied/reserved sets matched the stopped-server backup. Depot signs, homes and route workspace were retained; line1 remains published version1. No active SAL jobs existed during this deployment. No ledger reset, automatic train relocation or route publication was performed.
+- This is algorithm/contract/browser regression and real-server startup verification. It is **not** a new physical multi-train depot driving or all-fault-injection acceptance run. Old front-aligned parked trains require manual repositioning for centre capture.
+
+[中文设计、配置与契约](Common/doc/SAL-CENTRE-STABLING.md) · [English design and contract](Common/doc/SAL-CENTRE-STABLING.en.md)
+
 
 ## 2026.11.24 — PCC 2.4.1 display patch / 显示补丁
 
@@ -59,6 +174,14 @@ Reverse-facing dispatch, depot turnout movements, first-station reuse, competing
 
 ## Not shipped as runtime / 未实现的设计
 
-The up/down direction rule, atomic whole-single-track-section reservation, general intermediate multi-reversal search and a Python planning daemon remain **design only**. Existing Python desktop/viewer tools are not that planning daemon.
+The up/down direction rule, atomic whole-single-track-section reservation, unbounded general shunting and a Python planning daemon remain **design only**. Existing Python desktop/viewer tools are not that planning daemon.
 
 [Design / 设计](Common/doc/TRAFFIC-PLANNING-DAEMON-DESIGN.md) · [Manual / 手册](Common/README.zh.md)
+
+STF 5.1.3 automatic handles: full offline build passed 126 Java test entry points on Shiroha 26.2 and 126 on 26.3. Documentation validation: 100 Markdown files / 1058 local links, no errors. Log: Common/logs/automatic-handles-20261126.log. No server startup, deployment or production acceptance performed.
+
+SAL 0.7.7 / STCS 4.3.6 concurrent returns: complete offline build passed 128 Java test entry points on Shiroha 26.2 and 128 on 26.3, including AutomaticTrafficConflictTest and ReturnTrafficTest. Documentation check: 102 Markdown files / 1084 local links, no errors. Log: Common/logs/return-traffic-final-20261126.log. No server operation or production acceptance performed.
+
+SAL 0.8.0 / STF 5.1.4 final release: full offline build passed 131 Java test entry points on Shiroha 26.2 and 131 on 26.3. Includes ManeuverPlannerTest, ManeuverControlTest (post-reversal localisation failure/timeout), ChunkHandleRetentionTest and extended DepotHandoverTest. Source changes precede the final SAL compilation. Documentation: 104 Markdown files / 1111 local links, no errors. Log: Common/logs/maneuver-handover-release-20261126.log. No test server startup, production deployment or live acceptance performed.
+
+GitHub source publication check (2026-11-26): no Java changes since the final 131/131 offline build. Re-ran PCC real-browser route editor regression, 476-key i18n/placeholder/storage checks and JavaScript syntax validation successfully. Corrected obsolete design-only descriptions and synchronized current version tables; generated binaries, local server data and credentials remain excluded from Git. Browser log: Common/logs/github-operating-map-20261126.log.

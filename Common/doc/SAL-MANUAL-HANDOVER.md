@@ -1,5 +1,16 @@
 # SAL与手动驾驶移交（STF 5.0 / SAL 0.3）
 
+**[新增／修正 · SAL 0.8.0 / STF 5.1.4 · 2026-11-26]** depot纳管提示可补发、确认码过期刷新，停稳阈值与STF一致；出库接客和回库共用支持途中折返的分段寻路，经STCS释放旧MA、STA换向后逐段运行。hotbar等待区块加载不再清除手动牵引档，实际牵引仍被保护禁止。 [本版增量契约](SAL-MANEUVERS-AND-HANDOVER.md)
+
+**[新增／修正 · 2026-11-26]** STA2.9.2 / STF5.1.2 / SAL0.7.4：管理员 /sal override <列车名或UUID> 保持制动，确认撤销MA后退出SAL并保留手动状态，完成后可 /st drive。保留车身占用、TIMS及TR/PT，不授予行车许可。坡道定位改用STF经STA上报的实际railXYZ，不再floor实体坐标猜轨道。 [完整契约](SAL-OVERRIDE-AND-SLOPES.md)
+
+**[新增／修改 · 2026-11-26]** 本轮当前版本 STA2.9.0 / SAL0.7.0 / PCC2.6.0（STF5.1.2、STCS4.3.5）。公共station、awake线路＋始发点、GLOBAL偏好车池／RESTRICTED限制、独立JVM快照计算与提交围栏，以[共享派车契约](SAL-SHARED-DISPATCH.md)／[English contract](SAL-SHARED-DISPATCH.en.md)为准。下文若涉及旧站名归属、每线必须有车辆段、awake车辆段＋线路，只作历史说明，不再使用。STCS的占用、MA和STA→STF执行权边界不变。
+
+**[修正 · 2026-11-25]** STF5.1.2 / SAL0.6.1：手动司机选定前进或后退后才自动申请FS/MA，取得驾驶权但空挡时不申请。手动纳管放宽为车身任意部分覆盖depot并停稳3秒，自动提供随机六位码；也可停稳后 `/sal handover` 立即申请，再 `/sal handover 六位码` 确认、`/st release` 移交。自动回库中心停车不变。
+
+以下精确中心规则适用于自动停车；手动移交以覆盖牌子时的实际停放位置捕获，保留完整性、驾驶权及显式释放检查。
+
+
 配套 STA 2.5.0、STF 5.0.0、SAL 0.3.0，保留 STCS 4.3.2、PCC 2.2.3。需要整套更新并重启。
 
 ## 自动待命交还手动
@@ -77,3 +88,10 @@ STF的 switch/origin/balise/end 工务设备入口继续存在；运营 station�
 RailGraph版本97，line1保持发布；5列现有列车及所有原有占用记录逐项保留，无整本清空。
 启动核对结果为 `Common/target/stf5-handover-startup-check.json`。
 本次完成离线回归与服务启动检查，聊天按钮及两次实际驾驶权移交仍需玩家现场验收。
+
+
+## **[修改 · 2026-11-25] 中心停车与库位容量**
+
+**[破坏性修改 · 2026-11-25]** depot改为列车中心对牌；空间不足时只在本库位边界内调整计划中心，整列放不下则换位。同股道相邻库位沿轨中分并留净间隔；单端深处先停，双端评估两侧合法路径；出入库都排除车身阻挡。PCC显示容量、类型、范围和目标偏移。旧车头停车位置须手动调整，station语义不变。
+
+配套 STA2.8.0 / STF5.1.0 / STCS4.3.5 / SAL0.6.0 / PCC2.5.0；以上旧版章节保留为历史实现说明，depot旧领车参考以本次中心参考为准。[完整边界、配置、契约与重启规则](SAL-CENTRE-STABLING.md) · [English](SAL-CENTRE-STABLING.en.md)

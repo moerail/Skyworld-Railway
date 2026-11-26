@@ -20,6 +20,10 @@ final class Topology {
     }
     record Issue(String source,String sourcePort,String reason) {}
     record Location(Edge edge,double offset,double error,double alignment) {}
+    static double[] tangent(Location at){
+        var path=at.edge().path();for(int i=1;i<path.size();i++)if(at.offset()<=path.get(i).distanceMeters()+1e-6){var a=path.get(i-1);var b=path.get(i);return new double[]{b.x()-a.x(),b.y()-a.y(),b.z()-a.z()};}
+        var a=path.get(path.size()-2);var b=path.getLast();return new double[]{b.x()-a.x(),b.y()-a.y(),b.z()-a.z()};
+    }
     record Target(String node,Pos position,String edge) {
         Target(String node,Pos position){this(node,position,null);}
         static Target node(String id){return new Target(id,null,null);}static Target pos(Pos p){return new Target(null,p,null);}
@@ -35,14 +39,17 @@ final class Topology {
         }
         Location end() {var p=parts.getLast();return new Location(p.edge,p.to,0,1);}
         double progress(Location position,double expected) {
+            return progress(position,expected,.25);
+        }
+        double progress(Location position,double expected,double endpointToleranceMeters) {
             double before=0,best=Double.NaN,error=Double.POSITIVE_INFINITY;
             for(var p:parts) {
-                if(p.edge.id.equals(position.edge.id)&&position.offset>=p.from-.25&&position.offset<=p.to+.25) {
+                if(p.edge.id.equals(position.edge.id)&&position.offset>=p.from-endpointToleranceMeters&&position.offset<=p.to+endpointToleranceMeters) {
                     double value=before+position.offset-p.from,difference=Math.abs(value-expected);
                     if(difference<error){error=difference;best=Math.max(0,Math.min(length,value));}
                 }
                 // A rail-centre query can move to the outgoing edge while the vehicle is exactly at the shared node.
-                if(p.edge.to.equals(position.edge.from)&&position.offset<=.25&&Math.abs(p.to-p.edge.distanceMeters)<.01) {
+                if(p.edge.to.equals(position.edge.from)&&position.offset<=endpointToleranceMeters&&Math.abs(p.to-p.edge.distanceMeters)<.01) {
                     double value=before+p.length(),difference=Math.abs(value-expected);
                     if(difference<error){error=difference;best=value;}
                 }
@@ -75,7 +82,7 @@ final class Topology {
     }
     final long revision;final double scale;
     final Map<String,Node> nodes=new LinkedHashMap<>();final Map<String,Edge> edges=new LinkedHashMap<>();
-    final Map<String,List<Edge>> outgoing=new HashMap<>();final List<Issue> unresolved;
+    final Map<String,List<Edge>> outgoing=new HashMap<>(),incoming=new HashMap<>();final List<Issue> unresolved;
     Topology(String json) {
         var image=new Gson().fromJson(json,Image.class);
         if(image==null||image.nodes==null||image.edges==null||!Double.isFinite(image.blocksPerMeter)||image.blocksPerMeter<=0)throw new IllegalArgumentException("图不可用");
@@ -85,16 +92,19 @@ final class Topology {
             :image.unresolved==null?List.of():List.copyOf(image.unresolved);
         for(var n:image.nodes)nodes.put(n.id,n);
         for(var e:image.edges)if(e.path!=null&&e.path.size()>=2&&Double.isFinite(e.distanceMeters)&&e.distanceMeters>0) {
-            edges.put(e.id,e);outgoing.computeIfAbsent(e.from,k->new ArrayList<>()).add(e);
+            edges.put(e.id,e);outgoing.computeIfAbsent(e.from,k->new ArrayList<>()).add(e);incoming.computeIfAbsent(e.to,k->new ArrayList<>()).add(e);
         }
     }
     Location locate(Pos p,double dx,double dy,double dz) {
+        return locate(p,dx,dy,dz,1.5);
+    }
+    Location locate(Pos p,double dx,double dy,double dz,double maximumErrorBlocks) {
         Location best=null;
         for(var edge:edges.values()) {var candidate=project(edge,p,dx,dy,dz);
             if(candidate.alignment<-.1)continue;
             if(best==null||candidate.error<best.error-1e-5||Math.abs(candidate.error-best.error)<1e-5&&candidate.alignment>best.alignment)best=candidate;
         }
-        if(best==null||best.error>1.5)throw new IllegalArgumentException("轨道位置无法唯一定位");return best;
+        if(best==null||best.error>maximumErrorBlocks)throw new IllegalArgumentException("轨道位置无法唯一定位");return best;
     }
     Pos railAbove(String world,int x,int y,int z,int supportX,int supportZ) {
         var p=edges.values().stream().flatMap(e->e.path().stream()).filter(q->q.world().equals(world)&&q.y()>=y&&q.y()<y+32
@@ -113,7 +123,7 @@ final class Topology {
         }
         return new Location(edge,offset,Math.sqrt(error),alignment);
     }
-    private boolean transition(Edge a,Edge b) {
+    boolean transition(Edge a,Edge b) {
         if(!a.to.equals(b.from)||a.targetPort.equals(b.sourcePort))return false;
         var node=nodes.get(a.to);if(node==null)return false;
         if(unresolved.stream().anyMatch(i->i.source.equals(node.id)&&(i.sourcePort==null||i.sourcePort.equals("none")||i.sourcePort.equals(a.targetPort)||i.sourcePort.equals(b.sourcePort))))return false;
@@ -122,40 +132,45 @@ final class Topology {
     Plan plan(Location start,List<Target> targets) {
         List<Part> result=new ArrayList<>();var cursor=start;
         for(var target:targets) {
-            List<List<Part>> paths=new ArrayList<>();int[] budget={0};
-            search(cursor.edge,cursor.offset,target,new HashSet<>(),new ArrayList<>(),paths,budget);
-            if(paths.isEmpty())throw new IllegalArgumentException("路径不通或方向不符");
-            if(paths.size()>1)throw new IllegalArgumentException("存在多条路径，请追加道岔/应答器绑定");
-            for(var part:paths.getFirst()) {
+            var leg=shortest(cursor,target,p->true,true);
+            for(var part:leg.parts()) {
                 if(!result.isEmpty()&&result.getLast().edge.id.equals(part.edge.id)&&Math.abs(result.getLast().to-part.from)<.01) {
                     var old=result.removeLast();result.add(new Part(old.edge,old.from,part.to));
                 } else result.add(part);
             }
-            if(!paths.getFirst().isEmpty()) {var last=paths.getFirst().getLast();cursor=new Location(last.edge,last.to,0,1);}
+            cursor=leg.end();
         }
         if(result.isEmpty())throw new IllegalArgumentException("零长度路径");
         return new Plan(result,result.stream().mapToDouble(Part::length).sum(),scale,revision);
     }
-    /** Depot routing chooses the shortest legal directed path; operational waypoint validation stays strict. */
-    Plan shortest(Location start,Target target) {
+    /** All consumers choose the shortest legal directed path; explicit waypoints still constrain it. */
+    Plan shortest(Location start,Target target) {return shortest(start,target,p->true);}
+    Plan shortest(Location start,Target target,java.util.function.Predicate<Part> available) {
+        return shortest(start,target,available,false);
+    }
+    private Plan shortest(Location start,Target target,java.util.function.Predicate<Part> available,boolean positive) {
         record Walk(Edge edge,double from,double cost,List<Part> prefix) {}
-        var queue=new PriorityQueue<Walk>(Comparator.comparingDouble(Walk::cost));
+        var queue=new PriorityQueue<Walk>(Comparator.comparingDouble(Walk::cost).thenComparing(w->w.edge().id()).thenComparingDouble(Walk::from)
+            .thenComparing(w->w.prefix().stream().map(p->p.edge().id()).collect(java.util.stream.Collectors.joining("\n"))));
         queue.add(new Walk(start.edge(),start.offset(),0,List.of()));
         var best=new HashMap<String,Double>();Plan answer=null;int budget=0;
         while(!queue.isEmpty()) {
-            if(++budget>4096)throw new IllegalArgumentException("回库寻路超限");
+            if(++budget>4096)throw new IllegalArgumentException("路径搜索超限，请增加中间绑定");
             var walk=queue.remove();if(answer!=null&&walk.cost()>answer.length()+1e-6)break;
             String key=walk.edge().id()+":"+walk.from();
-            if(walk.cost()>=best.getOrDefault(key,Double.POSITIVE_INFINITY))continue;best.put(key,walk.cost());
             double end=-1;
             if(target.node()!=null&&walk.edge().to().equals(target.node()))end=walk.edge().distanceMeters();
             if(target.edge()!=null&&walk.edge().id().equals(target.edge()))end=walk.edge().distanceMeters()/2;
             if(target.position()!=null) {var p=project(walk.edge(),target.position(),0,0,0);if(p.error()<.8&&p.offset()>=walk.from()-.001)end=p.offset();}
-            if(end>=walk.from()) {
+            // A repeated stop must travel a real loop, not succeed on a zero-length
+            // projection. Evaluate a returning start state before pruning its cost.
+            if(end>=walk.from()&&(!positive||walk.cost()+end-walk.from()>.001)&&available.test(new Part(walk.edge(),walk.from(),end))) {
                 var parts=new ArrayList<>(walk.prefix());parts.add(new Part(walk.edge(),walk.from(),end));
                 var candidate=new Plan(parts,walk.cost()+end-walk.from(),scale,revision);
                 if(answer==null||candidate.length()<answer.length())answer=candidate;
             }
+            if(walk.cost()>=best.getOrDefault(key,Double.POSITIVE_INFINITY))continue;best.put(key,walk.cost());
+            if(!available.test(new Part(walk.edge(),walk.from(),walk.edge().distanceMeters())))continue;
             double cost=walk.cost()+walk.edge().distanceMeters()-walk.from();
             if(answer!=null&&cost>=answer.length())continue;
             var prefix=new ArrayList<>(walk.prefix());prefix.add(new Part(walk.edge(),walk.from(),walk.edge().distanceMeters()));
@@ -163,7 +178,7 @@ final class Topology {
             for(var next:outgoing.getOrDefault(walk.edge().to(),List.of()))if(transition(walk.edge(),next))
                 queue.add(new Walk(next,0,cost,List.copyOf(prefix)));
         }
-        if(answer==null)throw new IllegalArgumentException("没有可用回库路径");return answer;
+        if(answer==null)throw new IllegalArgumentException("路径不通或方向不符");return answer;
     }
     List<String> authorityEdges(Plan plan,double travelled,double tailBlocks) {
         var result=new ArrayList<>(plan.edges(travelled));var end=plan.end();var current=end.edge;
@@ -176,19 +191,5 @@ final class Topology {
             result.add(current.id);available+=current.distanceMeters*scale;
         }
         return List.copyOf(result);
-    }
-    private void search(Edge edge,double from,Target target,Set<String> seen,List<Part> prefix,List<List<Part>> answers,int[] budget) {
-        if(answers.size()>1||budget[0]++>4096||prefix.size()>=256)return;
-        double end=-1;
-        if(target.node!=null&&edge.to.equals(target.node))end=edge.distanceMeters;
-        if(target.edge!=null&&edge.id.equals(target.edge))end=edge.distanceMeters/2;
-        if(target.position!=null) {var p=project(edge,target.position,0,0,0);if(p.error<.8&&p.offset>=from-.001)end=p.offset;}
-        if(end>=from && (end-from>.001||!prefix.isEmpty())) {
-            var path=new ArrayList<>(prefix);path.add(new Part(edge,from,end));answers.add(List.copyOf(path));return;
-        }
-        if(!seen.add(edge.id))return;
-        var path=new ArrayList<>(prefix);path.add(new Part(edge,from,edge.distanceMeters));
-        for(var next:outgoing.getOrDefault(edge.to,List.of()))if(transition(edge,next))search(next,0,target,new HashSet<>(seen),path,answers,budget);
-        if(budget[0]>4096&&answers.size()<2)throw new IllegalArgumentException("路径搜索超限，请增加中间绑定");
     }
 }

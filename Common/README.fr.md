@@ -1,5 +1,44 @@
 # SkyRail Suite — Manuel détaillé français
 
+**[AJOUT / CORRECTION · SAL 0.8.0 / STF 5.1.4 · 2026-11-26]** Les invitations de transfert sont réessayées et les codes expirés renouvelés. Sortie/prise en charge et retour partagent un itinéraire segmenté avec rebroussements, libération MA par STCS et inversion via STA. Le chargement des chunks conserve le cran manuel sans autoriser la traction. [Details](doc/SAL-MANEUVERS-AND-HANDOVER.en.md)
+
+**[CORRECTION · SAL 0.7.7 / STCS 4.3.6 · 2026-11-26]** Les retours simultanés conservent itinéraire et place ; STCS gère le trafic temporaire par la MA. L’alignement automatique ne retire plus la MA d’un autre train. Dégagement de la place, obstacles stationnés et contrôles de défaut conservés. [Concurrent returns](doc/SAL-RETURN-TRAFFIC.en.md)
+
+**[MODIFIÉ · STF 5.1.3 · 2026-11-26]** La conduite automatique remplace P2/B4 fixes par un départ P4, une traction réduite à proximité de la vitesse cible, le freinage B6 et le maintien B7. Crans configurables ; contraintes MA, ATP, TIMS et véhicule conservées. [Automatic cab handles](doc/AUTOMATIC-DRIVING-HANDLES.en.md)
+
+**[CORRECTION · SAL0.7.6 · 2026-11-26]** Les attentes de retour renouvellent l’itinéraire déjà accepté pour éviter l’expiration1500ms. Vérification2s par défaut sans perdre la cible ; une géométrie corporelle inconnue n’est plus dite changement topologique. Incertitude persistante : FAULT ; vrai changement/espace insuffisant : nouvelle place après arrêt. Motifs détaillés et historique séparé. [Return rechecks](doc/SAL-RETURN-RECHECK.en.md)
+
+**[AJOUT / CORRECTION · 2026-11-26 · SAL0.7.6 / PCC2.6.4]** Coordonnées et direction proviennent du même relevé STF. Incertitude : freinage immédiat et vérification2s ; tolérances bornées configurables de0,75bloc aux limites et1,5bloc pour la projection. Deux relevés indépendants d’une autre branche déclenchent la reprise plus tôt. Aucune nouvelle MA. La cause initiale persiste dans /sal status et les événements PCC. [Localisation policy](doc/SAL-LOCALISATION-TOLERANCE.en.md)
+
+**[AJOUT / CORRECTION · 2026-11-26]** STA2.9.2 / STF5.1.2 / SAL0.7.6 : /sal override <nom ou UUID> est réservé aux administrateurs : freinage, confirmation du retrait MA, sortie SAL puis /st drive. Occupation, TIMS et TR/PT restent conservés. En pente, la localisation utilise railXYZ observé par STF via STA, sans arrondir les coordonnées de l’entité. [Override/slope contract](doc/SAL-OVERRIDE-AND-SLOPES.en.md)
+
+**[AJOUT · SAL0.7.6 · 2026-11-26]** Les appels expliquent l’éligibilité de chaque train, les deux sens, le plafond de temps, les autres trains aux observations périmées/corps inconnus/hors graphe, les voies obstruées et les résultats périmés. Les protections restent inchangées ; le seul maintien TIMS d’un autre train ne bloque pas tout le réseau. Diagnostic borné, affiché par PCC existant.
+
+**[MODIFICATION · SAL0.7.6 / PCC2.6.4 · 2026-11-26]** Les visites utilisent le plus court chemin ferroviaire orienté autorisé ; un long détour ne provoque plus de rejet pour ambiguïté. Les équipements/arêtes imposés restent contraignants. Sens, défauts du graphe, fermeture et MA restent vérifiés. PCC suit les rails réels, même pour le préfixe confirmé d’un brouillon inachevé ; seuls les liens non confirmés sont estimés. [Path policy](doc/SAL-ROUTE-PATHS.en.md)
+
+**[AJOUT / MODIFICATION · 2026-11-26]** PCC2.6.4 / SAL0.7.6 / STA2.9.2 : la validation désigne le premier segment en défaut par indices, noms et ID. Les deux visites sont marquées ; cliquer le diagnostic pour y accéder. Corriger puis vérifier à nouveau. Réordonner par la poignée ≡ à droite, souris ou tactile ; un seul envoi au relâchement, aucun en cas d’annulation. Les flèches clavier fonctionnent sur la poignée. UUID, arrêt et rebroussement restent liés à la visite. Enregistrer→Valider→Publier reste nécessaire.
+
+**[CORRECTION · PCC2.6.4 · 2026-11-26]** Le rafraîchissement conserve les cibles SAL et la liste inchangées. Sur écran étroit, l’éditeur reste visible sans train sélectionné. Les clics SAL ne déclenchent plus le déplacement de carte ; l’aperçu ne masque plus les arrêts. Une panne temporaire conserve le travail et la saisie ; les données périmées désactivent l’écriture. Les vrais conflits exigent toujours une résolution manuelle. Après remplacement de PCC : Ctrl+F5.
+
+## **[RUPTURE DE COMPATIBILITÉ · 2026-11-26] Arrêts publics et affectation partagée**
+
+STA2.9.2 / STF5.1.4 / STCS4.3.6 / SAL0.8.0 / PCC2.6.4.
+
+La ligne4 de station devient un nom d’arrêt unique ; poser le panneau ne complète plus un itinéraire. awake utilise la ligne3 pour l’itinéraire et la ligne4 pour l’arrêt de départ. Les anciens awake restent désactivés jusqu’à réécriture. Les anciens station reçoivent des noms uniques : vérifier /sal station list. Les panneaux depot et les rattachements existants restent conservés.
+
+Les nouvelles lignes utilisent GLOBAL avec groupes préférés facultatifs. RESTRICTED exige au moins un groupe autorisé ; les anciennes lignes gardent cette restriction. PCC propose les arrêts partagés, le mode, la pénalité, le plafond d’approche et la file des décisions.
+
+Les anciennes consignes sur l’appartenance des station, le dépôt obligatoire et la syntaxe depot/ligne de awake sont remplacées par cette section. [§8](#section-8). [Contrat partagé (anglais)](doc/SAL-SHARED-DISPATCH.en.md) · [Procédure de recette en chinois](../SkyATO-Lite/TEST.zh.md)
+
+
+**[CORRECTION · 2026-11-25]** STF5.1.2 / SAL0.7.6 : la demande FS/MA attend le choix avant/arrière. Un train arrêté recouvrant le marqueur depot reçoit un code aléatoire à six chiffres après3s ; `/sal handover` le demande immédiatement, `/sal handover <code>` confirme, puis `/st release` transfère. Le retour automatique reste centré.
+
+
+**[RUPTURE · 2026-11-25]** Le garage aligne désormais le milieu du train. Le centre prévu est ajusté uniquement dans les limites de sa place ; un train trop long doit utiliser une autre place. Les marqueurs voisins partagent la distance suivant la voie avec un intervalle libre. Voie à un accès : places profondes prioritaires ; deux accès : évaluation des deux approches autorisées. Les trains qui obstruent le parcours sont pris en compte. PCC affiche capacité, accès, limites et décalage. Repositionner manuellement les anciens trains arrêtés par leur tête ; station ne change pas.
+
+STA2.9.2 / STF5.1.4 / STCS4.3.6 / SAL0.8.0 / PCC2.6.4. [中文契约](doc/SAL-CENTRE-STABLING.md) · [English contract](doc/SAL-CENTRE-STABLING.en.md)
+
+
 ## **[2026-11-24] Ajout / correction : affichage PCC 2.4.1**
 
 ~~Contour de focus natif du navigateur autour des voies et équipements.~~ La sélection suit désormais la polyligne réelle ou un petit cercle autour de l’équipement, avec une épaisseur fixe à l’écran. Le zoom ne grossit plus le contour ; la sélection à la souris et le focus clavier restent visibles.
@@ -41,11 +80,11 @@ Distribution du 2026-11-24, consolidée à partir du Manuel détaillé précéde
 
 | Fichier / composant | Version | Responsabilité |
 | --- | --- | --- |
-| SkyworldTrainAPI / STA | **2.7.0** | Contrats typés, télémétrie et services de conduite/régulation |
-| SkyTrainFolia / STF | **5.0.2** | Compositions, physique, tickets de chunks, conduite, TIMS, ATP et actionneurs |
-| STCS | **4.3.5** | Infrastructure, graphe, localisation, occupation, réservations, MA et arbitrage des itinéraires |
-| SkyATO-Lite / SAL | **0.5.0** | Plans d’exploitation, appel, arrêts, titres passagers, dépôt et transfert ; aucun accès direct aux entités |
-| SkyPCC / PCC | **2.4.1** | Cartes Web infrastructure/exploitation, listes de dépôt et opérations contrôlées |
+| SkyworldTrainAPI / STA | **2.9.2** | Contrats typés, télémétrie et services de conduite/régulation |
+| SkyTrainFolia / STF | **5.1.4** | Compositions, physique, tickets de chunks, conduite, TIMS, ATP et actionneurs |
+| STCS | **4.3.6** | Infrastructure, graphe, localisation, occupation, réservations, MA et arbitrage des itinéraires |
+| SkyATO-Lite / SAL | **0.8.0** | Plans d’exploitation, appel, arrêts, titres passagers, dépôt et transfert ; aucun accès direct aux entités |
+| SkyPCC / PCC | **2.6.4** | Cartes Web infrastructure/exploitation, listes de dépôt et opérations contrôlées |
 
 ## Sommaire
 
@@ -73,15 +112,17 @@ Distribution du 2026-11-24, consolidée à partir du Manuel détaillé précéde
 
 | Fichier / composant | Version | Responsabilité |
 | --- | --- | --- |
-| SkyworldTrainAPI / STA | **2.7.0** | Contrats typés, télémétrie et services de conduite/régulation |
-| SkyTrainFolia / STF | **5.0.2** | Compositions, physique, tickets de chunks, conduite, TIMS, ATP et actionneurs |
-| STCS | **4.3.5** | Infrastructure, graphe, localisation, occupation, réservations, MA et arbitrage des itinéraires |
-| SkyATO-Lite / SAL | **0.5.0** | Plans d’exploitation, appel, arrêts, titres passagers, dépôt et transfert ; aucun accès direct aux entités |
-| SkyPCC / PCC | **2.4.1** | Cartes Web infrastructure/exploitation, listes de dépôt et opérations contrôlées |
+| SkyworldTrainAPI / STA | **2.9.2** | Contrats typés, télémétrie et services de conduite/régulation |
+| SkyTrainFolia / STF | **5.1.4** | Compositions, physique, tickets de chunks, conduite, TIMS, ATP et actionneurs |
+| STCS | **4.3.6** | Infrastructure, graphe, localisation, occupation, réservations, MA et arbitrage des itinéraires |
+| SkyATO-Lite / SAL | **0.8.0** | Plans d’exploitation, appel, arrêts, titres passagers, dépôt et transfert ; aucun accès direct aux entités |
+| SkyPCC / PCC | **2.6.4** | Cartes Web infrastructure/exploitation, listes de dépôt et opérations contrôlées |
 
 **[AJOUT · 2026-11-21]** Livrables : parcours SAL, sorties/rentrées au dépôt, transfert manuel/automatique, RailGraph incrémental, affichage MA/ATP exécutoire et carte d’exploitation PCC. Commandes : préfixe SAL bleu `[SkyATO-Lite]`, STF gris, STCS jaune. Seuls les anciens préfixes par défaut sont migrés. La page version inclut SAL et corrige l’ancienne annonce ATP inactif.
 
-**[MODIFICATION · 2026-11-21]** Les préférences `<ligne>:up|down`, la réservation complète des sections à voie unique, la recherche générale avec plusieurs rebroussements intermédiaires et le démon Python restent des projets. La recherche actuelle au dépôt peut comparer les deux sens à l’arrêt ; elle ne garantit pas toute manœuvre complexe.
+~~**[MODIFICATION · 2026-11-21]** Les préférences `<ligne>:up|down`, la réservation complète des sections à voie unique, la recherche générale avec plusieurs rebroussements intermédiaires et le démon Python restent des projets. La recherche actuelle au dépôt peut comparer les deux sens à l’arrêt ; elle ne garantit pas toute manœuvre complexe.~~
+
+**[MISE À JOUR · SAL 0.8.0]** Les parcours de prise en charge/retour avec jusqu’à4 inversions sont implémentés. Préférences up/down, réservation complète de voie unique, manœuvres générales sans borne et démon Python restent des projets. [Details](doc/SAL-MANEUVERS-AND-HANDOVER.en.md)
 
 [TRAFFIC-PLANNING-DAEMON-DESIGN](doc/TRAFFIC-PLANNING-DAEMON-DESIGN.md)
 
@@ -98,11 +139,11 @@ Distribution du 2026-11-24, consolidée à partir du Manuel détaillé précéde
 5. Ne pas vider de registre pour mettre à jour. SHA256 identifie les fichiers. L’archive Source et les documents/images liés sont inclus ; revenir à une sauvegarde cohérente complète.
 
 ```text
-SkyworldTrainAPI-2.7.0.jar
-SkyTrainFolia-5.0.2.jar
-STCS-4.3.5.jar
-SkyATO-Lite-0.5.0.jar
-SkyPCC-2.4.1.jar
+SkyworldTrainAPI-2.9.2.jar
+SkyTrainFolia-5.1.4.jar
+STCS-4.3.6.jar
+SkyATO-Lite-0.8.0.jar
+SkyPCC-2.6.4.jar
 ```
 
 [SHA256](../Latest/SHA256.json) · [LICENSE](LICENSE) · [ASSET-LICENSE](ASSET-LICENSE.md)
@@ -450,151 +491,63 @@ Cette distance d’analyse n’est pas la distance d’anticipation MA. Les long
 
 <a id="section-8"></a>
 
-## 8. SAL : lignes, panneaux et transfert de conduite
+## 8. SAL — Arrêts publics et affectation partagée
 
-**[AJOUT · 2026-11-21]** Un appel exécute un service, sans boucle infinie ni horaire. Première et dernière visites : station ; visites répétées possibles. Lier les balises/aiguilles nécessaires pour lever les ambiguïtés. SAL ne crée pas de train : préparer une composition STF et un dépôt.
+**[RUPTURE DE COMPATIBILITÉ · 2026-11-26]** La ligne4 de station devient un nom d’arrêt unique ; poser le panneau ne complète plus un itinéraire. awake utilise la ligne3 pour l’itinéraire et la ligne4 pour l’arrêt de départ. Les anciens awake restent désactivés jusqu’à réécriture. Les anciens station reçoivent des noms uniques : vérifier /sal station list. Les panneaux depot et les rattachements existants restent conservés.
 
-### Commandes et sélection
+Les nouvelles lignes utilisent GLOBAL avec groupes préférés facultatifs. RESTRICTED exige au moins un groupe autorisé ; les anciennes lignes gardent cette restriction. PCC propose les arrêts partagés, le mode, la pénalité, le plafond d’approche et la file des décisions.
 
-1. Créer Line1 face au sens de départ, ou fixer le point cardinal.
-2. Poser la première station puis bind près des équipements du graphe, dans l’ordre. Plusieurs candidats dans8blocs : choose sous60secondes ; UUID ou station ID explicite possible.
-3. Les nouvelles stations sont ajoutées dans l’ordre de pose. Vérifier list ; remove retire une visite par indice à partir de1. Relier à nouveau la première station pour y terminer.
-4. Le suffixe reverse sur une visite station demande le rebroussement après cet arrêt, pas n’importe où.
-5. preview dure deux minutes, vert si boucle valide, rouge sinon ; vert ne vaut ni voie libre ni MA. validate mémorise la validation, publish autorise les appels.
-~~6. Impossible de modifier une ligne avec tâche. Les dépendances affectées sont revérifiées ; un changement sans rapport ne dépublie pas.~~
+Enregistrer les station/depot publics, ouvrir l’éditeur PCC avec le Token existant, choisir équipements, sens et visites, puis Enregistrer→Valider→Publier. Préférences facultatives en GLOBAL, groupes obligatoires en RESTRICTED. Le conflit jeu/PCC gèle toujours les deux côtés jusqu’à résolution manuelle.
 
-**[AJOUT / MODIFICATION]** Enregistrer depot avant la ligne. Choisir balises, aiguilles, arêtes orientées et stations de cette ligne ; ordonner les visites, arrêts et rebroussements sans modifier les panneaux. Enregistrer, vérifier et publier séparément ; les tâches existantes gardent leur version.
-7. Poser les panneaux dépôt/vitesse/message, créer et rattacher le train, puis appeler par bouton ou awake.
+| Sign | 1 | 2 | 3 | 4 |
+| --- | --- | --- | --- | --- |
+| Depot | [SAL] | depot | maintown | L5-1 |
+| Public stop | [SAL] | station | 15 | MainStart |
+| Call | [SAL] | awake | MainTour | MainStart |
+| Title | [SAL] | message | Welcome | 5 |
+| Cruise | [SAL] | property | v_target | 40kmh |
+
+`[SkyATOL]` = `[SAL]`.
+
+Ancienne syntaxe supprimée: ~~station: 15 / Line1 (route ownership)~~; ~~awake: maintown / Line1~~; ~~/sal awake maintown Line1~~.
+
+Un appel à B transforme A→B→C→A en B→C→A→B, puis retour au dépôt. Pour un arrêt répété, copier nom@visitUUID depuis PCC ; la dernière répétition du premier arrêt n’est qu’un alias de fermeture. Les tâches en cours conservent leur publication.
 
 ```text
-/sal route create Line1
-/sal route direction Line1 east
-/sal route bind Line1
+/sal station list
+/sal route create MainTour
+/sal route direction MainTour east
+/sal route bind MainTour <deviceUUID>
 /sal route choose 1
-/sal route bind Line1 <deviceUUID>
-/sal route bind Line1 <stationID> reverse
-/sal route list Line1
-/sal route remove Line1 <index>
-/sal route preview Line1
-/sal route preview Line1 off
-/sal route validate Line1
-/sal route publish Line1
-```
-
-### Panneaux, ligne par ligne
-
-`[SAL]` = `[SkyATOL]`
-
-#### depot
-
-```text
-[SAL]
-depot
-maintown
-L1
-```
-
-depot : ligne3 dépôt maintown, ligne4 place L1. L2/L3 exigent des panneaux indépendants, éventuellement éloignés. Ce n’est pas la station de départ. Sauf awake, rattacher les panneaux à une colonne de voie enregistrée dans RailGraph.
-
-#### station
-
-```text
-[SAL]
-station
-15
-Line1
-```
-
-station : ligne3 secondes d’arrêt, ligne4 ligne SAL. Créer la ligne avant le panneau. Aucun champ de nom supplémentaire ; PCC utilise ligne et ordre.
-
-#### awake
-
-```text
-[SAL]
-awake
-maintown
-Line1
-```
-
-awake : ligne3 dépôt, ligne4 ligne. Front montant redstone sur panneau/support ; voie inutile dessous. Alimentation permanente/démarrage sans appel, demandes répétées fusionnées.
-
-#### property / v_target
-
-```text
-[SAL]
-property
-V_target
-36km/h
-```
-
-property ne prend que V_target, vitesse ligne4. Abrégé v_target : vitesse ligne3, ligne4 vide. Unités km/h, kmh, m/s, m/t, b/t, mph ; sans unité blocs/tick. Limites véhicule/train/ATP conservées.
-
-```text
-[SkyATOL]
-v_target
-36km/h
-
-```
-
-#### message
-
-```text
-[SAL]
-message
-Skyworld
-5
-```
-
-message : texte littéral ligne3, secondes ligne4. Title central aux passagers du train ; un nouveau message remplace immédiatement le précédent, sans file ni exécution de commande.
-
-### Trains et exécution
-
-**[MODIFICATION]** Cirno — SAL
-
-Administrateur assis dans une composition arrêtée : affecter home au dépôt, pas à L1. Un nouveau train sans conducteur peut être poussé sur la place pour capture de stationnement STF à faible vitesse. Appel uniquement avec observations complètes/récentes, sans maintien TIMS, conducteur humain ni autre tâche.
-
-```text
-/st create demo 6
+/sal route list MainTour
+/sal route remove MainTour 3
+/sal route supply MainTour global 30 120
+/sal route depot MainTour maintown
+/sal route depot MainTour none
+/sal route preview MainTour
+/sal route validate MainTour
+/sal route publish MainTour
+/sal route close MainTour
+/sal route resolve MainTour DISCARD
+/sal route retire MainTour
+/sal route delete MainTour
 /sal train home maintown
-/sal train home
-/sal awake maintown Line1
+/sal awake MainTour MainStart
 /sal status
-```
-
-Appel→sortie→embarquement première station→parcours/arrêts→dernière station→réservation d’une place→rentrée et arrêt. Même sans passager, un service complet. Un passager peut rentrer au dépôt ; refaire un tour demande un nouvel appel. Priorité au train admissible de la même ligne encore à la première station : annuler la rentrée, rétablir le sens si nécessaire, recommencer tout l’arrêt. Pas de réemploi après départ ou en panne.
-
-Recherche sur RailGraph indépendamment de l’orientation physique actuelle des aiguilles ; STCS trace et confirme via STA/STF. Pour changer de sens : libérer l’ancienne MA, confirmer arrêt et inversion, recalculer depuis la vraie voiture de tête. Sans place, espace ou chemin adéquat : maintien.
-
-### Transfert manuel/automatique
-
-Automatique→manuel : `/sal release` seulement pour un train complet, arrêté, PARKED au dépôt, sans tâche ni défaut ; attendre puis `/st drive` dans une voiture d’extrémité. Pas pendant la rentrée.
-
-Manuel→automatique : bail conducteur actif, arrêt continu3secondes sur place valide, confirmer SAL, puis `/st release` explicite sous30secondes ou second bouton. Le dépôt réel devient home ; attente, sans départ.
-
-Libération seule, descente, déconnexion, mouvement, changement de conducteur/place ou expiration ne transfèrent rien. État manuel persistant. Conducteur : skyatolite.driver et skytrain.use ; administration : skyatolite.admin.
-
-```text
-/sal release
-/st drive
-```
-
-### Trains vides et défauts
-
-```text
 /sal stop <trainUUID>
 /sal resume <trainUUID>
 /sal finish <trainUUID>
 ```
 
-stop maintient ; resume après vérification rétablit d’abord le retour ; finish exige localisation fiable et arrêt complet avant libération MA et fin de tâche. Paramètre : UUID du train.
+Après500ms par défaut, réutiliser une prise en charge de même version/départ, sinon affecter les trains SAL disponibles par appariement maximal de coût minimal. Chemin praticable, obstacles, observation complète récente, conducteur et tâches sont des contraintes impératives. Coût : secondes d’approche estimées + pénalité hors préférence (30s) + pénalité de stock facultative ; plafond120s. L’attente influence la priorité ; expiration après120s avec motif.
 
-Tickets STF indépendants des passagers ; préchargement asynchrone et accès sur région propriétaire. Chunks non prêts : traction interdite. pause-when-empty-seconds=-1 désactive séparément la pause du serveur vide.
+Un thread JVM dédié ne calcule que des instantanés immuables. Avant engagement, SAL revérifie graphe, publication, validité, position/sens/composition, groupe et bail de conduite. STCS reste seul arbitre MA/itinéraires ; STA transmet et STF agit sur les entités. Aucun démon Python externe.
 
-Auto-récupération TIMS après intégrité réellement restaurée, au plus3essais ; pas de changement de membres, réapparition ni effacement d’occupation. Défauts réels à inspecter.
+Les trains SAL déjà en attente ne demandent pas de nouveau consentement. Un train manuel arrêté sur depot obtient un code à six chiffres après3s, ou immédiatement avec /sal handover. Confirmer /sal handover <code>, puis saisir /st release. Une simple libération ne vaut pas consentement. /sal release puis /st drive rend la conduite manuelle après retour.
 
-Écart de parcours : alarme PCC, arrêt puis intégrité/localisation fiables avant SR en attente. Chaque segment exige une approbation distincte ; jamais d’autorisation illimitée.
+Un redémarrage annule les demandes non engagées et maintient les tâches en RECOVERY_REQUIRED. Ni défaut de stockage/localisation ni absence de MA ne sont contournés. GLOBAL peut rentrer dans tout groupe adapté ; RESTRICTED reste dans les groupes autorisés. Centrage et contrôle du gabarit complet sont conservés. Estimation sans modèle complet de congestion/accélération ; pas de redistribution préventive ni de rebroussements multiples arbitraires.
 
-[SAL-MANUAL-HANDOVER](doc/SAL-MANUAL-HANDOVER.md) · [SAL-DEPOT-AND-RETIREMENT](doc/SAL-DEPOT-AND-RETIREMENT.md)
+[Contrat partagé (anglais)](doc/SAL-SHARED-DISPATCH.en.md) · [Procédure de recette en chinois](../SkyATO-Lite/TEST.zh.md)
 
 <a id="section-9"></a>
 
@@ -902,3 +855,7 @@ Licence MIT du code/des documents et autorisations distinctes des images incluse
 ~~Destroy supprime réellement les entités. Testez sur une voie séparée et sauvegardée ; un train sous conduite manuelle ne devrait pas être détruit. Validez d’abord le traitement en gare, puis spawn/destroy séparément.~~
 
 [Ancien manuel complet — référence historique uniquement](doc/manual-baseline-20261120/README.fr.md)
+
+## Complément d’utilisation · SAL 0.8.0 / STF 5.1.4
+
+Arrêtez toute partie du train sur depot pendant3secondes, ou demandez un code par /sal handover. Confirmez sous30secondes avec /sal handover CODE, puis explicitement /st release. Une libération seule ne vaut pas consentement. Les notifications non reçues sont réessayées et les codes expirés renouvelés. Prise en charge/retour : jusqu’à4 inversions avec dégagement de toute la rame ; voies courtes/occupées et protections restent bloquantes. Après redémarrage, confirmation administrateur requise. Le chargement des chunks conserve le cran sans traction effective ; une nouvelle commande neutre/frein reste prioritaire.

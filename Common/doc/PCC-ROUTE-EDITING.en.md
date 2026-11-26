@@ -1,5 +1,23 @@
 # Unified PCC map and SAL route editor
 
+**[ADDED · SAL0.7.3 · 2026-11-26]** Pending/expired calls explain each vehicle’s eligibility, forward/reverse path attempts, pickup estimate cap, other trains with stale/unknown/off-graph bodies, obstructed edges and stale computation/graph results. Existing safety gates remain; another train’s TIMS hold alone does not globally block routing. Reports are bounded, not exhaustive network analysis. Existing PCC displays the reason field without an API change.
+
+**[CHANGED · SAL0.7.3 / PCC2.6.3 · 2026-11-26]** Ordered visits select the shortest legal directed track path; longer alternatives no longer cause ambiguity rejection. Explicit devices/edges constrain the choice. Direction, graph faults, closure and MA checks remain. PCC follows actual rail geometry, including confirmed prefixes of unfinished drafts; only unconfirmed connections are estimated. [Path policy](SAL-ROUTE-PATHS.en.md)
+
+**[ADDED / CHANGED · 2026-11-26]** PCC2.6.3 / SAL0.7.3 / STA2.9.1: validation identifies the first failing directed visit pair by index, device label and ID. Both list endpoints are marked; click the diagnostic to jump there. Fix it and validate again rather than guessing later arrival directions. Reorder with the right-hand ≡ grip using mouse/touch; release submits once, cancellation submits nothing. Focus the grip and use arrow keys for keyboard sorting. Visit UUID, dwell and reversal stay attached. Reordering is staged; Save→Validate→Publish remains explicit.
+
+**[FIX · PCC2.6.3 · 2026-11-26]** Polling preserves unchanged SAL click targets and route-list buttons. The narrow-screen editor stays visible without a selected train. SAL clicks bypass map drag capture; previews do not intercept stop selection. Temporary catalog failure preserves staged work and typed input while stale data disables writes. Actual cross-editor conflicts still require manual resolution. After replacing PCC, refresh with Ctrl+F5.
+
+**[BREAKING / ADDED · 2026-11-26]** STA2.9.1 / SAL0.7.3 / PCC2.6.3. Public station line4 is its unique name, shared across routes. Register stops before editing; placing a sign no longer appends a route. GLOBAL supply has optional preferred groups; RESTRICTED requires permitted groups. Legacy routes retain restricted policy.
+
+Choose supply mode, preference penalty (default30s), pickup estimate cap (default120s), and any preferred/permitted groups. Pick existing public stops and graph devices, then Save→Validate→Publish. An ordered visit has stable visitId; PCC shows copyable stop@visitUUID for repeated departures. Closure duplicates are aliases. Calling B rotates A-B-C-A into B-C-A-B without changing the publication. Existing jobs remain pinned; conflict freeze remains mandatory.
+
+awake now contains route on line3 and departure stop/reference on line4. The Dispatch panel shows queued/recent assignments, vehicle/group, ETA, cost and reason; assignment is not an MA. STA operating snapshot adds Dispatch; v10 Definition adds DispatchPolicy(supplyMode,preferenceSeconds,maxPickupSeconds) and Visit adds visitId. Old constructors remain; missing policy on existing grouped routes means RESTRICTED. SchemaVersion stays1 because these are additive fields, not ATO Message/Packet numbering.
+
+[Current shared-dispatch contract](SAL-SHARED-DISPATCH.en.md) · [Chinese production test](../../SkyATO-Lite/TEST.zh.md)
+
+Older depot/route-owned station instructions below are superseded where struck through.
+
 **[ADDED / CHANGED · 2026-11-24]** STA2.7.0 / SAL0.5.0 / PCC2.4.1 / STF5.0.2 / STCS4.3.5.
 The default-off routine-review logging option from STCS4.3.4 remains available.
 
@@ -16,18 +34,18 @@ Read-only viewing does not authorise editing. Browser writes are queued to an as
 ## Edit a route
 
 1. Register the physical RailGraph and SAL signs first, especially depot berths.
-2. Authenticate, select a line and **Edit selected route**, or enter a new name and select at least one existing depot before **Create draft**.
-3. Click balises, points, directed graph segments or matching SAL stations to append visits. An explicit edge constrains the chosen branch; current physical point setting does not determine the plan.
+2. Authenticate, select a line and **Edit selected route**, or enter a new name and choose optional preferred groups (GLOBAL), or at least one permitted group (RESTRICTED), before **Create draft**.
+3. Click balises, points, directed graph segments or public SAL stations to append visits. An explicit edge constrains the chosen branch; current physical point setting does not determine the plan.
 4. Reorder/remove visits and set per-visit dwell or reversal at a station. Repeated station visits are supported.
-5. **Save draft**, **Validate draft**, then **Publish version**. Incomplete/ambiguous draft connections are dashed and explicitly estimated, not proof of track connectivity.
+5. **Save draft**, **Validate draft**, then **Publish version**. Confirmed draft prefixes follow sampled rails; unconfirmed connections alone are estimated. Multiple legal connections select the shortest rather than failing as ambiguous. Draft line style still indicates it is unpublished.
 
-This phase reuses existing devices. It creates no virtual stations and rewrites no signs. A station still belongs to the line named on its fourth sign line; another line cannot silently share it.
-For a new line name, create its empty depot-bound draft, close the PCC edit, register matching station signs in game, close the game edit, then return to PCC. Existing property/message/awake signs retain their physical configuration.
+This phase reuses existing devices. It creates no virtual stations and rewrites no signs. ~~A station belongs to one route.~~ Its unique public name is shared without changing physical signs.
+Register public station signs before opening the editor. New GLOBAL drafts need no depot selection. Existing property/message/awake signs retain their physical configuration.
 
 ## Versions and running tasks
 
 - UPDATE changes a session proposal only. It is not a saved draft.
-- SAVE increments draft revision and invalidates its validation. A draft may be unclosed, but needs a depot and existing references.
+- SAVE increments draft revision and invalidates its validation. A draft may be unclosed; references must exist, and RESTRICTED alone requires groups.
 - VALIDATE checks the directed loop, station boundaries, reversal rules and topology dependencies.
 - PUBLISH checks dependencies again and replaces the current publication with a new numbered definition.
 - Each dispatched job persists its own routeSnapshot, visits, dwell values and publication version. Editing or publishing never replaces an existing job's plan.
@@ -35,7 +53,7 @@ For a new line name, create its empty depot-bound draft, close the PCC edit, reg
 The current publication and task-owned older snapshots are retained; this phase has no arbitrary historical-version rollback UI. The read-only operating Train DTO adds optional routeVersion while preserving the previous constructor.
 Unrelated graph changes preserve validation through STA v9 dependency checks. Changed/unavailable dependencies cannot be published directly. Actual track, device, localisation, TIMS or MA failures still cause the existing hold/recovery process.
 
-Every saved line must bind at least one registered depot. An awake depot/line pair must be permitted by the current publication. Retiring blocks new calls but keeps existing tasks. Deleting a line with tasks is rejected. A depot's last registered berth cannot be removed while the depot remains bound; physical devices referenced by jobs keep their existing removal guards.
+~~Every saved line must bind at least one depot; awake uses depot/line.~~ GLOBAL preferences are optional; RESTRICTED requires permitted groups. Calls select a published route and station entry. Retiring blocks new calls but keeps existing tasks. Deleting a line with tasks is rejected. A depot's last registered berth cannot be removed while the depot remains bound; physical devices referenced by jobs keep their existing removal guards.
 
 ## Conflict freeze and manual resolution
 
@@ -67,14 +85,14 @@ Non-conflicted sessions are cleared on restart; saved data remains. A refreshed 
 /sal route delete Line1
 ```
 
-create may omit the depot only if exactly one depot exists. Register depot first.
+create may omit groups; the new draft defaults to GLOBAL. /sal route supply Line1 global 30 120 sets the mode and timing policy.
 The first modifying game command begins a game session and ordinary successful changes save a draft. publish or close ends that game session. list/preview are read-only.
 The60second nearby-device chooser checks both graph and draft versions. Finish game editing before opening PCC to avoid a legitimate conflict.
 
 ## STA v10 and HTTP
 
 RouteEditingService is an operational planning contract with schemaVersion1, not MA or a newly numbered ATO Message/Packet.
-Definition carries name, dx/dz, ordered Visit(deviceId, reverse, optional dwellSeconds) and depots. Catalog carries producer session, graph revision, time, line versions, devices, depots and monotonic workspaceRevision. Requests carry requestId/action/line/actor/source/session/expectedRevision/definition/decision. Replies include state, preview and closure status plus workspaceRevision.
+Definition carries name, dx/dz, ordered Visit(deviceId, reverse, optional dwellSeconds, visitId), depots and DispatchPolicy. Catalog carries producer session, graph revision, time, line versions, devices, depots and monotonic workspaceRevision. Requests carry requestId/action/line/actor/source/session/expectedRevision/definition/decision. Replies include state, preview and closure status plus workspaceRevision.
 
 - GET /api/v10/routes: cached public catalog, without edit-session tokens.
 - POST /api/v10/routes: authenticated AUTH/CREATE/BEGIN/UPDATE/SAVE/VALIDATE/PUBLISH/HEARTBEAT/CANCEL/RESOLVE/RETIRE/DELETE.
@@ -102,3 +120,9 @@ Beside the A− / A+ text controls, **H− / H+** adjusts highlight size (50%–
 Infrastructure devices has **Balise, END, ORIGIN and Switch** children. The parent selects or clears all; children can be toggled independently, with an indeterminate parent for a partial selection. Markers, labels and switch-direction arrows are filtered together. Base track and SAL layers remain independent.
 
 These are display settings only: they do not edit RailGraph, devices, routes, MA or occupancy. Use Ctrl+F5 when updating an old browser page.
+
+## Validation diagnostic contract
+
+Upgrade STA2.9.1, SAL0.7.3 and PCC2.6.3 together for diagnostics; replacing PCC alone is insufficient. STF5.1.1/STCS4.3.5 are unchanged. Real phone/tablet dragging still needs device acceptance; the passed browser regression covers mouse/keyboard and touch-action styling.
+
+STA v10 Reply adds immutable issues (optional for older JSON), preserving old constructors and schemaVersion1. Each ValidationIssue carries one-based fromIndex/toIndex, fromDeviceId/toDeviceId, fromLabel/toLabel and detail. SAL attaches the directed pair at the failing planning/reversal/localisation operation and carries it through cached replies and previews. A final closing segment can refer back to visit1. Only the first failure is reported because later arrival directions are not known. A generic whole-definition failure may have no pair. This neither selects a branch nor grants MA.

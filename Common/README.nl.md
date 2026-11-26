@@ -1,5 +1,44 @@
 # SkyRail Suite — Uitgebreide Nederlandse handleiding
 
+**[NIEUW / HERSTEL · SAL 0.8.0 / STF 5.1.4 · 2026-11-26]** Depotmeldingen worden opnieuw bezorgd en verlopen codes vernieuwd. Ophalen en terugkeer delen gesegmenteerde routes met tussentijds keren, STCS-vrijgave en STA-omkering. Chunkladen wist de handmatige vermogensstand niet; werkelijke tractie blijft geblokkeerd. [Details](doc/SAL-MANEUVERS-AND-HANDOVER.en.md)
+
+**[HERSTEL · SAL 0.7.7 / STCS 4.3.6 · 2026-11-26]** Gelijktijdige depotritten behouden rijweg en parkeerplaats; STCS regelt tijdelijk verkeer via MA. Automatische wisselbediening trekt geen MA van een andere trein in. Controle op vrije bestemmingsruimte, gestalde treinen en echte fouten blijft. [Concurrent returns](doc/SAL-RETURN-TRAFFIC.en.md)
+
+**[GEWIJZIGD · STF 5.1.3 · 2026-11-26]** Automatisch rijden gebruikt P4 bij vertrek, afbouw nabij de doelsnelheid, B6 bedrijfsrem en B7 vasthouden in plaats van vast P2/B4. Instelbare standen; MA, ATP, TIMS en voertuiggrenzen blijven gelden. [Automatic cab handles](doc/AUTOMATIC-DRIVING-HANDLES.en.md)
+
+**[HERSTEL · SAL0.7.6 · 2026-11-26]** Wachten tijdens depotterugkeer vernieuwt de bestaande rijweglease tegen1500ms-verval. Hercontrole standaard2s met behoud van doel; onbekende wagengeometrie heet geen topologiewijziging. Blijvend onbekend geeft FAULT; echte ruimte/plaatswijziging kiest pas na stilstand opnieuw. Duidelijke redenen en aparte oproephistorie. [Return rechecks](doc/SAL-RETURN-RECHECK.en.md)
+
+**[TOEGEVOEGD / HERSTELD · 2026-11-26 · SAL0.7.6 / PCC2.6.4]** Spoorcoördinaten en richting komen uit dezelfde STF-meting. Onzekerheid remt direct met standaard2s hercontrole; begrensde instelbare eindtolerantie0,75blok en projectietolerantie1,5blok. Onafhankelijke bevestiging van een verkeerde tak start herstel eerder. Geen nieuwe of verruimde MA. De oorspronkelijke fout blijft zichtbaar in /sal status en PCC. [Localisation policy](doc/SAL-LOCALISATION-TOLERANCE.en.md)
+
+**[TOEGEVOEGD / HERSTELD · 2026-11-26]** STA2.9.2 / STF5.1.2 / SAL0.7.6: beheerders gebruiken /sal override <naam of UUID> voor remmen, bevestigde MA-intrekking en vrijgave van SAL, daarna /st drive. Bezetting, TIMS en TR/PT blijven behouden. Hellinglokalisatie gebruikt gemeten railXYZ via STA, niet afgeronde entiteitscoördinaten. [Override/slope contract](doc/SAL-OVERRIDE-AND-SLOPES.en.md)
+
+**[TOEGEVOEGD · SAL0.7.6 · 2026-11-26]** Oproepen tonen uitsluitingsredenen per trein, beide richtingen, ophaallimiet, andere treinen met oude/onbekende/niet aan de graaf gekoppelde wagenposities, blokkades en verouderde resultaten. Veiligheidsregels blijven behouden; alleen TIMS-vasthouden van een andere trein blokkeert niet alles. Begrensde diagnostiek werkt via het bestaande PCC-redenveld.
+
+**[GEWIJZIGD · SAL0.7.6 / PCC2.6.4 · 2026-11-26]** Bezoeken volgen het kortste toegestane gerichte spoorpad; langere omwegen leiden niet meer tot afwijzing. Expliciete apparaten/randen blijven beperkingen. Richting, graaffouten, lus en MA blijven gecontroleerd. PCC volgt echte spoorgeometrie, ook het bevestigde begin van een onvoltooid concept; alleen onbevestigde verbindingen zijn schattingen. [Path policy](doc/SAL-ROUTE-PATHS.en.md)
+
+**[TOEGEVOEGD / GEWIJZIGD · 2026-11-26]** PCC2.6.4 / SAL0.7.6 / STA2.9.2: validatie noemt het eerste foutieve traject met bezoeknummers, namen en ID’s. Beide bezoeken worden gemarkeerd; klik de melding om erheen te gaan. Herstel en valideer opnieuw. Sleep de ≡-greep rechts met muis of aanraking; pas bij loslaten wordt één voorstel verstuurd, bij annuleren geen. Gebruik pijltjestoetsen op de greep voor toetsenbordbediening. UUID, halteertijd en keren blijven behouden. Opslaan→Valideren→Publiceren blijft vereist.
+
+**[HERSTEL · PCC2.6.4 · 2026-11-26]** Vernieuwen behoudt ongewijzigde SAL-klikdoelen en lijnknoppen. Op smalle schermen blijft de editor zichtbaar zonder geselecteerde trein. SAL-klikken starten geen kaartversleping; voorbeelden onderscheppen geen halteklik. Tijdelijke catalogusuitval bewaart bewerkingen en invoer; verouderde gegevens blokkeren schrijven. Echte bewerkingsconflicten vereisen handmatige oplossing. Na vervanging van PCC: Ctrl+F5.
+
+## **[BREKENDE WIJZIGING · 2026-11-26] Openbare haltes en gedeelde toewijzing**
+
+STA2.9.2 / STF5.1.4 / STCS4.3.6 / SAL0.8.0 / PCC2.6.4.
+
+station-regel4 is een unieke haltenaam; plaatsing voegt niets meer toe aan een lijn. awake-regel3 is de lijn en regel4 de vertrekhalte. Oude awake-borden blijven uitgeschakeld tot herschrijven. Oude station-borden krijgen unieke namen: controleer /sal station list. Depotborden en bestaande voertuiggroepen blijven behouden.
+
+Nieuwe lijnen gebruiken GLOBAL met optionele voorkeursgroepen. RESTRICTED vereist minstens één toegestane groep; oude lijnen houden deze beperking. PCC toont openbare haltes, modus, voorkeurstijd, ophaallimiet en wachtrij/beslissingen.
+
+Oude aanwijzingen over station-eigendom, verplichte depotbinding en depot/lijn-awake zijn door deze paragraaf vervangen. [§8](#section-8). [Dispatchcontract (Engels)](doc/SAL-SHARED-DISPATCH.en.md) · [Chinese productietesthandleiding](../SkyATO-Lite/TEST.zh.md)
+
+
+**[HERSTEL · 2026-11-25]** STF5.1.2 / SAL0.7.6: FS/MA wordt pas na keuze van voor- of achteruit aangevraagd. Een stilstaande trein over een depotmarkering krijgt na3s een willekeurige zescijferige code; `/sal handover` vraagt direct een code, `/sal handover <code>` bevestigt, daarna draagt `/st release` over. Automatisch parkeren blijft gecentreerd.
+
+
+**[BREKENDE WIJZIGING · 2026-11-25]** Een depotstop lijnt nu het midden van de trein uit. Het doel verschuift alleen binnen de eigen standplaats; een te lange trein krijgt een andere plaats. Naburige markeringen delen de spoorlengte met een vrije tussenruimte. Enkelzijdige sporen vullen van achteren; bij twee toegangen worden beide toegestane benaderingen beoordeeld. Blokkerende treinen sluiten routes uit. PCC toont capaciteit, toegang, grenzen en doelverschuiving. Zet oude op de voorkant uitgelijnde treinen handmatig opnieuw neer; station blijft gelijk.
+
+STA2.9.2 / STF5.1.4 / STCS4.3.6 / SAL0.8.0 / PCC2.6.4. [中文契约](doc/SAL-CENTRE-STABLING.md) · [English contract](doc/SAL-CENTRE-STABLING.en.md)
+
+
 ## **[2026-11-24] Toegevoegd / hersteld: PCC 2.4.1 kaartweergave**
 
 ~~De standaard focusrand van de browser rond geselecteerde sporen en objecten.~~ De markering volgt nu de echte spoorlijn of een kleine ring rond het object, met een vaste lijndikte op het scherm. Inzoomen vergroot de rand niet; muisselectie en toetsenbordfocus blijven zichtbaar.
@@ -41,11 +80,11 @@ Distributie van2026-11-24, gebaseerd op de vorige uitgebreide Manuel en de defin
 
 | Bestand / component | Versie | Taak |
 | --- | --- | --- |
-| SkyworldTrainAPI / STA | **2.7.0** | Getypeerde contracten, telemetrie en bedieningsdiensten |
-| SkyTrainFolia / STF | **5.0.2** | Samenstellingen, fysica, chunktickets, handbediening, TIMS, ATP en uitvoering |
-| STCS | **4.3.5** | Infrastructuur, grafiek, lokalisatie, bezetting, reservering, MA en rijwegarbitrage |
-| SkyATO-Lite / SAL | **0.5.0** | Exploitatieplannen, oproepen, haltes, passagierstitels, depot en overdracht; geen directe entiteitsbediening |
-| SkyPCC / PCC | **2.4.1** | Webkaarten, depotlijsten en gecontroleerde verkeersleiding |
+| SkyworldTrainAPI / STA | **2.9.2** | Getypeerde contracten, telemetrie en bedieningsdiensten |
+| SkyTrainFolia / STF | **5.1.4** | Samenstellingen, fysica, chunktickets, handbediening, TIMS, ATP en uitvoering |
+| STCS | **4.3.6** | Infrastructuur, grafiek, lokalisatie, bezetting, reservering, MA en rijwegarbitrage |
+| SkyATO-Lite / SAL | **0.8.0** | Exploitatieplannen, oproepen, haltes, passagierstitels, depot en overdracht; geen directe entiteitsbediening |
+| SkyPCC / PCC | **2.6.4** | Webkaarten, depotlijsten en gecontroleerde verkeersleiding |
 
 ## Inhoud
 
@@ -73,15 +112,17 @@ Distributie van2026-11-24, gebaseerd op de vorige uitgebreide Manuel en de defin
 
 | Bestand / component | Versie | Taak |
 | --- | --- | --- |
-| SkyworldTrainAPI / STA | **2.7.0** | Getypeerde contracten, telemetrie en bedieningsdiensten |
-| SkyTrainFolia / STF | **5.0.2** | Samenstellingen, fysica, chunktickets, handbediening, TIMS, ATP en uitvoering |
-| STCS | **4.3.5** | Infrastructuur, grafiek, lokalisatie, bezetting, reservering, MA en rijwegarbitrage |
-| SkyATO-Lite / SAL | **0.5.0** | Exploitatieplannen, oproepen, haltes, passagierstitels, depot en overdracht; geen directe entiteitsbediening |
-| SkyPCC / PCC | **2.4.1** | Webkaarten, depotlijsten en gecontroleerde verkeersleiding |
+| SkyworldTrainAPI / STA | **2.9.2** | Getypeerde contracten, telemetrie en bedieningsdiensten |
+| SkyTrainFolia / STF | **5.1.4** | Samenstellingen, fysica, chunktickets, handbediening, TIMS, ATP en uitvoering |
+| STCS | **4.3.6** | Infrastructuur, grafiek, lokalisatie, bezetting, reservering, MA en rijwegarbitrage |
+| SkyATO-Lite / SAL | **0.8.0** | Exploitatieplannen, oproepen, haltes, passagierstitels, depot en overdracht; geen directe entiteitsbediening |
+| SkyPCC / PCC | **2.6.4** | Webkaarten, depotlijsten en gecontroleerde verkeersleiding |
 
 **[NIEUW · 2026-11-21]** Opgeleverd: SAL-ritten en depotbewegingen, handmatig/automatisch overdragen, incrementele RailGraph, uitvoerbare MA/ATP-weergave en afzonderlijke PCC-exploitatiekaart. SAL heeft blauw `[SkyATO-Lite]`, STF grijs en STCS geel. Oude standaardprefixen migreren; eigen prefixen blijven. De versiepagina toont SAL en de juiste ATP-status.
 
-**[GEWIJZIGD · 2026-11-21]** `<lijn>:up|down`-voorkeursrichting, volledige enkelsporige sectiereservering, algemeen zoeken met meerdere tussentijdse keerbewegingen en de Python-daemon zijn uitsluitend ontwerp. De huidige depotplanner vergelijkt beide startrichtingen bij stilstand, geen willekeurige meermaals kerende route.
+~~**[GEWIJZIGD · 2026-11-21]** `<lijn>:up|down`-voorkeursrichting, volledige enkelsporige sectiereservering, algemeen zoeken met meerdere tussentijdse keerbewegingen en de Python-daemon zijn uitsluitend ontwerp. De huidige depotplanner vergelijkt beide startrichtingen bij stilstand, geen willekeurige meermaals kerende route.~~
+
+**[BIJGEWERKT · SAL 0.8.0]** Begrensde ophaal-/depotroutes met maximaal4 omkeringen zijn geïmplementeerd. Up/down-voorkeuren, volledige enkelsporige reservering, onbeperkt rangeren en een Python-planningsdaemon blijven ontwerp. [Details](doc/SAL-MANEUVERS-AND-HANDOVER.en.md)
 
 [TRAFFIC-PLANNING-DAEMON-DESIGN](doc/TRAFFIC-PLANNING-DAEMON-DESIGN.md)
 
@@ -98,11 +139,11 @@ Distributie van2026-11-24, gebaseerd op de vorige uitgebreide Manuel en de defin
 5. Wis nooit registers voor een update. SHA256 controleert bestanden. Broncode onder Source en alle gelinkte documenten/afbeeldingen zijn bijgevoegd.
 
 ```text
-SkyworldTrainAPI-2.7.0.jar
-SkyTrainFolia-5.0.2.jar
-STCS-4.3.5.jar
-SkyATO-Lite-0.5.0.jar
-SkyPCC-2.4.1.jar
+SkyworldTrainAPI-2.9.2.jar
+SkyTrainFolia-5.1.4.jar
+STCS-4.3.6.jar
+SkyATO-Lite-0.8.0.jar
+SkyPCC-2.6.4.jar
 ```
 
 [SHA256](../Latest/SHA256.json) · [LICENSE](LICENSE) · [ASSET-LICENSE](ASSET-LICENSE.md)
@@ -450,151 +491,63 @@ De scanafstand is niet de MA-vooruitkijkafstand. Lange secties vereisen passende
 
 <a id="section-8"></a>
 
-## 8. SAL-lijnen, borden en bestuursoverdracht
+## 8. SAL — Openbare haltes en gedeelde toewijzing
 
-**[NIEUW · 2026-11-21]** Eén oproep geeft één rit, geen eindeloze lus of dienstregeling. Eerste/laatste bezoek zijn stations; herhaling mag. Bind tussenliggende bakens/wissels om vertakkingen eenduidig te maken. SAL maakt geen trein aan: eerst STF-samenstelling en depot.
+**[BREKENDE WIJZIGING · 2026-11-26]** station-regel4 is een unieke haltenaam; plaatsing voegt niets meer toe aan een lijn. awake-regel3 is de lijn en regel4 de vertrekhalte. Oude awake-borden blijven uitgeschakeld tot herschrijven. Oude station-borden krijgen unieke namen: controleer /sal station list. Depotborden en bestaande voertuiggroepen blijven behouden.
 
-### Commando en selectie
+Nieuwe lijnen gebruiken GLOBAL met optionele voorkeursgroepen. RESTRICTED vereist minstens één toegestane groep; oude lijnen houden deze beperking. PCC toont openbare haltes, modus, voorkeurstijd, ophaallimiet en wachtrij/beslissingen.
 
-1. Maak Line1 in de vertrekrichting, of stel de windrichting in.
-2. Plaats eerste station en bind apparatuur in volgorde. Meerdere kandidaten binnen8blokken: choose binnen60seconden; expliciete UUID/station ID mag.
-3. Nieuwe stations worden op plaatsingsvolgorde toegevoegd. Controleer list; remove verwijdert bezoek vanaf index1. Bind het eerste station opnieuw als eindpunt.
-4. reverse na een stationbinding keert na dat bezoek; geen automatische omkering op elke willekeurige plek.
-5. preview duurt twee minuten, groen bij gesloten route, anders rood. Groen is geen vrije baan of MA. validate bewaart validatie; publish maakt oproepen mogelijk.
-~~6. Een lijn met taak is niet bewerkbaar. Alleen gewijzigde afhankelijkheden vereisen hercontrole; ongerelateerde grafiekwijzigingen houden publicatie.~~
+Registreer openbare station/depot-borden, open PCC met het bestaande beheertoken, kies apparaten, richting en bezoekvolgorde en voer Opslaan→Valideren→Publiceren uit. GLOBAL heeft optionele voorkeuren; RESTRICTED vereist groepen. Gelijktijdig spel/PCC-bewerken bevriest beide kanten tot handmatige oplossing.
 
-**[NIEUW / GEWIJZIGD]** Eerst depot registreren. Klik bakens, wissels, gerichte graafranden en stations van deze lijn; wijzig volgorde, wachttijd en keren zonder borden te herschrijven. Opslaan, controleren en publiceren zijn aparte stappen. Lopende taken behouden hun eigen gepubliceerde versie.
-7. Plaats depot/snelheid/message, maak en bind trein en roep via knop/awake.
+| Sign | 1 | 2 | 3 | 4 |
+| --- | --- | --- | --- | --- |
+| Depot | [SAL] | depot | maintown | L5-1 |
+| Public stop | [SAL] | station | 15 | MainStart |
+| Call | [SAL] | awake | MainTour | MainStart |
+| Title | [SAL] | message | Welcome | 5 |
+| Cruise | [SAL] | property | v_target | 40kmh |
+
+`[SkyATOL]` = `[SAL]`.
+
+Verwijderde oude syntaxis: ~~station: 15 / Line1 (route ownership)~~; ~~awake: maintown / Line1~~; ~~/sal awake maintown Line1~~.
+
+Oproepen bij B verandert A→B→C→A in B→C→A→B, gevolgd door depotterugkeer. Gebruik naam@visitUUID uit PCC bij herhaalde bezoeken; het laatste dubbele beginpunt sluit alleen de lus. Lopende taken behouden hun publicatie.
 
 ```text
-/sal route create Line1
-/sal route direction Line1 east
-/sal route bind Line1
+/sal station list
+/sal route create MainTour
+/sal route direction MainTour east
+/sal route bind MainTour <deviceUUID>
 /sal route choose 1
-/sal route bind Line1 <deviceUUID>
-/sal route bind Line1 <stationID> reverse
-/sal route list Line1
-/sal route remove Line1 <index>
-/sal route preview Line1
-/sal route preview Line1 off
-/sal route validate Line1
-/sal route publish Line1
-```
-
-### Borden per regel
-
-`[SAL]` = `[SkyATOL]`
-
-#### depot
-
-```text
-[SAL]
-depot
-maintown
-L1
-```
-
-depot: regel3 maintown, regel4 plaats L1. L2/L3 elk eigen bord, eventueel verspreid. Depot is geen vertrekstation. Behalve awake koppelen aan een geregistreerde RailGraph-spoorkolom.
-
-#### station
-
-```text
-[SAL]
-station
-15
-Line1
-```
-
-station: regel3 wachttijd in seconden, regel4 SAL-lijn. Eerst lijn maken. Geen apart naamveld; PCC toont lijn en volgorde.
-
-#### awake
-
-```text
-[SAL]
-awake
-maintown
-Line1
-```
-
-awake: regel3 depot, regel4 lijn. Stijgende redstoneflank op bord/steun roept; spoor eronder niet nodig. Permanente voeding/start roept niet, dubbele oproepen worden samengevoegd.
-
-#### property / v_target
-
-```text
-[SAL]
-property
-V_target
-36km/h
-```
-
-property alleen V_target met snelheid regel4. v_target kort: snelheid regel3, regel4 leeg. km/h, kmh, m/s, m/t, b/t, mph; geen eenheid=blokken/tick. Voertuig-/treinlimiet en ATP blijven gelden.
-
-```text
-[SkyATOL]
-v_target
-36km/h
-
-```
-
-#### message
-
-```text
-[SAL]
-message
-Skyworld
-5
-```
-
-message: letterlijke tekst regel3, seconden regel4. Centrale Title voor eigen passagiers; nieuwe tekst overschrijft direct, geen wachtrij of commando-uitvoering.
-
-### Treinen en uitvoering
-
-**[GEWIJZIGD]** Cirno — SAL
-
-Beheerder in samengestelde stilstaande trein stelt home in: depot, geen vaste L1. Nieuwe bestuurderloze trein kan op zijn depotmarkering worden geduwd voor langzame STF-parkeerovername. Oproep vereist verse complete waarneming, geen TIMS-houding, menselijke bestuurder of andere taak.
-
-```text
-/st create demo 6
+/sal route list MainTour
+/sal route remove MainTour 3
+/sal route supply MainTour global 30 120
+/sal route depot MainTour maintown
+/sal route depot MainTour none
+/sal route preview MainTour
+/sal route validate MainTour
+/sal route publish MainTour
+/sal route close MainTour
+/sal route resolve MainTour DISCARD
+/sal route retire MainTour
+/sal route delete MainTour
 /sal train home maintown
-/sal train home
-/sal awake maintown Line1
+/sal awake MainTour MainStart
 /sal status
-```
-
-Oproep→uit depot→eerste station→rit/haltes→laatste station→passende plaats reserveren→terug en stoppen. Ook zonder instappers één rit. Passagiers mogen mee terug; volgende ronde vraagt nieuwe oproep. Geschikte trein van dezelfde lijn nog op eerste station wordt hergebruikt: terugkeer annuleren, zo nodig veilig keren, volledige wachttijd opnieuw. Niet na vertrek of storing.
-
-Route via RailGraph, onafhankelijk van huidige fysieke wisselstand. STCS legt om via STA/STF. Keren: oude MA vrijgeven, stilstand/omkering bevestigen, opnieuw plannen vanaf echte voorste wagen. Geen ruimte/plaats/pad: wachten.
-
-### Handmatige/automatische overdracht
-
-Automatisch→handmatig: alleen complete stilstaande PARKED-depottrein zonder taak/storingshoud met `/sal release`, daarna wachten en `/st drive` in eindwagen. Niet onderweg naar depot.
-
-Handmatig→automatisch: bestuurderslease,3seconden volledig stil op geldige plaats, SAL bevestigen, binnen30seconden expliciet `/st release` of tweede knop. Werkelijk depot wordt home; geen direct vertrek.
-
-Alleen release, uitstappen, verbreken, bewegen, andere bestuurder/plaats of verlopen bevestiging draagt niet over. Handmatige toestand blijft bewaard. Rechten: skyatolite.driver+skytrain.use; beheer skyatolite.admin.
-
-```text
-/sal release
-/st drive
-```
-
-### Lege treinen en storingen
-
-```text
 /sal stop <trainUUID>
 /sal resume <trainUUID>
 /sal finish <trainUUID>
 ```
 
-stop houdt; resume na controle herstelt eerst terugkeer; finish vraagt betrouwbare positie en complete stilstand voor MA-vrijgave/einde. Parameter=trein-UUID.
+Na standaard500ms wordt eerst een passende ophaaltaak met dezelfde versie/vertrekvisit hergebruikt; anders volgt maximale koppeling tegen minimale kosten. Bereikbaar spoor, obstakels, verse volledige waarneming, bestuurder en taken zijn harde eisen. Kosten: geschatte ophaalseconden + toeslag buiten voorkeur (30s) + optionele voorraadtoeslag; limiet120s. Wachttijd weegt mee; na120s verloopt de aanvraag met reden.
 
-STF-tickets zonder passagier; asynchroon laden en tickets op eigenaarregio. Onklaar chunk blokkeert tractie. Lege-serverpauze apart uitschakelen met pause-when-empty-seconds=-1.
+Een aparte JVM-thread rekent alleen met onveranderlijke momentopnamen. SAL controleert bij vastlegging grafiek/publicatie, geldigheid, positie/richting/samenstelling, groep en eigendom opnieuw. STCS verleent als enige MA en rijwegen; STA draagt opdrachten over en STF bedient entiteiten. Geen externe Python-daemon.
 
-TIMS-herstel pas na echte integriteit, maximaal3pogingen; geen leden wijzigen, opnieuw spawnen of lichaamsbezetting wissen. Echte schade handmatig inspecteren.
+Bestaande SAL-wachttreinen hoeven niet opnieuw te worden overgedragen. Een handmatige trein die depot raakt en3s stilstaat krijgt een zescijferige code; /sal handover vraagt die direct aan. Bevestig met /sal handover <code>, daarna voert de bestuurder /st release uit. Alleen vrijgeven is geen toestemming. Na terugkeer: /sal release, daarna /st drive.
 
-Padfout geeft PCC-alarm. Eerst stil, compleet en betrouwbaar gelokaliseerd, dan SR-aanvraag. Elke sectie opnieuw goedkeuren; geen eindeloze automatische SR.
+Herstart annuleert niet-vastgelegde aanvragen; bestaande taken blijven RECOVERY_REQUIRED. Opslag-, lokalisatie- of MA-fouten zijn geen afweegbare kosten. GLOBAL mag naar iedere geschikte groep terugkeren, RESTRICTED alleen naar toegestane groepen. Middenuitlijning en volledige ruimtecontrole blijven. ETA modelleert niet alle congestie/versnelling; geen preventieve herverdeling of willekeurige meervoudige keerbewegingen.
 
-[SAL-MANUAL-HANDOVER](doc/SAL-MANUAL-HANDOVER.md) · [SAL-DEPOT-AND-RETIREMENT](doc/SAL-DEPOT-AND-RETIREMENT.md)
+[Dispatchcontract (Engels)](doc/SAL-SHARED-DISPATCH.en.md) · [Chinese productietesthandleiding](../SkyATO-Lite/TEST.zh.md)
 
 <a id="section-9"></a>
 
@@ -904,3 +857,7 @@ MIT-code/documenten en afzonderlijke beeldrechten bijgevoegd. Presentatie verand
 ~~Destroy verwijdert daadwerkelijk entiteiten. Test op een apart spoor met back-up; een handmatig bestuurde trein hoort niet te worden verwijderd. Test eerst station, daarna spawn/destroy afzonderlijk.~~
 
 [Volledige vorige handleiding — alleen historische referentie](doc/manual-baseline-20261120/README.nl.md)
+
+## Aanvullende bediening · SAL 0.8.0 / STF 5.1.4
+
+Bedek depot met een treindeel en sta3seconden stil, of vraag een code via /sal handover. Bevestig binnen30seconden met /sal handover CODE en daarna /st release. Alleen vrijgeven is geen toestemming. Meldingen worden opnieuw bezorgd en verlopen codes vernieuwd. Ophalen/terugkeer: maximaal4 omkeringen met ruimte voor de hele trein; korte/bezette sporen en beveiliging blijven blokkeren. Na herstart vereisen taken beheerderbevestiging. Chunkwachten bewaart de stand zonder werkelijke tractie; nieuwe neutraal/rem-invoer heeft voorrang.

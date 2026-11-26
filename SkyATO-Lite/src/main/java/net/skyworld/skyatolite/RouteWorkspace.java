@@ -29,9 +29,9 @@ final class RouteWorkspace {
         if(old!=null)return old.getKey().equals(r)?old.getValue():reply(r,"REJECTED","REQUEST_ID_CONFLICT",null,graphRevision);
         Reply result;
         try{result=process(r,now,references,validate,inUse,graphRevision);}
-        catch(IllegalArgumentException|IllegalStateException ex){result=reply(r,"REJECTED",Objects.toString(ex.getMessage(),"INVALID_REQUEST"),null,graphRevision);}
+        catch(IllegalArgumentException|IllegalStateException ex){result=reply(r,"REJECTED",Objects.toString(ex.getMessage(),"INVALID_REQUEST"),null,graphRevision);if(ex instanceof RouteValidationFailure failure)result=new Reply(result.requestId(),result.status(),result.reason(),result.session(),result.line(),result.graphRevision(),result.preview(),result.closed(),sequence,List.of(failure.issue));}
         if(!r.action().equals("AUTH")&&(result.status().equals("APPLIED")||result.status().equals("CONFLICT")))sequence++;
-        result=new Reply(result.requestId(),result.status(),result.reason(),result.session(),result.line(),result.graphRevision(),result.preview(),result.closed(),sequence);
+        result=new Reply(result.requestId(),result.status(),result.reason(),result.session(),result.line(),result.graphRevision(),result.preview(),result.closed(),sequence,result.issues());
         if(receipts.size()>=512)receipts.remove(receipts.keySet().iterator().next());
         receipts.put(r.requestId(),Map.entry(r,result));return result;
     }
@@ -83,6 +83,6 @@ final class RouteWorkspace {
         }
         return reply(r,"APPLIED",r.action(),session.token,graphRevision);
     }
-    private void requireDefinition(Request r){if(r.definition()==null||!r.line().equals(r.definition().name()))throw new IllegalArgumentException("DEFINITION_REQUIRED");if(r.definition().depots().isEmpty())throw new IllegalArgumentException("DEPOT_REQUIRED");}
+    private void requireDefinition(Request r){if(r.definition()==null||!r.line().equals(r.definition().name()))throw new IllegalArgumentException("DEFINITION_REQUIRED");if(r.definition().dispatchPolicy().supplyMode().equals("RESTRICTED")&&r.definition().depots().isEmpty())throw new IllegalArgumentException("DEPOT_REQUIRED");}
     private Reply reply(Request r,String status,String reason,UUID token,long graphRevision){return new Reply(r.requestId(),status,reason,token,line(r.line()),graphRevision,List.of(),false);}
 }

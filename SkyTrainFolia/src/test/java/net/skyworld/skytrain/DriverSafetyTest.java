@@ -4,6 +4,14 @@ import java.util.UUID;
 
 public final class DriverSafetyTest {
     public static void main(String[] args) {
+        var waiting=new Train(UUID.randomUUID(),"direction",.4,1,1.1);waiting.operatingMode=OperatingMode.SB;waiting.protectionMode=ProtectionMode.ACTIVE;
+        var waitingMember=UUID.randomUUID();waiting.addMember(waitingMember);for(long at:new long[]{0,1000})waiting.tims.evaluate(waiting.members(),java.util.List.of(new TrainIntegrityMonitor.Sample(waitingMember,"w",0,0,0,at,"OBSERVED")),java.util.List.of(),1.1,at);
+        waiting.reverser=Reverser.NEUTRAL;assert !DriverSafety.defaultFsReady(waiting,1000):"Declaring a driver is not selecting direction";
+        waiting.reverser=Reverser.FORWARD;assert DriverSafety.defaultFsReady(waiting,1000);
+        waiting.reverser=Reverser.BACKWARD;assert DriverSafety.defaultFsReady(waiting,1000);
+        waiting.reverser=Reverser.NEUTRAL;assert !DriverSafety.defaultFsReady(waiting,1000):"Returning to neutral cannot request default FS";
+        waiting.reverser=Reverser.FORWARD;waiting.operatingMode=OperatingMode.TR;assert !DriverSafety.defaultFsReady(waiting,1000);
+        waiting.operatingMode=OperatingMode.SB;waiting.protectionMode=ProtectionMode.ISOLATED;assert !DriverSafety.defaultFsReady(waiting,1000);
         for (int slot = -1; slot <= 9; slot++)
             assert DriverSafety.neutralHotbarSlot(slot) == (slot == 4) : "Only player-facing slot 5 may enable hotbar controls";
         UUID driver = UUID.randomUUID(), passenger = UUID.randomUUID(), seat = UUID.randomUUID();

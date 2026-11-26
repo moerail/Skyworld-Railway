@@ -3,6 +3,11 @@ package net.skyworld.skytrain;
 import java.util.UUID;
 
 final class DriverSafety {
+    static boolean defaultFsReady(Train train,long now) {
+        return train.reverser!=Reverser.NEUTRAL && train.operatingMode==OperatingMode.SB
+            && train.protectionMode==ProtectionMode.ACTIVE && !train.tims.view(now).brakeHeld()
+            && !train.activeAtp.releasePending();
+    }
     static boolean neutralHotbarSlot(int slot) { return slot == 4; }
     static boolean sameSession(UUID expected, UUID current) {
         return expected != null && expected.equals(current);

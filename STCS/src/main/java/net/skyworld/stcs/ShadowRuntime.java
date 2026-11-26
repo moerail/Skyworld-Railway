@@ -1035,7 +1035,11 @@ final class ShadowRuntime implements ShadowAuthorityService, net.skyworld.sta.ap
             var holders=maPoints.entrySet().stream().filter(e->e.getValue().contains(request.switchId().toString()))
                     .map(Map.Entry::getKey).toList();
             var brake=brakeSource.get();
-            if(holders.size()==1 && brake!=null && stoppedForDispatch(holders.getFirst())
+            var automatic=automaticPointLeases.get(request.requestId());
+            // Automatic alignment must queue behind another train's MA. Only an
+            // explicit dispatcher operation may withdraw a different train's route.
+            if(holders.size()==1 && (automatic==null||automatic.train().equals(holders.getFirst()))
+                    && brake!=null && stoppedForDispatch(holders.getFirst())
                     && !dispatcherSuspended.containsKey(holders.getFirst()) && pointRejection(request,true)==null) {
                 UUID train=holders.getFirst();
                 pendingPoints.put(request.switchId(),request);

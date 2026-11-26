@@ -1,5 +1,5 @@
 name: SkyPCC
-version: 2.4.1
+version: 2.6.4
 main: net.skyworld.skypcc.SkyPccPlugin
 api-version: '1.13'
 folia-supported: true
